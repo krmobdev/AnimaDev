@@ -95,7 +95,7 @@ def remote_label(value):
     match=re.fullmatch(r'https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?',value)
     return 'github.com/'+match.group(1) if match else 'Remote скрыт: нестандартный адрес или данные авторизации'
 
-def inspect(root,home=HOME,git=None):
+def inspect(root,home=HOME,git=None,branches=False):
     root=pathlib.Path(root)
     if not permitted(root,home):return None
     marker=root/'.git'
@@ -129,7 +129,7 @@ def inspect(root,home=HOME,git=None):
             p.wait();raise
         finally:selector.close();p.stdout.close()
     jid='animaquiz' if root==pathlib.Path(home)/'quizapp' else hashlib.sha256(str(root).encode()).hexdigest()[:32]
-    result=dict(id=jid,name='AnimaQuiz' if jid=='animaquiz' else root.name[:80],path=str(root),branch='',commit='',remote='',dirty=None,error='',worktree=worktree)
+    result=dict(id=jid,name='AnimaQuiz' if jid=='animaquiz' else root.name[:80],path=str(root),branch='',commit='',remote='',dirty=None,error='',worktree=worktree,repository_path=str(config_root.parent))
     try:
         for config in (config_root/'config',marker.parent/'.git/config.worktree'):
             if config.exists() and (config.is_symlink() or config.stat().st_size>65536):raise ValueError('CONFIG_DENIED')
@@ -153,6 +153,25 @@ def inspect(root,home=HOME,git=None):
         code,changes=call(['status','--porcelain=v1','-z','--untracked-files=all'])
         if code:raise ValueError('GIT_FAILED')
         result['dirty']=bool(changes)
+        if branches:
+            code,default=call(['symbolic-ref','--quiet','refs/remotes/origin/HEAD'])
+            confirmed=code==0 and default.startswith('refs/remotes/origin/') and call(['show-ref','--verify','--quiet',default])[0]==0
+            result['default_branch']=default.removeprefix('refs/remotes/origin/') if confirmed else ''
+            # Remote HEAD is evidence; main/master names are never guessed.
+            code,rows=call(['for-each-ref','--count=41','--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)','refs/heads','refs/remotes/origin'])
+            if code:raise ValueError('GIT_FAILED')
+            result['branches']=[]
+            raw=rows.splitlines()
+            for row in raw[:40]:
+                parts=row.split('\t')
+                if len(parts)!=3 or not re.fullmatch('[0-9a-f]{40,64}',parts[1]):continue
+                ref,sha,date=parts
+                if ref=='refs/remotes/origin/HEAD':continue
+                local=ref.startswith('refs/heads/')
+                name=ref.removeprefix('refs/heads/') if local else ref.removeprefix('refs/remotes/origin/')
+                result['branches'].append(dict(name=name[:200],commit=sha,date=date[:40],local=local,active=local and name==result['branch'],default=bool(result['default_branch']) and name==result['default_branch']))
+            result['branches_limited']=len(raw)>40
+            result['branches'].sort(key=lambda b:(not b['default'],not b['active'],not b['local'],b['name']))
     except (OSError,subprocess.TimeoutExpired,ValueError):result['error']='Метаданные недоступны или конфигурация требует ручной проверки'
     return result
 
@@ -166,12 +185,12 @@ def catalog(home=HOME,git=None):
         elif len(issues)<40:issues.append(dict(path=str(root),reason='.git или worktree не прошёл проверку безопасности'))
     return dict(projects=entries,issues=issues,visited=visited,limited=limited or bool(issues),depth=MAX_DEPTH,scanned_at=time.time())
 
-def explicit(path,home=HOME,git=None):
+def explicit(path,home=HOME,git=None,branches=False):
     value=str(path)
     if value.startswith('~/'):value=str(home)+value[1:]
     root=pathlib.Path(value)
     if not permitted(root,home):return dict(projects=[],issues=[dict(path='',reason='Путь запрещён: разрешён HOME, глубина до 6, без скрытых/служебных каталогов и ссылок.')])
-    item=inspect(root,home,git)
+    item=inspect(root,home,git,branches=branches)
     return dict(projects=[item] if item else [],issues=[] if item else [dict(path=str(root),reason='Безопасный Git-репозиторий или worktree не найден.')])
 
 def environment():
@@ -190,8 +209,8 @@ def environment():
 
 def main():
     request,mode=sys.argv[1:3]
-    if not re.fullmatch('[a-f0-9]{32}',request) or mode not in ('CATALOG','ENV','PATH') or len(sys.argv)!=(4 if mode=='PATH' else 3):return 1
-    try: data=catalog() if mode=='CATALOG' else explicit(sys.argv[3]) if mode=='PATH' and len(sys.argv)==4 else environment()
+    if not re.fullmatch('[a-f0-9]{32}',request) or mode not in ('CATALOG','ENV','PATH','BRANCHES') or len(sys.argv)!=(4 if mode in ('PATH','BRANCHES') else 3):return 1
+    try: data=catalog() if mode=='CATALOG' else explicit(sys.argv[3],branches=mode=='BRANCHES') if mode in ('PATH','BRANCHES') and len(sys.argv)==4 else environment()
     except Exception:
         print(json.dumps(dict(request_id=request,mode=mode,ok=False,message='Не удалось прочитать разрешённые каталоги Termux.')));return 0
     print(json.dumps(dict(request_id=request,mode=mode,ok=True,data=data),ensure_ascii=False));return 0

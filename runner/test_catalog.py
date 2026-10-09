@@ -132,3 +132,32 @@ class CatalogTests(unittest.TestCase):
         self.run_git('config','core.fsmonitor',str(hook))
         r=catalog.inspect(self.repo,self.home,self.git)
         self.assertEqual(r['error'],'');self.assertFalse(marker.exists())
+
+    def test_common_directory_groups_linked_worktree(self):
+        linked=self.home/'linked';self.run_git('worktree','add','-b','linked',str(linked))
+        normal=catalog.inspect(self.repo,self.home,self.git);worktree=catalog.inspect(linked,self.home,self.git)
+        self.assertEqual(normal['repository_path'],str(self.repo));self.assertEqual(worktree['repository_path'],normal['repository_path'])
+    def test_copy_has_distinct_repository_identity(self):
+        copy=self.home/'copy';self.make_nested(copy)
+        self.assertNotEqual(catalog.inspect(copy,self.home,self.git)['repository_path'],catalog.inspect(self.repo,self.home,self.git)['repository_path'])
+    def test_default_branch_from_origin_head_not_name_guess(self):
+        self.run_git('update-ref','refs/remotes/origin/trunk','HEAD')
+        self.run_git('symbolic-ref','refs/remotes/origin/HEAD','refs/remotes/origin/trunk')
+        r=catalog.inspect(self.repo,self.home,self.git,branches=True)
+        self.assertEqual(r['default_branch'],'trunk');self.assertTrue(r['branches'][0]['default']);self.assertEqual(r['branches'][0]['name'],'trunk')
+        self.assertTrue(any(b['active'] for b in r['branches']));self.assertTrue(all(b['date'] and len(b['commit'])==40 for b in r['branches']))
+    def test_absent_remote_head_is_unknown(self):
+        self.run_git('branch','main')
+        self.assertEqual(catalog.inspect(self.repo,self.home,self.git,branches=True)['default_branch'],'')
+        self.run_git('symbolic-ref','refs/remotes/origin/HEAD','refs/remotes/origin/missing')
+        self.assertEqual(catalog.inspect(self.repo,self.home,self.git,branches=True)['default_branch'],'')
+    def test_branch_view_does_not_checkout_or_mutate(self):
+        (self.repo/'local').write_text('preserve')
+        branch=self.run_git('branch','--show-current');sha=self.run_git('rev-parse','HEAD')
+        r=catalog.explicit(str(self.repo),self.home,self.git,branches=True)
+        self.assertTrue(r['projects'][0]['dirty']);self.assertEqual(branch,self.run_git('branch','--show-current'));self.assertEqual(sha,self.run_git('rev-parse','HEAD'));self.assertEqual('preserve',(self.repo/'local').read_text())
+    def test_branch_count_limit_is_explicit(self):
+        for i in range(45):self.run_git('branch','fixture'+str(i))
+        r=catalog.inspect(self.repo,self.home,self.git,branches=True)
+        self.assertLessEqual(len(r['branches']),40);self.assertTrue(r['branches_limited'])
+

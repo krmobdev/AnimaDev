@@ -13,17 +13,17 @@ class CatalogGateway(private val context:Context) {
     val prefs=context.getSharedPreferences("catalog_v1",Context.MODE_PRIVATE)
     fun expire() { if(prefs.getBoolean("pending",false) && System.currentTimeMillis()-prefs.getLong("sent",0)>75_000)prefs.edit().putBoolean("pending",false).putString("message","Ответ задержался. Повторите безопасное чтение.").remove("request").commit() }
     fun read(mode:String,path:String="") {
-        expire();if(mode !in setOf("CATALOG","ENV","PATH") || prefs.getBoolean("pending",false))return
-        if(mode=="PATH" && !ProjectPolicy.permittedPath(path.replace("~/",ProjectPolicy.HOME+"/"))) { prefs.edit().putString("message","Путь запрещён политикой безопасности.").apply();return }
+        expire();if(mode !in setOf("CATALOG","ENV","PATH","BRANCHES") || prefs.getBoolean("pending",false))return
+        if(mode in setOf("PATH","BRANCHES") && !ProjectPolicy.permittedPath(path.replace("~/",ProjectPolicy.HOME+"/"))) { prefs.edit().putString("message","Путь запрещён политикой безопасности.").apply();return }
         val id=UUID.randomUUID().toString().replace("-","")
         val source=context.assets.open("catalog/catalog.py").bufferedReader().use { it.readText() }
-        if(!prefs.edit().putString("request",id).putString("mode",mode).putLong("sent",System.currentTimeMillis()).putBoolean("pending",true).putString("message","Читаем Termux…").commit())return
+        if(!prefs.edit().putString("request",id).putString("mode",mode).putString("path",path.replace("~/",ProjectPolicy.HOME+"/")).putLong("sent",System.currentTimeMillis()).putBoolean("pending",true).putString("message","Читаем Termux…").commit())return
         val target=Intent(context,CatalogReceiver::class.java).setAction("com.animacode.animadev.CATALOG").setData(Uri.parse("animadev://catalog/$id"))
         val callback=PendingIntent.getBroadcast(context,id.hashCode(),target,PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_MUTABLE)
         val intent=Intent("com.termux.RUN_COMMAND").apply {
             setClassName("com.termux","com.termux.app.RunCommandService")
             putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
-            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",if(mode=="PATH")arrayOf("-c",source,id,mode,path) else arrayOf("-c",source,id,mode))
+            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",if(mode in setOf("PATH","BRANCHES"))arrayOf("-c",source,id,mode,path) else arrayOf("-c",source,id,mode))
             putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
             putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
             putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
@@ -43,9 +43,14 @@ class CatalogReceiver:BroadcastReceiver() {
             val out=result.getString("stdout","") ?: "";require(out.length<=40_000)
             val j=JSONObject(out);require(j.getString("request_id")==id && j.getString("mode")==prefs.getString("mode","") && result.getInt("exitCode")==0 && result.getInt("err")==-1 && j.getBoolean("ok"))
             val data=j.getJSONObject("data");val editor=prefs.edit().putBoolean("pending",false).remove("request").putString("message","Обзор обновлён")
-            if(j.getString("mode") in setOf("CATALOG","PATH")) {
+            if(j.getString("mode")=="BRANCHES") {
+                val a=data.getJSONArray("projects");require(a.length()<=1)
+                if(a.length()==1)require(a.getJSONObject(0).getString("path")==prefs.getString("path","") && (a.getJSONObject(0).optJSONArray("branches")?.length() ?: 0)<=40)
+                editor.putString("branches",data.toString())
+            } else if(j.getString("mode") in setOf("CATALOG","PATH")) {
                 val a=data.getJSONArray("projects");require(a.length()<=40)
                 val projects=buildList { for(i in 0 until a.length())add(LocalProject.parse(a.getJSONObject(i))) }
+                if(j.getString("mode")=="PATH")require(projects.all {it.path==prefs.getString("path","")})
                 ProjectStore(context).update(projects)
                 editor.putString("catalog",data.toString())
             } else editor.putString("environment",data.toString())

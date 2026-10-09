@@ -39,13 +39,17 @@ import org.json.JSONObject
     var explicitPath by rememberSaveable { mutableStateOf("") };var showIssues by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(Unit) { val l=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,_->generation++ };store.prefs.registerOnSharedPreferenceChangeListener(l);onDispose { store.prefs.unregisterOnSharedPreferenceChangeListener(l) } }
     val projects=remember(generation) { store.all() };val info=rememberCatalogRecord(context);val record=rememberRepoRecord(context)
+    val registeredGroups=ProjectGrouping.groups(projects.map {ProjectIdentity(it.id,it.path,it.repositoryPath,it.worktree)})
+    val primaryProjects=registeredGroups.mapNotNull {g->projects.find {it.id==g.first().id}}
     val catalog=info.getJSONObject("catalog");val a=catalog.optJSONArray("projects")
     val found=remember(info.toString(),projects) { buildList { if(a!=null)for(i in 0 until a.length())runCatching { LocalProject.parse(a.getJSONObject(i)) }.getOrNull()?.takeIf { p->projects.none { it.path==p.path } }?.let { add(it) } } }
+    val foundGroups=ProjectGrouping.groups(found.map {ProjectIdentity(it.id,it.path,it.repositoryPath,it.worktree)})
+    val newProjects=foundGroups.mapNotNull {g->found.find {it.id==g.first().id}}.filter {candidate->primaryProjects.none {p->(p.repositoryPath.ifEmpty {p.path})==(candidate.repositoryPath.ifEmpty {candidate.path})}}
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=100.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            item { Text("${projects.size} ${if(projects.size==1)"проект" else "проекта"} в Termux",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(bottom=8.dp)) }
+            item { Text("Репозитории: ${primaryProjects.size} · worktree: ${projects.count {it.worktree}}",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(bottom=8.dp)) }
             if(projects.isEmpty())item { Text("Добавьте существующий Git-репозиторий. Его файлы останутся на месте.",style=MaterialTheme.typography.bodyLarge) }
-            items(projects,key={it.id}) { p ->
+            items(primaryProjects,key={it.id}) { p ->
                 val snapshot=if(p.supported)record.optJSONObject("snapshot") else null
                 var menu by remember { mutableStateOf(false) }
                 val branch=snapshot?.optString("branch")?.ifEmpty { p.branch } ?: p.branch
@@ -72,7 +76,8 @@ import org.json.JSONObject
         LazyColumn(Modifier.fillMaxWidth().imePadding().heightIn(max=640.dp),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             item { Text("Добавить проект",style=MaterialTheme.typography.titleLarge);Text("Из существующих репозиториев Termux",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
             item { Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Text(if(permitted)info.optString("message").ifEmpty { "Поиск ещё не выполнялся" } else "Разрешите Termux в разделе Termux.",Modifier.weight(1f),style=MaterialTheme.typography.bodySmall);IconButton(onClick={gateway.read("CATALOG")},enabled=permitted && !info.optBoolean("pending")){Icon(AppIcons.Refresh,"Повторить поиск")} };if(info.optBoolean("pending"))LinearProgressIndicator(Modifier.fillMaxWidth()) }
-            items(found,key={it.id}) { p ->
+            item { Text("Найдено репозиториев: ${foundGroups.size} · worktree: ${found.count {it.worktree}}",style=MaterialTheme.typography.bodySmall) }
+            items(newProjects,key={it.id}) { p ->
                 Surface(onClick={if(store.add(p)){haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm);add=false}},shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceContainerLow) {
                     Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                         Icon(AppIcons.Folder,null,tint=MaterialTheme.colorScheme.primary)
@@ -85,7 +90,7 @@ import org.json.JSONObject
                     }
                 }
             }
-            if(found.isEmpty() && !info.optBoolean("pending"))item {Text("Новых проектов в последнем поиске нет.",style=MaterialTheme.typography.bodyMedium)}
+            if(newProjects.isEmpty() && !info.optBoolean("pending"))item {Text("Новых проектов в последнем поиске нет.",style=MaterialTheme.typography.bodyMedium)}
             item { SectionLabel("По точному пути");OutlinedTextField(explicitPath,{explicitPath=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Локальный путь")},placeholder={Text("~/projects/MyApp")});FilledTonalButton(onClick={gateway.read("PATH",explicitPath)},enabled=permitted && explicitPath.isNotBlank() && !info.optBoolean("pending"),modifier=Modifier.padding(top=8.dp)){Text("Проверить путь")} }
             item { Text("Поиск в HOME до 6 уровней. Скрытые и служебные каталоги исключены; ссылки не обходятся.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
             val issues=catalog.optJSONArray("issues")
@@ -99,6 +104,9 @@ import org.json.JSONObject
     remove?.let { p->AlertDialog(onDismissRequest={remove=null},title={Text("Убрать проект?")},text={Text("${p.name} исчезнет из списка приложения. Файлы и история останутся в Termux.")},confirmButton={TextButton(onClick={store.remove(p.id);remove=null}){Text("Убрать")}},dismissButton={TextButton(onClick={remove=null}){Text("Отмена")}}) }
 }
 @Composable fun ProjectWorkspace(context:Context,project:LocalProject,onTool:(String)->Unit) {
+    val catalogInfo=rememberCatalogRecord(context).getJSONObject("catalog")
+    val entries=catalogInfo.optJSONArray("projects")
+    val worktrees=buildList {if(entries!=null)for(i in 0 until entries.length())runCatching {LocalProject.parse(entries.getJSONObject(i))}.getOrNull()?.takeIf {it.worktree && it.repositoryPath.isNotEmpty() && it.repositoryPath==(project.repositoryPath.ifEmpty {project.path})}?.let {add(it)}}
     val record=rememberRepoRecord(context);val snap=if(project.supported)record.optJSONObject("snapshot") else null
     val branch=snap?.optString("branch")?.ifEmpty {project.branch} ?: project.branch
     val sha=snap?.optString("local_commit")?.ifEmpty {project.commit} ?: project.commit
@@ -111,6 +119,11 @@ import org.json.JSONObject
             if(project.worktree)Text("Worktree · только просмотр",style=MaterialTheme.typography.labelMedium)
         } } }
         if(active)item { Surface(onClick={onTool(if(record.optString("action")=="TEST")"tests" else "git")},shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.secondaryContainer) { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {Text("${record.optString("action")} · ${MonitorPolicy.label(record.optString("state"),false,false)}",style=MaterialTheme.typography.titleSmall);LinearProgressIndicator(Modifier.fillMaxWidth())} } }
+        item { OutlinedButton(onClick={onTool("branches")},modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Git,null);Spacer(Modifier.width(8.dp));Text("Ветки · просмотр")} }
+        if(worktrees.isNotEmpty())item { Card {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            SectionLabel("Worktree (${worktrees.size})")
+            worktrees.forEach {wt->Text(wt.branch+" · "+wt.commit.take(8),style=MaterialTheme.typography.titleSmall);Text(wt.path.removePrefix(ProjectPolicy.HOME+"/"),style=MaterialTheme.typography.bodySmall);Text(if(wt.dirty==true)"Локальные изменения" else if(wt.dirty==false)"Чисто · только просмотр" else "Не проверено",style=MaterialTheme.typography.labelSmall)}
+        } } }
         item { Column { SectionLabel("Инструменты")
             Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
                 val tools=listOf(Triple("git","Git",AppIcons.Git),Triple("tests","Тесты",AppIcons.Tests),Triple("build","Сборка",AppIcons.Build),Triple("history","История",AppIcons.History))

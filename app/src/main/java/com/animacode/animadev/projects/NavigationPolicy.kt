@@ -12,7 +12,7 @@ data class NavigationState(val section:String="projects",val route:String="list"
         section=="termux"->switchRoot("projects")
         route=="journal"->copy(route=journalParent,job="")
         route=="wait"->copy(route="tests")
-        route in setOf("git","tests","history")->copy(route="workspace",job="")
+        route in setOf("git","tests","history","branches")->copy(route="workspace",job="")
         route=="workspace"->copy(route="list")
         else->null
     }
