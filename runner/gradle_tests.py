@@ -171,7 +171,7 @@ def execute(guard, log, on_process, identity, redact, timeout=TIMEOUT, jid=''):
     try:result['tests']=summary(before,reports(guard.root))
     except ReportError as e:
         if code==0:result['error_code']=e.code
-    after=guard.snapshot();guard.require(after)
+    after=guard.snapshot();guard.require(after,clean=bool(guard.project.get('dynamic')))
     result['snapshot']=after
     if after['branch']!=snapshot['branch'] or after['local_commit']!=snapshot['local_commit']:
         result['error_code']='TEST_STATE_CHANGED'
@@ -234,7 +234,8 @@ def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT
         return dict(state='FAILED',error_code='BUILD_ARTIFACT_INVALID',exit_code=code,snapshot=after)
     if not DOWNLOADS.is_dir() or DOWNLOADS.is_symlink():
         return dict(state='FAILED',error_code='DOWNLOADS_UNAVAILABLE',exit_code=code,snapshot=after)
-    target = DOWNLOADS / ('AnimaQuiz_'+remote[:12]+'_'+jid[:8]+'_debug.apk')
+    stem = re.sub(r'[^A-Za-z0-9_-]+','_',guard.project['name'])[:40].strip('_') or 'AndroidProject'
+    target = DOWNLOADS / (stem+'_'+remote[:12]+'_'+jid[:8]+'_debug.apk')
     tmp = DOWNLOADS / ('.animadev-'+jid+'.part')
     digest=hashlib.sha256()
     try:

@@ -345,7 +345,7 @@ class GitGuard:
 class Engine:
     def __init__(self, root=STATE_ROOT, registry=None):
         self.store = Store(root)
-        self.registry = REGISTRY if registry is None else registry
+        self.registry = dict(REGISTRY if registry is None else registry)
         self.git_executable = FIXED_GIT if registry is None else shutil.which('git')
         module_path = pathlib.Path(__file__).resolve().parent / 'job_monitor.py'
         data = module_path.read_bytes()
@@ -464,7 +464,7 @@ class Engine:
                 module = {'__file__':str(module_path), '__name__':'verified_gradle_tests'}
                 exec(compile(data,str(module_path),'exec'), module)
                 result = (module['execute'](guard,log,
-                    lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact)
+                    lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid=jid)
                     if j['action']=='TEST' else module['execute_debug'](guard,log,
                     lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid))
                 code = result.get('error_code','')
