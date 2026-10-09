@@ -51,16 +51,11 @@ private fun HighlightedLogChunk(chunk:String) {
     val annotated=remember(chunk,scheme) {
         buildAnnotatedString {
             append(chunk)
-            fun mark(regex:Regex,color:Color,bold:Boolean=false) {
-                regex.findAll(chunk).forEach { hit ->
-                    addStyle(SpanStyle(color=color,fontWeight=if(bold)FontWeight.SemiBold else FontWeight.Normal),hit.range.first,hit.range.last+1)
-                }
+            JournalStylePolicy.styles(chunk).forEach { line ->
+                val color=when(line.tone) { LogTone.SUCCESS->success;LogTone.ERROR->scheme.error;LogTone.WARNING->warning;else->scheme.onSurface }
+                if(line.tone!=LogTone.NORMAL)addStyle(SpanStyle(color=color,fontWeight=FontWeight.SemiBold),line.start,line.end)
+                if(line.timestampEnd>line.start)addStyle(SpanStyle(color=if(light)Color(0xFF161616) else Color(0xFFF5F5F5),fontWeight=FontWeight.Bold),line.start,line.timestampEnd)
             }
-            mark(Regex("""\[\d{2}:\d{2}:\d{2}]|\b\d{2}:\d{2}:\d{2}\b|\b\d{2}\.\d{2}\.\d{4}\b|\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{2}\b"""),scheme.onSurfaceVariant)
-            mark(Regex("""\b(?:event|step|command):"""),scheme.primary,true)
-            mark(Regex("""\b(?:SUCCEEDED|BUILD SUCCESSFUL|Успешно)\b""",RegexOption.IGNORE_CASE),success,true)
-            mark(Regex("""\b(?:FAILED|FAILURE|ERROR|EXCEPTION|FATAL)\b""",RegexOption.IGNORE_CASE),scheme.error,true)
-            mark(Regex("""\b(?:WARNING|WARN|предупреждение)\b|(?m)^w:""",RegexOption.IGNORE_CASE),warning,true)
         }
     }
     SelectionContainer { Text(annotated,modifier=Modifier.fillMaxWidth(),fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodySmall,softWrap=true) }
@@ -101,7 +96,7 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
     var displayed by remember { mutableStateOf(emptyList<String>()) }
     LaunchedEffect(text,search) { displayed=withContext(Dispatchers.Default) {
         val filtered=if(search.isEmpty())text else text.lineSequence().filter { it.contains(search,ignoreCase=true) }.joinToString("\n")
-        filtered.ifEmpty { if(search.isNotEmpty())"Совпадений нет" else "Журнал ещё не загружен" }.chunked(3000)
+        filtered.ifEmpty { if(search.isNotEmpty())"Совпадений нет" else "Журнал ещё не загружен" }.let { JournalStylePolicy.chunks(it) }
     } }
     LaunchedEffect(displayed,jobId,view,contentLoaded) {
         if(!positionRestored && contentLoaded && displayed.isNotEmpty()) {
