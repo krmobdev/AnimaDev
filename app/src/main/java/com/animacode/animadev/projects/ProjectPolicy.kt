@@ -10,7 +10,7 @@ object ProjectPolicy {
         return parts.size in 1..6 && parts.none { it.isBlank() || it.startsWith('.') || it in excluded }
     }
     fun supported(id: String,path: String)=id=="animaquiz" && path==QUIZ
-    fun canExecute(id: String,path: String,action: String,worktree:Boolean=false)=!worktree && supported(id,path) && action in setOf("STATUS","CHECK","SYNC","TEST")
+    fun canExecute(id: String,path: String,action: String,worktree:Boolean=false)=!worktree && supported(id,path) && action in setOf("STATUS","CHECK","SYNC","TEST","BUILD_DEBUG")
     fun validId(id: String,path: String)=permittedPath(path) && (if(path==QUIZ) id=="animaquiz" else id.matches(Regex("[a-f0-9]{32}")))
     fun nextSelection(ids: List<String>,selected: String)=selected.takeIf { it in ids } ?: ""
 }

@@ -51,7 +51,7 @@ class RepoResultReceiver : BroadcastReceiver() {
                 val active = j.optJSONObject("active_job")
                 if (code == "JOB_BUSY" && active != null) {
                     check(active.getString("project_id") == RepoGateway.PROJECT)
-                    check(active.getString("action") in setOf("STATUS", "CHECK", "SYNC", "TEST"))
+                    check(active.getString("action") in setOf("STATUS", "CHECK", "SYNC", "TEST", "BUILD_DEBUG"))
                     check(active.getString("job_id").matches(Regex("[a-f0-9]{32}")))
                     record.put("job_id", active.getString("job_id")).put("action", active.getString("action"))
                 }
@@ -61,6 +61,13 @@ class RepoResultReceiver : BroadcastReceiver() {
                 check(RepoPolicy.validJob(record.getString("job_id"), record.getString("action"),
                     job.getString("job_id"), job.getString("action"), job.getString("state")))
                 if (job.getString("state") == "SUCCEEDED") check(job.getInt("exit_code") == 0)
+                if (job.getString("action") == "BUILD_DEBUG" && job.getString("state") == "SUCCEEDED") {
+                    val artifact = job.getJSONObject("artifact")
+                    check(artifact.getString("kind") == "DEBUG_APK" &&
+                        artifact.getString("sha256").matches(Regex("[a-f0-9]{64}")) && artifact.getLong("size") > 1024L)
+                    check(artifact.getString("commit") == job.getJSONObject("snapshot").getString("local_commit"))
+                    record.put("build_job", job)
+                }
                 if (job.getString("action") == "TEST") {
                     val tests = job.optJSONObject("tests")
                     if (tests != null) check(RepoPolicy.validCounts(tests.getLong("total"), tests.getLong("passed"),

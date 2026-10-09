@@ -104,7 +104,7 @@ class MainActivity:ComponentActivity() {
             }
             BackHandler { back() }
             val root=route=="list"
-            val title=when { route=="settings"->SettingsPolicy.toolbarTitle(settingsSection);top=="termux"->"Termux";route=="list"->"Проекты";route=="branches"->"Ветки";route=="git"->"Git";route=="tests"->"Тесты";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
+            val title=when { route=="settings"->SettingsPolicy.toolbarTitle(settingsSection);top=="termux"->"Termux";route=="list"->"Проекты";route=="branches"->"Ветки";route=="git"->"Git";route=="tests"->"Тесты";route=="build"->"Сборка";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
             Scaffold(
                 contentWindowInsets=WindowInsets.safeDrawing,
                 topBar={TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(!root)IconButton(onClick={back()}){Icon(AppIcons.Back,"Вернуться")}},actions={
@@ -125,6 +125,7 @@ class MainActivity:ComponentActivity() {
                     route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
                     route=="branches"->BranchesScreen(context,current,permitted)
                     route=="workspace"->ProjectWorkspace(context,current,onTool={route=it})
+                    route=="build"->BuildScreen(context,current,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent="build";route="journal"})
                     route=="git" || route=="tests"->ProjectTools(context,current,route,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent=route;route="journal"},{route="wait"})
                     route=="history"->if(current.supported)HistoryScreen(context,{id->journalJob=id;journalParent="history";route="journal"}) else UnavailableTool("История", "У этого проекта пока нет заданий AnimaDev.")
                     route=="journal"->if(current.supported)JournalScreen(context,journalJob) else UnavailableTool("Журнал","Нет безопасного профиля этого проекта.")

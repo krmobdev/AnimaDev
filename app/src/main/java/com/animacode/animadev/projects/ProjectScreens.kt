@@ -128,8 +128,8 @@ import org.json.JSONObject
             Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
                 val tools=listOf(Triple("git","Git",AppIcons.Git),Triple("tests","Тесты",AppIcons.Tests),Triple("build","Сборка",AppIcons.Build),Triple("history","История",AppIcons.History))
                 tools.forEachIndexed { index,(id,title,icon)->
-                    val enabled=id!="build" && (project.supported || id=="git")
-                    val subtitle=when(id){"git"->if(project.supported)"Состояние и обновления" else "Метаданные · только просмотр";"tests"->if(project.supported)"Gradle unit-тесты" else "Нет профиля запуска";"history"->if(project.supported)"Задания, результаты и журналы" else "Заданий пока нет";else->"Недоступно · следующий этап"}
+                    val enabled=project.supported || id=="git"
+                    val subtitle=when(id){"git"->if(project.supported)"Состояние и обновления" else "Метаданные · только просмотр";"tests"->if(project.supported)"Gradle unit-тесты" else "Нет профиля запуска";"history"->if(project.supported)"Задания, результаты и журналы" else "Заданий пока нет";else->if(project.supported)"Debug APK · AAB после настройки подписи" else "Нет профиля сборки"}
                     Surface(onClick={onTool(id)},enabled=enabled,color=MaterialTheme.colorScheme.surfaceContainerLow) { ListItem(headlineContent={Text(title,style=MaterialTheme.typography.titleMedium)},supportingContent={Text(subtitle)},leadingContent={Icon(icon,null,tint=if(enabled)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)},trailingContent={if(enabled)Icon(AppIcons.Chevron,null)},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) }
                     if(index<3)HorizontalDivider(Modifier.padding(start=56.dp,end=16.dp),color=MaterialTheme.colorScheme.outlineVariant)
                 }

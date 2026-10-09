@@ -25,8 +25,8 @@ import androidx.compose.ui.unit.dp
         Text(value,style=MaterialTheme.typography.bodyMedium)
     }
 }
-val settingsSections=listOf("appearance" to "Внешний вид","git" to "Проекты и Git","profiles" to "Профили тестирования и сборки","jobs" to "Выполнение заданий и ожидание","notifications" to "Уведомления","files" to "Файлы и загрузки","about" to "О приложении / Диагностика")
-private val descriptions=mapOf("appearance" to "Тема и динамические цвета","git" to "Получение изменений, локальные репозитории","profiles" to "Unit-тесты AnimaQuiz, доступные профили","jobs" to "Предупреждения и защитный предел","notifications" to "Разрешение Android и состояние заданий","files" to "Папка отчётов и загрузок","about" to "Версия, Android и диагностика")
+val settingsSections=listOf("appearance" to "Внешний вид","git" to "Проекты и Git","profiles" to "Профили тестирования и сборки","signing" to "Подпись Release AAB","jobs" to "Выполнение заданий и ожидание","notifications" to "Уведомления","files" to "Файлы и загрузки","about" to "О приложении / Диагностика")
+private val descriptions=mapOf("appearance" to "Тема и динамические цвета","git" to "Получение изменений, локальные репозитории","profiles" to "Тесты и Debug APK","signing" to "Локальный ключ и alias, без передачи паролей","jobs" to "Предупреждения и защитный предел","notifications" to "Разрешение Android и состояние заданий","files" to "Папка отчётов и загрузок","about" to "Версия, Android и диагностика")
 
 @Composable private fun Preference(title:String,value:String,onClick:(()->Unit)?=null,trailing:(@Composable ()->Unit)?=null) {
     ListItem(headlineContent={Text(title)},supportingContent={Text(value)},trailingContent=trailing ?: if(onClick!=null)({Icon(AppIcons.Chevron,null)}) else null,modifier=if(onClick!=null)Modifier.clickable(onClick=onClick) else Modifier)
@@ -48,7 +48,7 @@ private val descriptions=mapOf("appearance" to "Тема и динамическ
         if(section.isEmpty()) {
             item {OutlinedTextField(query,{query=it},label={Text("Поиск настроек")},leadingIcon={Icon(AppIcons.Search,null)},trailingIcon={if(query.isNotEmpty())IconButton(onClick={query=""}){Icon(AppIcons.Close,"Очистить поиск")}},singleLine=true,modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp))}
             if(query.isBlank())settingsSections.forEach {(id,title)->item(key=id) {
-                ListItem(headlineContent={Text(title)},supportingContent={Text(descriptions.getValue(id))},leadingContent={Icon(when(id){"git"->AppIcons.Git;"profiles"->AppIcons.Tests;"jobs"->AppIcons.Waiting;"files"->AppIcons.Folder;"about"->AppIcons.Info;"notifications"->AppIcons.Notifications;else->AppIcons.Palette},null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},modifier=Modifier.clickable{openSection(id)})
+                ListItem(headlineContent={Text(title)},supportingContent={Text(descriptions.getValue(id))},leadingContent={Icon(when(id){"git"->AppIcons.Git;"profiles"->AppIcons.Tests;"signing"->AppIcons.Build;"jobs"->AppIcons.Waiting;"files"->AppIcons.Folder;"about"->AppIcons.Info;"notifications"->AppIcons.Notifications;else->AppIcons.Palette},null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},modifier=Modifier.clickable{openSection(id)})
             }} else {
                 val results=SettingsPolicy.search(query)
                 if(results.isEmpty())item {DetailRow("Ничего не найдено","Попробуйте другое название или описание")}
@@ -66,8 +66,9 @@ private val descriptions=mapOf("appearance" to "Тема и динамическ
             "profiles"->{
                 item {Preference("AnimaQuiz · unit-тесты Debug","test/decomposition-v1 · фиксированный офлайн-профиль",{showCommand=!showCommand})
                     if(showCommand)DetailRow("Команда профиля","bash ./gradlew :app:testDebugUnitTest --offline --no-daemon --rerun-tasks --console=plain")}
-                item {Preference("Профили сборки","APK/AAB пока недоступны")}
+                item {Preference("Профили сборки","Debug APK для AnimaQuiz; Release AAB после защиты секрета")}
             }
+            "signing"->item {SigningSettings(context)}
             "jobs"->{
                 item {Preference("Предупреждать без прогресса","Через $minutes минут",{selector="warning"})}
                 item {Preference("Защитный предел TEST","90 минут. Предупреждение не останавливает процесс; UNKNOWN блокирует повтор.")}

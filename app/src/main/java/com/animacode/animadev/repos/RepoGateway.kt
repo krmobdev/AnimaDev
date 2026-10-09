@@ -94,9 +94,10 @@ class RepoGateway(private val context: Context) {
         val project=com.animacode.animadev.projects.ProjectStore(context).all().find {it.id==projectId && it.path==projectPath} ?: return
         if (!ProjectPolicy.canExecute(projectId,projectPath,action,project.worktree)) return
         val r = store.read()
-        if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked()) return
+        if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST", "BUILD_DEBUG") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked()) return
         if (action == "SYNC" && !maySync(r)) return
         if (action == "TEST" && !mayTest(r)) return
+        if (action == "BUILD_DEBUG" && !mayBuild(r)) return
         val job = id()
         r.put("job_id", job).put("action", action).put("state", "REQUESTED")
             .put("job_runner_sha", sha())
@@ -114,7 +115,7 @@ class RepoGateway(private val context: Context) {
     fun journal(mode: String, job: String, action: String, offset: Long, view: String) {
         val r = store.read()
         if (r.optBoolean("pending") || !r.optBoolean("ready") || r.optString("installed_sha") != sha()) return
-        if (mode !in setOf("LOG", "HISTORY") || !job.matches(Regex("[a-f0-9]{32}")) || action !in setOf("STATUS","CHECK","SYNC","TEST")) return
+        if (mode !in setOf("LOG", "HISTORY") || !job.matches(Regex("[a-f0-9]{32}")) || action !in setOf("STATUS","CHECK","SYNC","TEST","BUILD_DEBUG")) return
         dispatch(mode, job, action, offset, view)
     }
     private fun dispatch(mode: String, target: String = "", targetAction: String = "", offset: Long = 0, view: String = "ALL") {
@@ -175,6 +176,12 @@ class RepoGateway(private val context: Context) {
         val snapshot = r.optJSONObject("snapshot") ?: return false
         return RepoPolicy.mayTest(snapshot.optString("branch"), snapshot.optBoolean("remote_ok"),
             r.optBoolean("ready"), store.blocked() || r.optBoolean("pending"))
+    }
+    fun mayBuild(r: JSONObject): Boolean {
+        val s = r.optJSONObject("snapshot") ?: return false
+        return RepoPolicy.mayBuild(s.optString("branch"),s.optBoolean("dirty",true),s.optBoolean("remote_ok"),
+            r.optBoolean("ready"),store.blocked() || r.optBoolean("pending"),s.optBoolean("checked"),
+            s.optInt("ahead",-1),s.optInt("behind",-1),s.optString("local_commit"),s.optString("remote_commit"))
     }
     fun maySync(r: JSONObject): Boolean {
         val s = r.optJSONObject("snapshot") ?: return false
