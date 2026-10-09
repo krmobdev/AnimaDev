@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.animacode.animadev.termux.*
+import com.animacode.animadev.repos.RepositoriesScreen
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -40,7 +41,18 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = lightColorScheme(
                 primary = Color(0xFF3559D5), background = Color(0xFFF5F6FA),
                 surface = Color.White, onSurface = Color(0xFF192033))) {
-                ProbeScreen()
+                var repositoryTab by remember { mutableStateOf(true) }
+                Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { repositoryTab = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Репозитории") }
+                        TextButton(onClick = { repositoryTab = false }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Связь Termux") }
+                    }
+                    HorizontalDivider()
+                    Box(Modifier.weight(1f)) {
+                        if (repositoryTab) RepositoriesScreen(this@MainActivity, permitted, version) { permitted = gateway.permitted() }
+                        else ProbeScreen()
+                    }
+                }
             }
         }
     }
@@ -75,8 +87,7 @@ class MainActivity : ComponentActivity() {
             state.state == "ERROR" -> "Проверка не подтверждена"
             else -> "Связь не проверена"
         }
-        Scaffold(containerColor = MaterialTheme.colorScheme.background) { inset ->
-            Column(Modifier.fillMaxSize().padding(inset).verticalScroll(rememberScrollState())
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("AnimaDev", style = MaterialTheme.typography.headlineMedium)
@@ -129,9 +140,8 @@ class MainActivity : ComponentActivity() {
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                Text("0.1.0-probe · Без серверов и сетевых запросов", style = MaterialTheme.typography.bodySmall)
+                Text("0.2.0 · Без серверов и сетевых запросов", style = MaterialTheme.typography.bodySmall)
             }
-        }
     }
     @Composable private fun OutputBlock(label: String, output: String) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
