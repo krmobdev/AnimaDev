@@ -2,6 +2,7 @@ package com.animacode.animadev.repos
 
 import android.content.Context
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -88,9 +89,11 @@ fun MonitorSettings(context: Context,embedded:Boolean=false,showNotifications:Bo
         owner.lifecycle.addObserver(listener);onDispose {owner.lifecycle.removeObserver(listener)}
     }
     val permission=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {enabled=context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()}
-    Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Text(if(enabled)"Уведомления разрешены" else "Уведомления отключены",style=MaterialTheme.typography.titleMedium)
-        OutlinedButton(onClick={if(context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)permission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,context.packageName))},modifier=Modifier.fillMaxWidth()) { Text(if(enabled)"Настройки уведомлений" else "Разрешить уведомления") }
-        Text("Отказ не блокирует задания. Уведомление показывает полученное состояние и не гарантирует сохранение процесса Termux.",style=MaterialTheme.typography.bodySmall)
+    Column {
+        ListItem(headlineContent={Text("Уведомления заданий")},supportingContent={Text(if(enabled)"Разрешены · изменить в Android" else "Отключены · разрешить в Android")},trailingContent={Icon(com.animacode.animadev.projects.AppIcons.Chevron,null)},modifier=Modifier.fillMaxWidth().then(Modifier.clickable {
+            if(context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)permission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            else context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,context.packageName))
+        }))
+        Text("Отказ не блокирует задания. Уведомления не гарантируют сохранение процесса Termux.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp))
     }
 }
