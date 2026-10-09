@@ -3,6 +3,12 @@ import org.junit.Assert.*
 import org.junit.Test
 class RepoPolicyTest {
     private fun sync(branch:String="test/decomposition-v1", dirty:Boolean=false, remote:Boolean=true, ahead:Int=0, behind:Int=1, checked:Boolean=true, runner:Boolean=true, blocked:Boolean=false) = RepoPolicy.maySync(branch,dirty,remote,ahead,behind,checked,runner,blocked)
+    @Test fun dynamicProjectAllowedOnItsVerifiedBranch() {
+        assertTrue(RepoPolicy.mayTest("feature/development",true,true,false,"another-project"))
+        assertFalse(RepoPolicy.mayTest("Detached HEAD",true,true,false,"another-project"))
+        assertTrue(RepoPolicy.mayBuild("feature/development",false,true,true,false,true,0,0,"abc","abc","another-project"))
+        assertFalse(RepoPolicy.mayBuild("feature/development",true,true,true,false,true,0,0,"abc","abc","another-project"))
+    }
     @Test fun validFastForwardAllowed() { assertTrue(sync()) }
     @Test fun mainBlocked() { assertFalse(sync(branch="main")) }
     @Test fun masterBlocked() { assertFalse(sync(branch="master")) }

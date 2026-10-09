@@ -2,6 +2,16 @@ package com.animacode.animadev.projects
 import org.junit.Assert.*
 import org.junit.Test
 class ProjectPolicyTest {
+    @Test fun catalogIdentityEnablesOnlyExactGitHubProject() {
+        val path=ProjectPolicy.HOME+"/anima-workspace/AnimaNotes"
+        val id=ProjectPolicy.stableId(path)
+        assertTrue(ProjectPolicy.validId(id,path))
+        assertTrue(ProjectPolicy.canExecute(id,path,"STATUS",false,"github.com/krmobdev/AnimaNotes"))
+        assertTrue(ProjectPolicy.canExecute(id,path,"BUILD_DEBUG",false,"github.com/krmobdev/AnimaNotes"))
+        assertFalse(ProjectPolicy.canExecute(id,path,"TEST",true,"github.com/krmobdev/AnimaNotes"))
+        assertFalse(ProjectPolicy.canExecute(id,path,"TEST",false,"https://evil.invalid/thing"))
+        assertFalse(ProjectPolicy.canExecute("a".repeat(32),path,"TEST",false,"github.com/krmobdev/AnimaNotes"))
+    }
     @Test fun onlyRegisteredQuizCanExecute() { listOf("STATUS","CHECK","SYNC","TEST").forEach { assertTrue(ProjectPolicy.canExecute("animaquiz",ProjectPolicy.QUIZ,it)) } }
     @Test fun otherProjectCannotFallBackToQuiz() { assertFalse(ProjectPolicy.canExecute("other",ProjectPolicy.QUIZ,"TEST"));assertFalse(ProjectPolicy.canExecute("animaquiz",ProjectPolicy.HOME+"/other","SYNC")) }
     @Test fun noBuildOrShellAction() { listOf("BUILD","SHELL","PUSH","RESET","REBASE").forEach { assertFalse(ProjectPolicy.canExecute("animaquiz",ProjectPolicy.QUIZ,it)) } }
