@@ -51,7 +51,7 @@ class CatalogReceiver:BroadcastReceiver() {
                     require(page.getString("path")==prefs.getString("path","") && (page.optJSONArray("branches")?.length() ?: 0)<=34)
                     if(page.optString("error").isNotEmpty()) {
                         editor.putString("message","Список не дочитан: метаданные или лимит чтения. Повторите эту страницу.")
-                        if(offset==0)editor.putString("branches",data.toString())
+                        if(offset==0L)editor.putString("branches",data.toString())
                     } else {
                         require(page.getLong("branches_offset")==offset && page.getLong("branches_next")>=offset)
                         if(offset>0) {
