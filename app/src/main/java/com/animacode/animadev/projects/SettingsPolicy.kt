@@ -19,6 +19,9 @@ object SettingsPolicy {
         SettingEntry("about","diagnostics","Диагностика","Связь Termux и очищенные журналы заданий")
     )
     fun search(query:String)=query.trim().takeIf {it.isNotEmpty()}?.let {q->entries.filter {(it.title+" "+it.description).contains(q,true)}} ?: emptyList()
+    fun toolbarTitle(target:String)=when(section(target)) {
+        "appearance"->"Внешний вид";"git"->"Проекты и Git";"profiles"->"Профили";"jobs"->"Ожидание заданий";"notifications"->"Уведомления";"files"->"Файлы и загрузки";"about"->"О приложении";else->"Настройки"
+    }
     fun section(target:String)=target.substringBefore('/')
     fun index(target:String)=entries.filter {it.section==section(target)}.indexOfFirst {it.id==target.substringAfter('/',"")}.coerceAtLeast(0)
 }
