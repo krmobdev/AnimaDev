@@ -1,4 +1,4 @@
-# AnimaDev · 0.4.0-beta.1
+# AnimaDev · 0.4.0-beta.2
 
 Самостоятельное Android-приложение Kotlin/Compose для локального Git через
 Termux RUN_COMMAND. Единственный профиль: AnimaQuiz, `~/quizapp`,
@@ -104,4 +104,6 @@ Android 13+, Material You, динамические цвета и system/light/d
 Исполнение пока только для AnimaQuiz; другие проекты доступны для просмотра.
 Сборка APK/AAB и обслуживание пакетов явно недоступны.
 Журнал: начало/конец, поиск, копирование, Downloads и Android Sharesheet.
-Отчёт о Beta и приёмка: docs/beta-0.4.0-acceptance.md.
+Отчёт о Beta и приёмка: docs/beta2-acceptance.md.
+
+Beta.2: [иерархия и поиск проектов](docs/beta2-architecture.md).

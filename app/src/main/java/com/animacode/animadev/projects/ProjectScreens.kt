@@ -23,7 +23,7 @@ import org.json.JSONObject
 }
 @Composable fun rememberRepoRecord(context:Context):JSONObject {
     val store=remember { RepoStore(context) };var record by remember { mutableStateOf(store.read()) }
-    DisposableEffect(Unit) { val l=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,_->record=store.read() };store.prefs.registerOnSharedPreferenceChangeListener(l);onDispose { store.prefs.unregisterOnSharedPreferenceChangeListener(l) } }
+    DisposableEffect(Unit) { val l=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,_->record=store.read() };store.prefs.registerOnSharedPreferenceChangeListener(l);record=store.read();onDispose { store.prefs.unregisterOnSharedPreferenceChangeListener(l) } }
     return record
 }
 @Composable fun rememberCatalogRecord(context:Context):JSONObject {
@@ -33,54 +33,96 @@ import org.json.JSONObject
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun ProjectsScreen(context:Context,permitted:Boolean,onOpen:(LocalProject)->Unit) {
+    val haptic=androidx.compose.ui.platform.LocalHapticFeedback.current
     val store=remember { ProjectStore(context) };val gateway=remember { CatalogGateway(context) }
     var generation by remember { mutableIntStateOf(0) };var add by rememberSaveable { mutableStateOf(false) };var remove by remember { mutableStateOf<LocalProject?>(null) }
+    var explicitPath by rememberSaveable { mutableStateOf("") };var showIssues by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(Unit) { val l=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,_->generation++ };store.prefs.registerOnSharedPreferenceChangeListener(l);onDispose { store.prefs.unregisterOnSharedPreferenceChangeListener(l) } }
     val projects=remember(generation) { store.all() };val info=rememberCatalogRecord(context);val record=rememberRepoRecord(context)
-    val a=info.getJSONObject("catalog").optJSONArray("projects")
-    val found=remember(info.toString(),projects) { buildList { if(a!=null) for(i in 0 until a.length())runCatching { LocalProject.parse(a.getJSONObject(i)) }.getOrNull()?.takeIf { p->projects.none { it.path==p.path } }?.let { add(it) } } }
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-            Text("Локальные репозитории",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f))
-            FilledTonalButton(onClick={add=true;if(permitted)gateway.read("CATALOG")}) { Text("+ Добавить") }
-        } }
-        if(projects.isEmpty())item { Text("Добавьте существующий репозиторий Termux. Файлы не копируются.") }
-        items(projects,key={it.id}) { project ->
-            val snap=if(project.supported)record.optJSONObject("snapshot") else null
-            val branch=snap?.optString("branch")?.ifEmpty { project.branch } ?: project.branch
-            val dirty=snap?.optBoolean("dirty") ?: project.dirty
-            val active=project.supported && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
-            Card(onClick={onOpen(project)}) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Icon(BetaIcons.Folder,null,tint=MaterialTheme.colorScheme.primary);Spacer(Modifier.width(12.dp));Text(project.name,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);TextButton(onClick={remove=project}){Text("Убрать")} }
-                    Text(branch.ifEmpty { "Ветка ещё не проверена" },style=MaterialTheme.typography.bodyMedium)
-                    Text(if(active)"Задание: ${MonitorPolicy.label(record.optString("state"),false,false)}" else when(dirty) {true->"Есть локальные изменения";false->"Рабочее дерево чистое";else->"Состояние не проверено"},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    val catalog=info.getJSONObject("catalog");val a=catalog.optJSONArray("projects")
+    val found=remember(info.toString(),projects) { buildList { if(a!=null)for(i in 0 until a.length())runCatching { LocalProject.parse(a.getJSONObject(i)) }.getOrNull()?.takeIf { p->projects.none { it.path==p.path } }?.let { add(it) } } }
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=100.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            item { Text("${projects.size} ${if(projects.size==1)"проект" else "проекта"} в Termux",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(bottom=8.dp)) }
+            if(projects.isEmpty())item { Text("Добавьте существующий Git-репозиторий. Его файлы останутся на месте.",style=MaterialTheme.typography.bodyLarge) }
+            items(projects,key={it.id}) { p ->
+                val snapshot=if(p.supported)record.optJSONObject("snapshot") else null
+                var menu by remember { mutableStateOf(false) }
+                val branch=snapshot?.optString("branch")?.ifEmpty { p.branch } ?: p.branch
+                val dirty=snapshot?.optBoolean("dirty") ?: p.dirty
+                val active=p.supported && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
+                Card(onClick={onOpen(p)},colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
+                    Row(Modifier.fillMaxWidth().padding(start=16.dp,top=12.dp,bottom=12.dp,end=4.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                        Surface(shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.secondaryContainer) { Icon(AppIcons.Folder,null,tint=MaterialTheme.colorScheme.onSecondaryContainer,modifier=Modifier.padding(10.dp)) }
+                        Column(Modifier.weight(1f).padding(horizontal=12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)) {
+                            Text(p.name,style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text(branch.ifEmpty { "Ветка не проверена" },style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if(active)"${record.optString("action")} · ${MonitorPolicy.label(record.optString("state"),false,false)}" else if(p.error.isNotEmpty())"Нужна проверка" else if(p.worktree)"Worktree · только просмотр" else when(dirty){true->"Локальные изменения";false->"Чисто";else->"Не проверено"},style=MaterialTheme.typography.labelMedium,color=if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Box { IconButton(onClick={haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick);menu=true}) {Icon(AppIcons.More,"Меню ${p.name}")}
+                            DropdownMenu(menu,{menu=false}) {DropdownMenuItem(text={Text("Убрать из приложения")},onClick={menu=false;remove=p})}
+                        }
+                    }
                 }
             }
         }
-        item { Text("GitHub → Termux · изменения никогда не отправляются на GitHub",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+        ExtendedFloatingActionButton(onClick={add=true;if(permitted)gateway.read("CATALOG")},icon={Icon(AppIcons.Add,null)},text={Text("Добавить проект")},modifier=Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(16.dp))
     }
     if(add)ModalBottomSheet(onDismissRequest={add=false}) {
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max=560.dp),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            item { Text("Добавить проект",style=MaterialTheme.typography.titleLarge);Text("Только доступные локальные Git-репозитории",style=MaterialTheme.typography.bodySmall) }
-            item { OutlinedButton(onClick={gateway.read("CATALOG")},enabled=permitted && !info.optBoolean("pending")) { Text(if(info.optBoolean("pending"))"Поиск…" else "Найти репозитории") };Text(if(permitted)info.optString("message") else "Разрешите доступ к Termux в разделе Termux.") }
-            items(found,key={it.id}) { p -> ListItem(headlineContent={Text(p.name)},supportingContent={Text("${p.branch.ifEmpty { "Не проверено" }}\n${p.path.removePrefix(ProjectPolicy.HOME+"/")}")},trailingContent={TextButton(onClick={store.add(p);add=false}){Text("Добавить")}}) }
-            if(found.isEmpty() && !info.optBoolean("pending"))item { Text("Новых доступных репозиториев в последнем обзоре нет.") }
-            if(info.getJSONObject("catalog").optBoolean("limited"))item { Text("Обзор ограничен по времени/числу проектов. Защищённые каталоги не обходятся.") }
+        LazyColumn(Modifier.fillMaxWidth().imePadding().heightIn(max=640.dp),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            item { Text("Добавить проект",style=MaterialTheme.typography.titleLarge);Text("Из существующих репозиториев Termux",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+            item { Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Text(if(permitted)info.optString("message").ifEmpty { "Поиск ещё не выполнялся" } else "Разрешите Termux в разделе Termux.",Modifier.weight(1f),style=MaterialTheme.typography.bodySmall);IconButton(onClick={gateway.read("CATALOG")},enabled=permitted && !info.optBoolean("pending")){Icon(AppIcons.Refresh,"Повторить поиск")} };if(info.optBoolean("pending"))LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            items(found,key={it.id}) { p ->
+                Surface(onClick={if(store.add(p)){haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm);add=false}},shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                        Icon(AppIcons.Folder,null,tint=MaterialTheme.colorScheme.primary)
+                        Column(Modifier.weight(1f).padding(horizontal=12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)) {
+                            Text(p.name,style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text(p.path.removePrefix(ProjectPolicy.HOME+"/"),style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if(p.worktree)"Worktree · только просмотр" else p.branch.ifEmpty { "Метаданные не подтверждены" },style=MaterialTheme.typography.labelMedium)
+                        }
+                        Icon(AppIcons.Add,"Добавить ${p.name}")
+                    }
+                }
+            }
+            if(found.isEmpty() && !info.optBoolean("pending"))item {Text("Новых проектов в последнем поиске нет.",style=MaterialTheme.typography.bodyMedium)}
+            item { SectionLabel("По точному пути");OutlinedTextField(explicitPath,{explicitPath=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Локальный путь")},placeholder={Text("~/projects/MyApp")});FilledTonalButton(onClick={gateway.read("PATH",explicitPath)},enabled=permitted && explicitPath.isNotBlank() && !info.optBoolean("pending"),modifier=Modifier.padding(top=8.dp)){Text("Проверить путь")} }
+            item { Text("Поиск в HOME до 6 уровней. Скрытые и служебные каталоги исключены; ссылки не обходятся.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+            val issues=catalog.optJSONArray("issues")
+            if(issues!=null && issues.length()>0)item {
+                TextButton(onClick={showIssues=!showIssues}){Text(if(showIssues)"Скрыть ограничения" else "Пропуски и ограничения (${issues.length()})")}
+                if(showIssues)Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {for(i in 0 until issues.length()) {val item=issues.getJSONObject(i);Text(item.optString("path").removePrefix(ProjectPolicy.HOME)+"\n"+item.optString("reason"),style=MaterialTheme.typography.bodySmall)} }
+            }
+            item {Spacer(Modifier.height(12.dp))}
         }
     }
-    remove?.let { p -> AlertDialog(onDismissRequest={remove=null},title={Text("Убрать ${p.name} из списка?")},text={Text("Репозиторий, файлы и история останутся в Termux.")},confirmButton={TextButton(onClick={store.remove(p.id);remove=null}){Text("Убрать")}},dismissButton={TextButton(onClick={remove=null}){Text("Отмена")}}) }
+    remove?.let { p->AlertDialog(onDismissRequest={remove=null},title={Text("Убрать проект?")},text={Text("${p.name} исчезнет из списка приложения. Файлы и история останутся в Termux.")},confirmButton={TextButton(onClick={store.remove(p.id);remove=null}){Text("Убрать")}},dismissButton={TextButton(onClick={remove=null}){Text("Отмена")}}) }
 }
 @Composable fun ProjectWorkspace(context:Context,project:LocalProject,onTool:(String)->Unit) {
     val record=rememberRepoRecord(context);val snap=if(project.supported)record.optJSONObject("snapshot") else null
+    val branch=snap?.optString("branch")?.ifEmpty {project.branch} ?: project.branch
+    val sha=snap?.optString("local_commit")?.ifEmpty {project.commit} ?: project.commit
+    val dirty=snap?.optBoolean("dirty") ?: project.dirty
+    val active=project.supported && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        item { Text(snap?.optString("branch")?.ifEmpty { project.branch } ?: project.branch.ifEmpty { "Ветка не проверена" },style=MaterialTheme.typography.titleMedium);Text(project.remote.ifEmpty { if(project.supported)"github.com/krmobdev/quizapp" else "Origin не проверен" },style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-        item { BoxWithConstraints { val columns=if(maxWidth>=600.dp)4 else 2
-            val tools=listOf(Triple("git","Git",BetaIcons.Git),Triple("tests","Тесты",BetaIcons.Tests),Triple("build","Сборка",BetaIcons.Build),Triple("history","История",BetaIcons.History))
-            Column(verticalArrangement=Arrangement.spacedBy(12.dp)) { tools.chunked(columns).forEach { row->Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) { row.forEach { (id,title,icon)->Card(onClick={onTool(id)},modifier=Modifier.weight(1f)) { Column(Modifier.fillMaxWidth().heightIn(min=104.dp).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) { Icon(icon,null,tint=MaterialTheme.colorScheme.primary);Text(title,style=MaterialTheme.typography.titleMedium);if(id=="build" || (!project.supported && id!="history"))Text("Скоро",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant) } } } } } }
+        item { Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.primaryContainer) { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+            Text(branch.ifEmpty {"Ветка не проверена"},style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(sha.take(8).ifEmpty {"Коммит не проверен"}+" · "+when(dirty){true->"Локальные изменения";false->"Чисто";else->"Не проверено"},style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)
+            if(project.worktree)Text("Worktree · только просмотр",style=MaterialTheme.typography.labelMedium)
+        } } }
+        if(active)item { Surface(onClick={onTool(if(record.optString("action")=="TEST")"tests" else "git")},shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.secondaryContainer) { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {Text("${record.optString("action")} · ${MonitorPolicy.label(record.optString("state"),false,false)}",style=MaterialTheme.typography.titleSmall);LinearProgressIndicator(Modifier.fillMaxWidth())} } }
+        item { Column { SectionLabel("Инструменты")
+            Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
+                val tools=listOf(Triple("git","Git",AppIcons.Git),Triple("tests","Тесты",AppIcons.Tests),Triple("build","Сборка",AppIcons.Build),Triple("history","История",AppIcons.History))
+                tools.forEachIndexed { index,(id,title,icon)->
+                    val enabled=id!="build" && (project.supported || id=="git")
+                    val subtitle=when(id){"git"->if(project.supported)"Состояние и обновления" else "Метаданные · только просмотр";"tests"->if(project.supported)"Gradle unit-тесты" else "Нет профиля запуска";"history"->if(project.supported)"Задания, результаты и журналы" else "Заданий пока нет";else->"Недоступно · следующий этап"}
+                    Surface(onClick={onTool(id)},enabled=enabled,color=MaterialTheme.colorScheme.surfaceContainerLow) { ListItem(headlineContent={Text(title,style=MaterialTheme.typography.titleMedium)},supportingContent={Text(subtitle)},leadingContent={Icon(icon,null,tint=if(enabled)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)},trailingContent={if(enabled)Icon(AppIcons.Chevron,null)},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) }
+                    if(index<3)HorizontalDivider(Modifier.padding(start=56.dp,end=16.dp),color=MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
         } }
-        if(project.supported && RepoPolicy.blocked(record.optString("job_id"),record.optString("state")))item { Card(onClick={onTool(if(record.optString("action")=="TEST")"tests" else "git")}) { Column(Modifier.padding(16.dp)) { Text("Текущее задание · ${record.optString("action")}",style=MaterialTheme.typography.titleMedium);Text(MonitorPolicy.label(record.optString("state"),false,false));LinearProgressIndicator(Modifier.fillMaxWidth().padding(top=12.dp)) } } }
-        if(!project.supported)item { Text("Проект добавлен для просмотра. Git-синхронизация и тесты пока не подключены к безопасному профилю.",style=MaterialTheme.typography.bodyMedium) }
+        item { Text(project.remote.ifEmpty {"Origin не проверен"},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
-@Composable fun UnavailableTool(title:String,reason:String) { Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) { Icon(BetaIcons.Build,null,tint=MaterialTheme.colorScheme.onSurfaceVariant);Text(title,style=MaterialTheme.typography.titleLarge);Text(reason);Text("Действие недоступно в 0.4.0 Beta",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant) } }
+@Composable fun UnavailableTool(title:String,reason:String) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {Text(title,style=MaterialTheme.typography.titleMedium);Text(reason,style=MaterialTheme.typography.bodyMedium)} }

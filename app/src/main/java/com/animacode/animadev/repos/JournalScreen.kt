@@ -35,6 +35,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import com.animacode.animadev.projects.AppIcons
 
 @OptIn(ExperimentalLayoutApi::class,ExperimentalMaterial3Api::class)
 @Composable
@@ -48,9 +49,9 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
     var view by rememberSaveable { mutableStateOf(prefs.getString("journal_view","IMPORTANT") ?: "IMPORTANT") }
     var search by rememberSaveable { mutableStateOf("") }
     var text by remember { mutableStateOf("") }; var notice by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf("") }; var expanded by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") };var menu by remember { mutableStateOf(false) };var showSearch by rememberSaveable { mutableStateOf(false) }
     var loadAll by rememberSaveable { mutableStateOf(true) }
-    var historyLoading by remember { mutableStateOf(true) }
+    var historyLoading by remember { mutableStateOf(false) }
     val scroll=remember(jobId,view) { LazyListState() }
     val savedPosition=remember(jobId,view) { prefs.getInt("scroll_${jobId}_$view",0) }
     var positionRestored by remember(jobId,view) { mutableStateOf(false) }
@@ -67,7 +68,7 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
     } }
     LaunchedEffect(displayed,jobId,view,contentLoaded) {
         if(!positionRestored && contentLoaded && displayed.isNotEmpty()) {
-            scroll.scrollToItem(minOf(savedPosition,displayed.size));positionRestored=true
+            scroll.scrollToItem(minOf(savedPosition,maxOf(0,displayed.size-1)));positionRestored=true
         }
     }
     LaunchedEffect(jobId) {
@@ -129,34 +130,22 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
     val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if(uri!=null) scope.launch { message=withContext(Dispatchers.IO) { try { context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } ?: error("storage"); "Отчёт сохранён" } catch(_:Exception) { "Не удалось сохранить отчёт" } } }
     }
-    Box(Modifier.fillMaxSize()) {
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal=16.dp),state=scroll,verticalArrangement=Arrangement.spacedBy(8.dp)) {
-      item { Column(Modifier.padding(vertical=8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-        Box {
-            OutlinedButton(onClick={expanded=true}) { Text(jobs.find { it.optString("job_id")==jobId }?.let { "${it.optString("action")} · ${jobId.take(8)}" } ?: "Выбрать задание") }
-        }
-        Text("AnimaQuiz · ${jobId.take(8)}",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected=view=="IMPORTANT",onClick={view="IMPORTANT";loadAll=true},label={Text("Важное")})
-            FilterChip(selected=view=="ALL",onClick={view="ALL";loadAll=true},label={Text("Всё")})
-        }
-        OutlinedTextField(value=search,onValueChange={search=it},label={Text("Поиск в журнале")},singleLine=true,modifier=Modifier.fillMaxWidth())
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick={loadAll=true},enabled=!loadAll && !historyLoading && jobId.isNotEmpty()) { Text(if(loadAll)"Читаем…" else "Загрузить журнал") }
-            TextButton(onClick={historyLoading=true},enabled=!historyLoading && !loadAll) { Text("История") }
-        }
-        if(jobId==record.optString("job_id") && record.optString("state")=="RUNNING")Text("Живой журнал · обновляется автоматически",style=MaterialTheme.typography.bodySmall)
-        else if(loadAll || historyLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if(notice.isNotEmpty())Text(notice,color=MaterialTheme.colorScheme.error)
-        FlowRow(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-            TextButton(onClick={scope.launch { scroll.scrollToItem(0) }}) { Text("В начало") }
-            TextButton(onClick={scope.launch { scroll.scrollToItem(maxOf(0,scroll.layoutInfo.totalItemsCount-1)) }}) { Text("В конец") }
-            TextButton(onClick={scope.launch {
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.padding(horizontal=16.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Text("${actionForJob()} · ${jobId.take(8)}",Modifier.weight(1f),style=MaterialTheme.typography.titleSmall)
+                IconButton(onClick={showSearch=!showSearch;if(!showSearch)search=""}) {Icon(AppIcons.Search,"Поиск в журнале")}
+                IconButton(onClick={loadAll=true},enabled=!loadAll && jobId.isNotEmpty()){Icon(AppIcons.Refresh,"Обновить журнал")}
+            IconButton(onClick={scope.launch {
                 try { val intent=withContext(Dispatchers.IO) { ReportSharing.prepare(context,jobId,view,notice+"\n"+text) };context.startActivity(Intent.createChooser(intent,"Поделиться диагностикой")) }
                 catch(_:Exception) { message="Не удалось подготовить отчёт" }
-            }},enabled=text.isNotEmpty() && jobId.matches(Regex("[a-f0-9]{32}"))) { Text("Поделиться") }
-            TextButton(onClick={context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("AnimaDev",text));message="Доступный журнал скопирован"},enabled=text.isNotEmpty()) { Text("Копировать") }
-            TextButton(onClick={
+            }},enabled=text.isNotEmpty() && jobId.matches(Regex("[a-f0-9]{32}"))) { Icon(AppIcons.Share,"Поделиться диагностикой") }
+                Box {
+                    IconButton(onClick={menu=true}) {Icon(AppIcons.More,"Действия с журналом")}
+                    DropdownMenu(menu,{menu=false}) {
+                        DropdownMenuItem(text={Text("Копировать доступный журнал")},leadingIcon={Icon(AppIcons.Copy,null)},enabled=text.isNotEmpty(),onClick={menu=false;context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("AnimaDev",notice+"\n"+text));message="Журнал скопирован"})
+            DropdownMenuItem(text={Text("Сохранить в Загрузки")},leadingIcon={Icon(AppIcons.Download,null)},onClick={
+                menu=false;
                 if(Build.VERSION.SDK_INT<29)export.launch("AnimaDev_${jobId.take(8)}_${view}.txt")
                 else scope.launch { message=withContext(Dispatchers.IO) {
                     var uri:android.net.Uri?=null
@@ -168,13 +157,23 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                         "Отчёт сохранён в Загрузки"
                     } catch(_:Exception) { uri?.let { context.contentResolver.delete(it,null,null) };"Не удалось сохранить отчёт" }
                 } }
-            },enabled=text.isNotEmpty()) { Text("Скачать") }
+            },enabled=text.isNotEmpty())
+                    }
+                }
+            }
+            FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected=view=="IMPORTANT",onClick={view="IMPORTANT";loadAll=true},label={Text("Важное")})
+                FilterChip(selected=view=="ALL",onClick={view="ALL";loadAll=true},label={Text("Всё")})
+            }
+            if(showSearch)OutlinedTextField(search,{search=it},label={Text("Поиск по доступному журналу")},singleLine=true,modifier=Modifier.fillMaxWidth())
+            if(notice.isNotEmpty())Text(notice,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
+            if(message.isNotEmpty())Text(message,style=MaterialTheme.typography.bodySmall)
         }
-        if(message.isNotEmpty())Text(message,style=MaterialTheme.typography.bodySmall)
-        Text("Удерживайте текст для выделения. Сохраняется и отправляется весь доступный выбранный режим.",style=MaterialTheme.typography.bodySmall)
-      } }
-      items(displayed) { chunk -> SelectionContainer { Text(chunk,modifier=Modifier.fillMaxWidth(),fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodySmall,softWrap=true) } }
-    }
+        if(loadAll || historyLoading)LinearProgressIndicator(Modifier.fillMaxWidth()) else HorizontalDivider()
+        Box(Modifier.weight(1f)) {
+            LazyColumn(Modifier.fillMaxSize().padding(horizontal=16.dp),state=scroll,contentPadding=PaddingValues(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                items(displayed) {chunk->SelectionContainer {Text(chunk,modifier=Modifier.fillMaxWidth(),fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodySmall,softWrap=true)} }
+            }
     val thumb=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.55f)
     Canvas(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(5.dp)) {
         val count=scroll.layoutInfo.totalItemsCount
@@ -186,14 +185,10 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
         }
     }
     }
-    if(expanded) ModalBottomSheet(onDismissRequest={expanded=false}) {
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max=560.dp),contentPadding=PaddingValues(16.dp)) {
-            item { Text("Выбрать задание",style=MaterialTheme.typography.titleLarge) }
-            items(jobs,key={it.getString("job_id")}) { j ->
-                ListItem(headlineContent={Text("${j.optString("action")} · ${MonitorPolicy.label(j.optString("state"),false,false)}")},
-                    supportingContent={Text("${java.text.SimpleDateFormat("dd.MM HH:mm",java.util.Locale.getDefault()).format(java.util.Date((j.optDouble("created_at",0.0)*1000).toLong()))} · ${j.optString("job_id").take(8)}")},
-                    trailingContent={TextButton(onClick={jobId=j.getString("job_id");expanded=false;loadAll=true}){Text("Открыть")}})
-            }
-        }
+    Row(Modifier.fillMaxWidth().padding(horizontal=16.dp),verticalAlignment=Alignment.CenterVertically) {
+        Text(if(loadAll)"Читаем сохранённый журнал…" else "Удерживайте текст для выделения",Modifier.weight(1f),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        IconButton(onClick={scope.launch {scroll.scrollToItem(0)}}) {Icon(AppIcons.Top,"В начало журнала")}
+        IconButton(onClick={scope.launch {scroll.scrollToItem(maxOf(0,scroll.layoutInfo.totalItemsCount-1))}}) {Icon(AppIcons.Bottom,"В конец журнала")}
+    }
     }
 }

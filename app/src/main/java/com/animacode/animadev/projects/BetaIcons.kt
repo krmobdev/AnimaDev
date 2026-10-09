@@ -1,17 +1,32 @@
 package com.animacode.animadev.projects
 
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.vectorResource
+import com.animacode.animadev.R
 
-object BetaIcons {
-    val Folder=ImageVector.Builder("Projects",24.dp,24.dp,24f,24f).apply { path(fill=SolidColor(Color.Black),pathFillType=PathFillType.EvenOdd) { moveTo(3f,4f);lineTo(10f,4f);lineTo(12f,6f);lineTo(21f,6f);lineTo(21f,20f);lineTo(3f,20f);close() } }.build()
-    val Terminal=ImageVector.Builder("Termux",24.dp,24.dp,24f,24f).apply { path(fill=SolidColor(Color.Black),pathFillType=PathFillType.EvenOdd) { moveTo(4f,4f);lineTo(20f,4f);lineTo(20f,20f);lineTo(4f,20f);close();moveTo(6f,7f);lineTo(10f,11f);lineTo(6f,15f);lineTo(7.5f,16.5f);lineTo(13f,11f);lineTo(7.5f,5.5f);close();moveTo(12f,15f);lineTo(18f,15f);lineTo(18f,17f);lineTo(12f,17f);close() } }.build()
-    val Git=ImageVector.Builder("Git",24.dp,24.dp,24f,24f).apply { path(fill=SolidColor(Color.Black),pathFillType=PathFillType.EvenOdd) { moveTo(11f,2f);lineTo(22f,13f);lineTo(13f,22f);lineTo(2f,11f);close() } }.build()
-    val Tests=ImageVector.Builder("Tests",24.dp,24.dp,24f,24f).apply { path(fill=SolidColor(Color.Black),pathFillType=PathFillType.EvenOdd) { moveTo(9f,3f);lineTo(15f,3f);lineTo(15f,5f);lineTo(14f,5f);lineTo(14f,10f);lineTo(20f,20f);lineTo(4f,20f);lineTo(10f,10f);lineTo(10f,5f);lineTo(9f,5f);close() } }.build()
-    val Build=ImageVector.Builder("Build",24.dp,24.dp,24f,24f).apply { path(fill=SolidColor(Color.Black),pathFillType=PathFillType.EvenOdd) { moveTo(6f,3f);lineTo(18f,3f);lineTo(18f,21f);lineTo(6f,21f);close() } }.build()
-    val History=ImageVector.Builder("History",24.dp,24.dp,24f,24f).apply { path(fill=SolidColor(Color.Black),pathFillType=PathFillType.EvenOdd) { moveTo(4f,4f);lineTo(20f,4f);lineTo(20f,20f);lineTo(4f,20f);close();moveTo(7f,7f);lineTo(7f,9f);lineTo(17f,9f);lineTo(17f,7f);close();moveTo(7f,11f);lineTo(7f,13f);lineTo(17f,13f);lineTo(17f,11f);close();moveTo(7f,15f);lineTo(7f,17f);lineTo(14f,17f);lineTo(14f,15f);close() } }.build()
+/** Official Google Material Symbols Outlined; source/license in docs. */
+object AppIcons {
+    val Folder:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_folder)
+    val Git:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_account_tree)
+    val Tests:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_science)
+    val Build:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_build)
+    val History:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_history)
+    val Terminal:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_terminal)
+    val Back:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_arrow_back)
+    val More:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_more_vert)
+    val Add:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_add)
+    val Chevron:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_chevron_right)
+    val Refresh:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_refresh)
+    val Share:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_share)
+    val Search:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_search)
+    val Copy:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_content_copy)
+    val Download:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_download)
+    val Top:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_vertical_align_top)
+    val Bottom:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_vertical_align_bottom)
+    val Settings:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_settings)
+    val Success:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_check_circle)
+    val Error:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_error)
+    val Info:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_info)
+    val Close:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_close)
 }

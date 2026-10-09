@@ -7,7 +7,7 @@ class ProjectPolicyTest {
     @Test fun noBuildOrShellAction() { listOf("BUILD","SHELL","PUSH","RESET","REBASE").forEach { assertFalse(ProjectPolicy.canExecute("animaquiz",ProjectPolicy.QUIZ,it)) } }
     @Test fun canonicalShapedPathsOnly() { assertTrue(ProjectPolicy.permittedPath(ProjectPolicy.QUIZ));assertTrue(ProjectPolicy.permittedPath(ProjectPolicy.HOME+"/anima-workspace/AnimaDev")) }
     @Test fun traversalAndProtectedDirectoriesDenied() { listOf("/.ssh","/storage/project","/android-sdk","/foo/../quizapp","//quizapp","/quizapp/").forEach { assertFalse(ProjectPolicy.permittedPath(ProjectPolicy.HOME+it)) } }
-    @Test fun arbitraryDeepPathDenied() { assertFalse(ProjectPolicy.permittedPath(ProjectPolicy.HOME+"/other/nested"));assertFalse(ProjectPolicy.permittedPath(ProjectPolicy.HOME+"/anima-workspace/a/b")) }
+    @Test fun nestedPathAllowed() { assertTrue(ProjectPolicy.permittedPath(ProjectPolicy.HOME+"/other/nested"));assertTrue(ProjectPolicy.permittedPath(ProjectPolicy.HOME+"/anima-workspace/a/b")) }
     @Test fun outsideHomeDenied() { assertFalse(ProjectPolicy.permittedPath("/storage/emulated/0/project")) }
     @Test fun selectionRetainedIfRegistered() { assertEquals("p2",ProjectPolicy.nextSelection(listOf("p1","p2"),"p2")) }
     @Test fun removedSelectionDoesNotPickDifferentProject() { assertEquals("",ProjectPolicy.nextSelection(listOf("p1"),"p2")) }
@@ -21,4 +21,7 @@ class ProjectPolicyTest {
         assertFalse(ProjectSelection(storage).choose(listOf("p1"),"p2"));assertEquals("p1",saved)
     }
     @Test fun futureBuildModelHasNoExecutionApi() { val c=BuildConfiguration("p1","commit","debug",CacheMode.RERUN_NO_BUILD_CACHE,"Downloads","app.apk",BuildKind.DEBUG_APK);assertEquals("p1",c.projectId);assertEquals(3,CacheMode.entries.size);assertEquals(5,BuildKind.entries.size) }
+    @Test fun depthLimit() { assertTrue(ProjectPolicy.permittedPath(ProjectPolicy.HOME+"/a/b/c/d/e/f"));assertFalse(ProjectPolicy.permittedPath(ProjectPolicy.HOME+"/a/b/c/d/e/f/g")) }
+    @Test fun nestedServicePathDenied() { assertFalse(ProjectPolicy.permittedPath(ProjectPolicy.HOME+"/projects/credentials/repo")) }
+    @Test fun worktreeProfileCannotExecute() { assertFalse(ProjectPolicy.canExecute("animaquiz",ProjectPolicy.QUIZ,"TEST",true));assertFalse(ProjectPolicy.canExecute("animaquiz",ProjectPolicy.QUIZ,"SYNC",true)) }
 }

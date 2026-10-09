@@ -32,7 +32,7 @@ class MainActivity:ComponentActivity() {
     override fun onResume() { super.onResume();permitted=termux.permitted();version=termux.installedVersion() }
     override fun onNewIntent(intent:Intent) { super.onNewIntent(intent);setIntent(intent);requestedJournal=intent.getStringExtra("journal_job") ?: "" }
     override fun onCreate(savedInstanceState:Bundle?) {
-        super.onCreate(savedInstanceState);enableEdgeToEdge();requestedJournal=intent.getStringExtra("journal_job") ?: ""
+        super.onCreate(savedInstanceState);enableEdgeToEdge();requestedJournal=NavigationState.notificationTarget(intent.getStringExtra("journal_job") ?: "",savedInstanceState!=null)
         setContent { BetaApp() }
     }
     @OptIn(ExperimentalMaterial3Api::class)
@@ -50,7 +50,7 @@ class MainActivity:ComponentActivity() {
             var top by rememberSaveable { mutableStateOf("projects") }
             var route by rememberSaveable { mutableStateOf(if(projects.selected().isEmpty())"list" else "workspace") }
             var journalJob by rememberSaveable { mutableStateOf("") }
-            var showSettings by rememberSaveable { mutableStateOf(false) }
+            var settingsParent by rememberSaveable { mutableStateOf("list") };var menu by remember { mutableStateOf(false) }
             var confirmExit by rememberSaveable { mutableStateOf(false) }
             var projectGeneration by remember { mutableIntStateOf(0) }
             val current=remember(selected,projectGeneration) { projects.all().find { it.id==selected } }
@@ -76,41 +76,43 @@ class MainActivity:ComponentActivity() {
             LaunchedEffect(requestedJournal) {
                 if(requestedJournal.isNotEmpty()) {
                     val quiz=projects.all().find { it.supported }
-                    if(quiz!=null) { selected=quiz.id;projects.select(quiz.id);journalJob=requestedJournal;top="projects";route="history" }
+                    if(quiz!=null) { selected=quiz.id;projects.select(quiz.id);journalJob=requestedJournal;top="projects";route="journal" }
+                    requestedJournal=""
                 }
             }
-            fun back() { if(top=="termux")top="projects" else when(route) { "git","tests","build","history","wait"->route="workspace";"workspace"->route="list";else->confirmExit=true } }
-            BackHandler(enabled=!showSettings) { back() }
-            val title=when { top=="termux"->"Termux";route=="list"->"Проекты";route=="git"->"Git";route=="tests"->"Тесты";route=="build"->"Сборка";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
+            fun back() {
+                val n=NavigationState(top,route,selected,journalJob,settingsParent).back()
+                if(n==null)confirmExit=true else {top=n.section;route=n.route;journalJob=n.job}
+            }
+            BackHandler { back() }
+            val root=route=="list"
+            val title=when { route=="settings"->"Настройки";top=="termux"->"Termux";route=="list"->"Проекты";route=="git"->"Git";route=="tests"->"Тесты";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
             Scaffold(
                 contentWindowInsets=WindowInsets.safeDrawing,
-                topBar={TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(top=="projects" && route!="list")TextButton(onClick={back()}) { Text("Назад") }},actions={TextButton(onClick={showSettings=true}) { Text("Вид") }})},
-                bottomBar={NavigationBar {
-                    NavigationBarItem(selected=top=="projects",onClick={top="projects"},icon={Icon(BetaIcons.Folder,null)},label={Text("Проекты")})
-                    NavigationBarItem(selected=top=="termux",onClick={top="termux"},icon={Icon(BetaIcons.Terminal,null)},label={Text("Termux")})
+                topBar={TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(!root)IconButton(onClick={back()}){Icon(AppIcons.Back,"Вернуться")}},actions={
+                    Box { IconButton(onClick={menu=true}){Icon(AppIcons.More,"Меню приложения")}
+                        DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
+                            DropdownMenuItem(text={Text("Настройки")},leadingIcon={Icon(AppIcons.Settings,null)},onClick={menu=false;if(route!="settings"){settingsParent=route;route="settings"}})
+                        }
+                    }
+                })},
+                bottomBar={if(root)NavigationBar {
+                    NavigationBarItem(selected=top=="projects",onClick={top="projects";route="list";journalJob=""},icon={Icon(AppIcons.Folder,null)},label={Text("Проекты")})
+                    NavigationBarItem(selected=top=="termux",onClick={top="termux";route="list";journalJob=""},icon={Icon(AppIcons.Terminal,null)},label={Text("Termux")})
                 }}
             ) { padding -> Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when {
+                    route=="settings"->AppearanceSettings(theme,dynamic,{theme=it;settings.edit().putString("theme",it).apply()},{dynamic=it;settings.edit().putBoolean("dynamic",it).apply()})
                     top=="termux"->TermuxOverview(context,permitted,version) { permitted=termux.permitted() }
-                    route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->projects.select(p.id);selected=p.id;route="workspace"})
+                    route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
                     route=="workspace"->ProjectWorkspace(context,current,onTool={route=it})
-                    route=="git" || route=="tests"->ProjectTools(context,current,route,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;route="history"},{route="wait"})
-                    route=="history"->if(current.supported)JournalScreen(context,journalJob) else UnavailableTool("История", "У этого проекта ещё нет заданий AnimaDev. Файлы сторонних сеансов Termux не читаются.")
+                    route=="git" || route=="tests"->ProjectTools(context,current,route,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;route="journal"},{route="wait"})
+                    route=="history"->if(current.supported)HistoryScreen(context,{id->journalJob=id;route="journal"}) else UnavailableTool("История", "У этого проекта пока нет заданий AnimaDev.")
+                    route=="journal"->if(current.supported)JournalScreen(context,journalJob) else UnavailableTool("Журнал","Нет безопасного профиля этого проекта.")
                     route=="wait"->MonitorSettings(context)
-                    else->UnavailableTool("Сборка APK / AAB","В этой Beta сборка ещё не подключена. Debug APK будет отдельным следующим этапом.")
+                    else->ProjectWorkspace(context,current,onTool={route=it})
                 }
             } }
-            if(showSettings) ModalBottomSheet(onDismissRequest={showSettings=false}) {
-                Column(Modifier.padding(horizontal=24.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                    Text("Оформление",style=MaterialTheme.typography.titleLarge)
-                    listOf("system" to "Как в системе","light" to "Светлая","dark" to "Тёмная").forEach { (id,label)->
-                        SingleChoiceRow(label,theme==id) { theme=id;settings.edit().putString("theme",id).apply() }
-                    }
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text("Динамические цвета",Modifier.weight(1f).padding(top=12.dp));Switch(checked=dynamic,onCheckedChange={dynamic=it;settings.edit().putBoolean("dynamic",it).apply()}) }
-                    Text("AnimaDev 0.4.0 Beta",style=MaterialTheme.typography.bodySmall)
-                    Spacer(Modifier.height(16.dp))
-                }
-            }
             if(confirmExit)AlertDialog(onDismissRequest={confirmExit=false},title={Text("Закрыть AnimaDev?")},text={Text(if(store.blocked())"Задание продолжится в Termux. Состояние и журнал восстановятся при следующем открытии." else "Проекты, результаты и журналы сохранятся.")},confirmButton={TextButton(onClick={confirmExit=false;finishAndRemoveTask()}){Text("Выйти")}},dismissButton={TextButton(onClick={confirmExit=false}){Text("Отмена")}})
         }
     }

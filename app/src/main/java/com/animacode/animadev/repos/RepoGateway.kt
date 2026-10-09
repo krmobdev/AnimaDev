@@ -91,7 +91,8 @@ class RepoGateway(private val context: Context) {
         send(request, arrayOf("-c", script, request, hash, data, helperSha, helperData, monitorSha, monitorData))
     }
     fun start(action: String, projectId: String, projectPath: String) {
-        if (!ProjectPolicy.canExecute(projectId,projectPath,action)) return
+        val project=com.animacode.animadev.projects.ProjectStore(context).all().find {it.id==projectId && it.path==projectPath} ?: return
+        if (!ProjectPolicy.canExecute(projectId,projectPath,action,project.worktree)) return
         val r = store.read()
         if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked()) return
         if (action == "SYNC" && !maySync(r)) return
