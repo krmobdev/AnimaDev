@@ -31,6 +31,7 @@ import org.json.JSONObject
         item {OutlinedButton(onClick={gateway.read("BRANCHES",project.path)},enabled=permitted && !pending){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Обновить список")};if(pending)LinearProgressIndicator(Modifier.fillMaxWidth());Text(gateway.prefs.getString("message","") ?: "",style=MaterialTheme.typography.bodySmall)}
         item {OutlinedTextField(search,{search=it},label={Text("Поиск по загруженным веткам")},leadingIcon={Icon(AppIcons.Search,null)},singleLine=true,modifier=Modifier.fillMaxWidth())}
         if(metadata!=null) {
+            item {Text("Рабочее дерево: "+BranchPolicy.workingTree(metadata.opt("dirty") as? Boolean,metadata.optString("error").isNotBlank()),style=MaterialTheme.typography.bodyMedium)}
             item {Text("Проверено: "+java.text.SimpleDateFormat("dd.MM.yyyy · HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date((data.optDouble("scanned_at",0.0)*1000).toLong())),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 if(metadata.optBoolean("branches_limited"))Text("Старый снимок неполный. Обновите список для чтения всех страниц.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
                 Text("Загружено веток: ${BranchPolicy.merge(refs).size}"+(if(metadata.optBoolean("branches_more"))" · есть следующая страница" else ""),style=MaterialTheme.typography.bodySmall)
