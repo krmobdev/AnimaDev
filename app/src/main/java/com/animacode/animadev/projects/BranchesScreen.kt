@@ -32,6 +32,7 @@ import org.json.JSONObject
         item {OutlinedTextField(search,{search=it},label={Text("Поиск по загруженным веткам")},leadingIcon={Icon(AppIcons.Search,null)},singleLine=true,modifier=Modifier.fillMaxWidth())}
         if(metadata!=null) {
             item {Text("Проверено: "+java.text.SimpleDateFormat("dd.MM.yyyy · HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date((data.optDouble("scanned_at",0.0)*1000).toLong())),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                if(metadata.optBoolean("branches_limited"))Text("Старый снимок неполный. Обновите список для чтения всех страниц.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
                 Text("Загружено веток: ${BranchPolicy.merge(refs).size}"+(if(metadata.optBoolean("branches_more"))" · есть следующая страница" else ""),style=MaterialTheme.typography.bodySmall)
                 if(metadata.optString("default_branch").isEmpty())Text("Главная ветка не подтверждена: origin/HEAD отсутствует.",style=MaterialTheme.typography.bodySmall)
                 Text("Origin показывает последний локальный снимок, а не текущие данные GitHub. Для актуальности используйте проверку обновлений в Git.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
