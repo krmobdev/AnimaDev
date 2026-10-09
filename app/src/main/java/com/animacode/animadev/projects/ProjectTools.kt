@@ -22,7 +22,7 @@ import com.animacode.animadev.repos.*
     val gateway=remember {RepoGateway(context)};val r=rememberRepoRecord(context);val store=remember {RepoStore(context)}
     val snap=r.optJSONObject("snapshot");val pending=r.optBoolean("pending");val blocked=store.blocked();val ready=r.optBoolean("ready")
     val available=HelperPolicy.mayRun(permitted,termuxVersion!=null,ready,pending,blocked)
-    var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)};var showTask by rememberSaveable {mutableStateOf(false)}
+    var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)}
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {Text(project.name,style=MaterialTheme.typography.titleMedium);Text(snap?.optString("branch")?.ifEmpty {"Ветка не проверена"} ?: "Ветка не проверена",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
@@ -50,8 +50,6 @@ import com.animacode.animadev.repos.*
             item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text("Unit-тесты · Debug",style=MaterialTheme.typography.titleMedium)
                 Text("Фиксированный профиль AnimaQuiz",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick={showTask=!showTask}){Text(if(showTask)"Скрыть команду" else "Команда запуска")}
-                if(showTask)Text(":app:testDebugUnitTest\n--offline --no-daemon --rerun-tasks --console=plain",style=MaterialTheme.typography.bodySmall)
                 Button(onClick={gateway.start("TEST",project.id,project.path)},enabled=available && gateway.mayTest(r),modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Tests,null);Spacer(Modifier.width(8.dp));Text("Запустить тесты")}
             }} }
             if(!available || !gateway.mayTest(r))item {Text(if(blocked)"Повторный запуск заблокирован: задание выполняется или итог неизвестен." else "Для запуска нужны готовый помощник и проверенные ветка/origin.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
@@ -61,9 +59,8 @@ import com.animacode.animadev.repos.*
                 test.optJSONObject("tests")?.let {counts->Text("${counts.optLong("passed")} из ${counts.optLong("total")} успешно",style=MaterialTheme.typography.headlineSmall);Text("Ошибок ${counts.optLong("failed")} · пропущено ${counts.optLong("skipped")}",style=MaterialTheme.typography.bodyMedium)}
                 val started=test.optDouble("started_at");val ended=test.optDouble("ended_at")
                 if(ended>started && started>0)Text("${((ended-started)/60).toInt()} мин ${((ended-started)%60).toInt()} с · exit ${test.optString("exit_code")}",style=MaterialTheme.typography.bodySmall)
-                TextButton(onClick={onJournal(test.optString("job_id"))}){Text("Открыть результат и журнал")}
+                OutlinedButton(onClick={onJournal(test.optString("job_id"))},modifier=Modifier.fillMaxWidth()){Text("Открыть результат и журнал")}
             }} }
-            item {TextButton(onClick=onWait){Text("Настройки ожидания")}}
         }
         if(r.optString("job_id").isNotEmpty() && (blocked || (tool=="git" && r.optString("action")!="TEST")))item {JobMonitor(context,r,permitted,onJournal)}
     }

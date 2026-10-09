@@ -50,12 +50,12 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
             if(job!=null && !job.isNull("exit_code"))Text("Exit code: ${job.optInt("exit_code")}")
             Text(record.optString("message"),style=MaterialTheme.typography.bodySmall)
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick={openJournal(jid)}) { Text("Открыть журнал") }
+                OutlinedButton(onClick={openJournal(jid)},modifier=Modifier.fillMaxWidth()) { Text("Открыть журнал") }
                 if(manual) OutlinedButton(onClick={gateway.query(true)},enabled=permitted && !record.optBoolean("pending")) {
                     Text(if(record.optBoolean("pending") && record.optBoolean("manual_query"))"Проверяем…" else "Проверить состояние задания")
                 }
             }
-            TextButton(onClick={details=!details}){Text(if(details)"Скрыть сведения" else "Сведения о задании")}
+            OutlinedButton(onClick={details=!details},modifier=Modifier.fillMaxWidth()){Text(if(details)"Скрыть сведения" else "Сведения о задании")}
             if(record.optString("query_result").isNotEmpty())Text(record.optString("query_result"),style=MaterialTheme.typography.bodySmall)
         }
     }
@@ -66,7 +66,7 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
 }
 
 @Composable
-fun MonitorSettings(context: Context) {
+fun MonitorSettings(context: Context,embedded:Boolean=false) {
     val prefs=remember { context.getSharedPreferences("monitor_settings",Context.MODE_PRIVATE) }
     var minutes by remember { mutableIntStateOf(MonitorPolicy.minutes(prefs.getInt("warning_minutes",10))) }
     var enabled by remember { mutableStateOf(context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()) }
@@ -76,8 +76,8 @@ fun MonitorSettings(context: Context) {
         owner.lifecycle.addObserver(listener);onDispose { owner.lifecycle.removeObserver(listener) }
     }
     val notifications=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { enabled=context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled() }
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        Text("Настройки",style=MaterialTheme.typography.headlineMedium)
+    Column(if(embedded)Modifier.fillMaxWidth().padding(16.dp) else Modifier.verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Text(if(embedded)"Ожидание заданий" else "Настройки ожидания",style=MaterialTheme.typography.titleMedium)
         Text("Предупреждать при отсутствии признаков прогресса")
         MonitorPolicy.thresholds.forEach { value ->
             Row { RadioButton(selected=minutes==value,onClick={minutes=value;prefs.edit().putInt("warning_minutes",value).apply()});Text("$value минут",Modifier.padding(top=12.dp)) }

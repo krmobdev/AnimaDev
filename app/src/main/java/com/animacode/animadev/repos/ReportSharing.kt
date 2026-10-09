@@ -10,10 +10,11 @@ import java.io.FileOutputStream
 object ReportSharing {
     fun prepare(context:Context,jobId:String,view:String,report:String):Intent {
         require(jobId.matches(Regex("[a-f0-9]{32}")) && view in setOf("ALL","IMPORTANT"))
-        val directory=File(context.cacheDir,"shared_reports").apply { mkdirs() }
-        require(directory.canonicalFile==directory.absoluteFile)
+        val directory=File(context.cacheDir,"shared_reports")
+        check(directory.isDirectory || directory.mkdirs()) { "Cannot create report cache" }
+        check(!java.nio.file.Files.isSymbolicLink(directory.toPath()))
         val file=File(directory,"AnimaDev_${jobId}_${view}.txt")
-        require(file.canonicalFile==file.absoluteFile && !java.nio.file.Files.isSymbolicLink(file.toPath()))
+        check(!java.nio.file.Files.isSymbolicLink(file.toPath()))
         val safe=RepoResultReceiver.redact(report)
         FileOutputStream(file).use { it.write(safe.toByteArray(Charsets.UTF_8));it.fd.sync() }
         val uri=FileProvider.getUriForFile(context,"${context.packageName}.reports",file)

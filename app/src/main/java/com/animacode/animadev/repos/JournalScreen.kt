@@ -29,6 +29,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -36,6 +41,30 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import com.animacode.animadev.projects.AppIcons
+
+@Composable
+private fun HighlightedLogChunk(chunk:String) {
+    val scheme=MaterialTheme.colorScheme
+    val light=scheme.surface.luminance()>0.5f
+    val success=if(light)Color(0xFF257A3B) else Color(0xFF81C784)
+    val warning=if(light)Color(0xFF996000) else Color(0xFFFFD54F)
+    val annotated=remember(chunk,scheme) {
+        buildAnnotatedString {
+            append(chunk)
+            fun mark(regex:Regex,color:Color,bold:Boolean=false) {
+                regex.findAll(chunk).forEach { hit ->
+                    addStyle(SpanStyle(color=color,fontWeight=if(bold)FontWeight.SemiBold else FontWeight.Normal),hit.range.first,hit.range.last+1)
+                }
+            }
+            mark(Regex("""\[\d{2}:\d{2}:\d{2}]|\b\d{2}:\d{2}:\d{2}\b|\b\d{2}\.\d{2}\.\d{4}\b|\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{2}\b"""),scheme.onSurfaceVariant)
+            mark(Regex("""\b(?:event|step|command):"""),scheme.primary,true)
+            mark(Regex("""\b(?:SUCCEEDED|BUILD SUCCESSFUL|Успешно)\b""",RegexOption.IGNORE_CASE),success,true)
+            mark(Regex("""\b(?:FAILED|FAILURE|ERROR|EXCEPTION|FATAL)\b""",RegexOption.IGNORE_CASE),scheme.error,true)
+            mark(Regex("""\b(?:WARNING|WARN|предупреждение)\b|(?m)^w:""",RegexOption.IGNORE_CASE),warning,true)
+        }
+    }
+    SelectionContainer { Text(annotated,modifier=Modifier.fillMaxWidth(),fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodySmall,softWrap=true) }
+}
 
 @OptIn(ExperimentalLayoutApi::class,ExperimentalMaterial3Api::class)
 @Composable
@@ -146,13 +175,23 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                 IconButton(onClick={showSearch=!showSearch;if(!showSearch)search=""}) {Icon(AppIcons.Search,"Поиск в журнале")}
                 IconButton(onClick={loadAll=true},enabled=!loadAll && jobId.isNotEmpty()){Icon(AppIcons.Refresh,"Обновить журнал")}
             IconButton(onClick={scope.launch {
+                val content=RepoResultReceiver.redact(notice+"\n"+text)
                 try {
-                    val intent=withContext(Dispatchers.IO) { ReportSharing.prepare(context,jobId,view,notice+"\n"+text) }
+                    val intent=withContext(Dispatchers.IO) { ReportSharing.prepare(context,jobId,view,content) }
                     context.startActivity(intent)
-                } catch(_:android.content.ActivityNotFoundException) {
-                    message="Нет приложения для отправки отчёта"
-                } catch(_:Exception) {
-                    message="Не удалось поделиться. Можно сохранить отчёт в Загрузки."
+                } catch(error:Exception) {
+                    android.util.Log.w("AnimaDevShare","File attachment failed: "+error.javaClass.simpleName,error)
+                    try {
+                        val body=if(content.length>100_000)content.take(100_000)+"\n\n[Текст сокращён. Полный отчёт доступен через «Сохранить в Загрузки».]" else content
+                        val fallback=Intent(Intent.ACTION_SEND).setType("text/plain")
+                            .putExtra(Intent.EXTRA_TEXT,body)
+                            .putExtra(Intent.EXTRA_SUBJECT,"AnimaDev · журнал "+jobId.take(8))
+                        context.startActivity(Intent.createChooser(fallback,"Поделиться текстом"))
+                        message="Вложение недоступно ("+error.javaClass.simpleName+"). Открыта отправка текстом."
+                    } catch(second:Exception) {
+                        android.util.Log.e("AnimaDevShare","Text sharing also failed",second)
+                        message="Не удалось поделиться ("+second.javaClass.simpleName+"). Сохраните отчёт в Загрузки."
+                    }
                 }
             }},enabled=text.isNotEmpty() && jobId.matches(Regex("[a-f0-9]{32}"))) { Icon(AppIcons.Share,"Поделиться отчётом") }
                 Box {
@@ -186,7 +225,7 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
         if(loadAll || historyLoading)LinearProgressIndicator(Modifier.fillMaxWidth()) else HorizontalDivider()
         Box(Modifier.weight(1f)) {
             LazyColumn(Modifier.fillMaxSize().padding(horizontal=16.dp),state=scroll,contentPadding=PaddingValues(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                items(displayed) {chunk->SelectionContainer {Text(chunk,modifier=Modifier.fillMaxWidth(),fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodySmall,softWrap=true)} }
+                items(displayed) {chunk->HighlightedLogChunk(chunk)}
             }
     val thumb=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.55f)
     Canvas(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(5.dp)) {

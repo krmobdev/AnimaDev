@@ -9,8 +9,8 @@ android {
         applicationId = "com.animacode.animadev"
         minSdk = 33
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.4.0-beta.3"
+        versionCode = 9
+        versionName = "0.4.0-beta.4"
     }
     buildFeatures { compose = true }
     compileOptions {

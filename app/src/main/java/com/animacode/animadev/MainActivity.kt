@@ -103,7 +103,7 @@ class MainActivity:ComponentActivity() {
                 }}
             ) { padding -> Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when {
-                    route=="settings"->AppearanceSettings(theme,dynamic,{theme=it;settings.edit().putString("theme",it).apply()},{dynamic=it;settings.edit().putBoolean("dynamic",it).apply()})
+                    route=="settings"->AppearanceSettings(context,theme,dynamic,{theme=it;settings.edit().putString("theme",it).apply()},{dynamic=it;settings.edit().putBoolean("dynamic",it).apply()})
                     top=="termux"->TermuxOverview(context,permitted,version) { permitted=termux.permitted() }
                     route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
                     route=="workspace"->ProjectWorkspace(context,current,onTool={route=it})
