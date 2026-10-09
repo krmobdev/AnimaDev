@@ -156,7 +156,7 @@ class CatalogTests(unittest.TestCase):
         branch=self.run_git('branch','--show-current');sha=self.run_git('rev-parse','HEAD')
         r=catalog.explicit(str(self.repo),self.home,self.git,branches=True)
         self.assertTrue(r['projects'][0]['dirty']);self.assertEqual(branch,self.run_git('branch','--show-current'));self.assertEqual(sha,self.run_git('rev-parse','HEAD'));self.assertEqual('preserve',(self.repo/'local').read_text())
-    def test_branch_count_limit_is_explicit(self):
+    def test_all_branches_are_accessible_through_pages(self):
         for i in range(45):self.run_git('branch','fixture'+str(i))
         r=catalog.inspect(self.repo,self.home,self.git,branches=True)
         self.assertTrue(r['branches_more']);self.assertFalse(r['branches_limited']);self.assertTrue(any(b['active'] for b in r['branches']))
@@ -164,5 +164,21 @@ class CatalogTests(unittest.TestCase):
         while r['branches_more']:
             r=catalog.inspect(self.repo,self.home,self.git,branches=True,branch_offset=r['branches_next'])
             seen.update((b['name'],b['local']) for b in r['branches'])
-        self.assertGreater(len(seen),40)
+        self.assertEqual(len(seen),46)
 
+
+    def test_negative_branch_offset_is_rejected(self):
+        r=catalog.inspect(self.repo,self.home,self.git,branches=True,branch_offset=-1)
+        self.assertTrue(r['error'])
+    def test_remote_and_local_refs_survive_paging(self):
+        for i in range(70):
+            self.run_git('branch','feature/'+str(i))
+            self.run_git('update-ref','refs/remotes/origin/feature/'+str(i),'HEAD')
+        offset=0;seen=set()
+        while True:
+            r=catalog.inspect(self.repo,self.home,self.git,branches=True,branch_offset=offset)
+            self.assertFalse(r['error']);self.assertLessEqual(len(r['branches']),34)
+            seen.update((b['name'],b['local']) for b in r['branches'])
+            if not r['branches_more']:break
+            self.assertGreater(r['branches_next'],offset);offset=r['branches_next']
+        self.assertEqual(len(seen),141)

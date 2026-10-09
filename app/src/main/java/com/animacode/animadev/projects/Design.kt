@@ -43,7 +43,7 @@ private val descriptions=mapOf("appearance" to "Тема и динамическ
         if(section.isEmpty()) {
             item {OutlinedTextField(query,{query=it},label={Text("Поиск настроек")},leadingIcon={Icon(AppIcons.Search,null)},trailingIcon={if(query.isNotEmpty())IconButton(onClick={query=""}){Icon(AppIcons.Close,"Очистить поиск")}},singleLine=true,modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp))}
             if(query.isBlank())settingsSections.forEach {(id,title)->item(key=id) {
-                ListItem(headlineContent={Text(title)},supportingContent={Text(descriptions.getValue(id))},leadingContent={Icon(when(id){"git"->AppIcons.Git;"profiles"->AppIcons.Tests;"jobs"->AppIcons.History;"files"->AppIcons.Folder;"about"->AppIcons.Info;"notifications"->AppIcons.Info;else->AppIcons.Settings},null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},modifier=Modifier.clickable{onSection(id)})
+                ListItem(headlineContent={Text(title)},supportingContent={Text(descriptions.getValue(id))},leadingContent={Icon(when(id){"git"->AppIcons.Git;"profiles"->AppIcons.Tests;"jobs"->AppIcons.Waiting;"files"->AppIcons.Folder;"about"->AppIcons.Info;"notifications"->AppIcons.Notifications;else->AppIcons.Palette},null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},modifier=Modifier.clickable{onSection(id)})
             }} else {
                 val results=SettingsPolicy.search(query)
                 if(results.isEmpty())item {DetailRow("Ничего не найдено","Попробуйте другое название или описание")}

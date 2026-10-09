@@ -7,6 +7,9 @@ import com.animacode.animadev.R
 
 /** Official Google Material Symbols Outlined; source/license in docs. */
 object AppIcons {
+    val Palette:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_palette)
+    val Notifications:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_notifications)
+    val Waiting:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_hourglass_empty)
     val Folder:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_folder)
     val Git:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_account_tree)
     val Tests:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ms_science)

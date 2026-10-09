@@ -10,7 +10,7 @@ object JournalPresentation {
             val m=channel.find(line)
             if(m!=null) {
                 val kind=m.groupValues[1];val body=m.groupValues[2]
-                keep=kind !in setOf("command","step") && (kind=="event" || significant.containsMatchIn(body))
+                keep=kind !in setOf("command","step") && (kind in setOf("event","stderr") || significant.containsMatchIn(body))
             }
             keep
         }.joinToString("\n")
@@ -20,7 +20,7 @@ object JournalPresentation {
     fun chunks(text:String):List<String> {
         val result=mutableListOf<String>();val normal=StringBuilder();val command=StringBuilder()
         fun flushNormal(){if(normal.isNotEmpty()){result.addAll(JournalStylePolicy.chunks(normal.toString()));normal.clear()}}
-        fun flushCommand(){if(command.isNotEmpty()){result.add(command.toString());command.clear()}}
+        fun flushCommand(){if(command.isNotEmpty()){result.addAll(JournalStylePolicy.chunks(command.toString()));command.clear()}}
         text.splitToSequence('\n').forEach {line->
             val m=channel.find(line)
             if(m?.groupValues?.get(1)=="command") {flushNormal();flushCommand();command.append(line).append('\n')}
