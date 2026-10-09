@@ -28,4 +28,14 @@ class RepoPolicyTest {
     @Test fun legacyQueryPreservesRunner() { assertEquals("legacy", RepoPolicy.runnerForQuery("QUERY","new","","","legacy")) }
     @Test fun newStartAlwaysUsesCurrentRunner() { assertEquals("new", RepoPolicy.runnerForQuery("START","new","old","old","legacy")) }
     @Test fun failedNetworkCheckAllowsExplicitRetry() { assertFalse(RepoPolicy.blocked("id","FAILED")); assertFalse(sync(checked=false)) }
+    @Test fun testsAllowedWithConfirmedProfile() { assertTrue(RepoPolicy.mayTest("test/decomposition-v1",true,true,false)) }
+    @Test fun testsMainBlocked() { assertFalse(RepoPolicy.mayTest("main",true,true,false)) }
+    @Test fun testsWrongRemoteBlocked() { assertFalse(RepoPolicy.mayTest("test/decomposition-v1",false,true,false)) }
+    @Test fun testsMissingRunnerBlocked() { assertFalse(RepoPolicy.mayTest("test/decomposition-v1",true,false,false)) }
+    @Test fun testsConflictBlocked() { assertFalse(RepoPolicy.mayTest("test/decomposition-v1",true,true,true)) }
+    @Test fun junitCountsValid() { assertTrue(RepoPolicy.validCounts(3,1,1,1,125)) }
+    @Test fun junitCountsMismatchRejected() { assertFalse(RepoPolicy.validCounts(4,1,1,1,125)) }
+    @Test fun junitNegativeRejected() { assertFalse(RepoPolicy.validCounts(3,-1,1,3,125)) }
+    @Test fun launchStateIsWaiting() { assertEquals("Ожидание",RepoPolicy.testState("QUEUED")); assertEquals("Результат неизвестен",RepoPolicy.testState("UNKNOWN")) }
+    @Test fun upgradeQueriesUse021Version() { assertEquals("0.2.1",RepoPolicy.runnerVersion("7239fd9dd4979342bdfec98f0a10ef198358e8f8e6ecc8b3696be6ca0df5b0b2","0.3.0")) }
 }

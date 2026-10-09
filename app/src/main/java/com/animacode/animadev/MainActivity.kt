@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
                     onDismissRequest = { confirmExit = false },
                     title = { Text("Закрыть AnimaDev?") },
                     text = { Text(if (operationMayContinue)
-                        "Git-задание может ещё выполняться. Оно продолжится в Termux, а результат сохранится для следующего открытия приложения."
+                        "Задание проекта может ещё выполняться. Оно продолжится в Termux, а результат сохранится для следующего открытия приложения."
                         else "Состояние и результаты сохранятся для следующего открытия приложения.") },
                     confirmButton = { TextButton(onClick = { confirmExit = false; finishAndRemoveTask() }) { Text("Выйти") } },
                     dismissButton = { TextButton(onClick = { confirmExit = false }) { Text("Отмена") } }
@@ -114,7 +114,7 @@ class MainActivity : ComponentActivity() {
                     Text("ПРОБА 01", style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp))
                 }
-                Text("Локальная связь с телефоном", style = MaterialTheme.typography.bodyLarge)
+                Text("Диагностика Termux: не обязательна перед каждым действием. Проверку можно повторить после завершения предыдущей.", style = MaterialTheme.typography.bodyLarge)
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(title, style = MaterialTheme.typography.titleLarge,
@@ -160,7 +160,7 @@ class MainActivity : ComponentActivity() {
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                Text("0.2.1 · Без серверов и сетевых запросов", style = MaterialTheme.typography.bodySmall)
+                Text("0.3.0 · Без серверов", style = MaterialTheme.typography.bodySmall)
             }
     }
     @Composable private fun OutputBlock(label: String, output: String) {

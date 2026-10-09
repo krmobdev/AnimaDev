@@ -14,7 +14,8 @@ import subprocess
 import sys
 import time
 
-VERSION = '0.2.1'
+VERSION = '0.3.0'
+GRADLE_SHA = '321d79a9cc18eb617d34cc136a3c8a357670dda69f5fb6572b2ac90bbed9c0c9'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
 STATE_ROOT = HOME / '.local/share/animadev'
@@ -22,7 +23,7 @@ FIXED_GIT = str(HOME.parent / 'usr/bin/git')
 FIXED_SSH = str(HOME.parent / 'usr/bin/ssh')
 REGISTRY = {'animaquiz': {'name': 'AnimaQuiz', 'root': str(HOME / 'quizapp'),
     'origin': 'git@github.com:krmobdev/quizapp.git', 'branch': 'test/decomposition-v1'}}
-ACTIONS = {'STATUS', 'CHECK', 'SYNC'}
+ACTIONS = {'STATUS', 'CHECK', 'SYNC', 'TEST'}
 TERMINAL = {'SUCCEEDED', 'FAILED', 'TIMED_OUT', 'INTERRUPTED', 'NOT_STARTED'}
 HEX_ID = re.compile(r'^[0-9a-f]{32}$')
 SHA = re.compile(r'^[0-9a-f]{40,64}$')
@@ -35,7 +36,7 @@ MESSAGES = {
  'REPO_DIRTY': 'Есть локальные изменения. Синхронизация заблокирована.',
  'LOCAL_AHEAD': 'В локальной ветке есть свои коммиты. Автосинхронизация заблокирована.',
  'NON_FAST_FORWARD': 'Истории разошлись. Безопасный fast-forward невозможен.',
- 'JOB_BUSY': 'Другая Git-операция ещё выполняется.',
+ 'JOB_BUSY': 'Другая операция проекта ещё выполняется.',
  'REPLAY_CONFLICT': 'ID уже принадлежит другой операции.',
  'EXECUTABLE_CONFIG': 'В Git настроены внешние фильтры или включаемые конфигурации. Автооперация заблокирована.',
  'GIT_FAILED': 'Git завершился с ошибкой. Рабочее дерево не затиралось.',
@@ -49,6 +50,7 @@ MESSAGES = {
  'JOB_INTERRUPTED': 'Процесс Termux прерван. Успех не подтверждён.',
  'RESULT_MALFORMED': 'Недопустимый запрос или ответ.', 'OUTPUT_LIMIT': 'Вывод Git превысил безопасный размер.',
  'STATE_CHANGED': 'Состояние репозитория изменилось во время операции. Обновление отменено.',
+ 'RUNNER_CHECKSUM_MISMATCH': 'Контрольная сумма runner не совпадает. Операция отменена.',
  'STORAGE_UNAVAILABLE': 'Не удалось сохранить состояние задания.',
  'PROCESS_IDENTITY_UNAVAILABLE': 'Termux не позволяет проверить идентичность процессов. Запуск заблокирован.',
  'HISTORY_FULL': 'Журнал достиг лимита 100 заданий. Очистка автоматически не выполняется.',
@@ -147,7 +149,11 @@ class Store:
             child = identity(j['child_pid']) if j.get('child_pid') else None
             child_live = child is not None and (child == '__UNKNOWN__' or j.get('child_identity') is None or child == j.get('child_identity'))
             if active and (current == '__UNKNOWN__' or (dead and child_live)):
-                j.update(state='UNKNOWN', message='Контроллер недоступен; дочерний Git может ещё выполняться. Повторный запуск заблокирован.')
+                j.update(state='UNKNOWN', message='Контроллер недоступен; дочерний процесс может ещё выполняться. Повторный запуск заблокирован.')
+                self.save(c, j)
+                continue
+            if active and j.get('action') == 'TEST' and (dead or j.get('unresolved')):
+                j.update(state='UNKNOWN', unresolved=True, message='Контроллер Gradle потерян или задача превысила таймаут. Результат неизвестен; новый запуск заблокирован.')
                 self.save(c, j)
                 continue
             if active and (dead or unstarted):
@@ -366,6 +372,19 @@ class Engine:
             except BlockingIOError: raise Denied('JOB_BUSY')
             guard = GitGuard(self.registry[j['project_id']], log, self.git_executable,
                 lambda pid, token: self.store.update(jid, child_pid=pid, child_identity=token))
+            if j['action'] == 'TEST':
+                module_path = pathlib.Path(__file__).resolve().parent / 'gradle_tests.py'
+                data = module_path.read_bytes()
+                if module_path.is_symlink() or hashlib.sha256(data).hexdigest() != GRADLE_SHA:
+                    raise Denied('RUNNER_CHECKSUM_MISMATCH')
+                module = {'__file__':str(module_path), '__name__':'verified_gradle_tests'}
+                exec(compile(data,str(module_path),'exec'), module)
+                result = module['execute'](guard, log,
+                    lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact)
+                code = result.get('error_code','')
+                result['message'] = module['MESSAGES'].get(code,'Unit-тесты завершены; результаты получены из JUnit XML.')
+                self.store.update(jid,ended_at=time.time(),**result)
+                return
             snap = guard.execute(j['action'], jid)
             message = 'Состояние репозитория проверено.'
             if snap['checked']:
@@ -381,6 +400,9 @@ class Engine:
                 error_code=e.code, message=MESSAGES.get(e.code, 'Ошибка Git.'), exit_code=e.exit_code,
                 ended_at=time.time(), snapshot=snap)
         except Exception:
+            if j['action'] == 'TEST':
+                self.store.update(jid,state='UNKNOWN',unresolved=True,error_code='RESULT_MALFORMED',message='Результат Gradle не подтверждён; повторный запуск заблокирован.',ended_at=time.time())
+                return
             self.store.update(jid, state='FAILED', error_code='STORAGE_UNAVAILABLE',
                 message=MESSAGES['STORAGE_UNAVAILABLE'], ended_at=time.time())
         finally: os.close(fd)

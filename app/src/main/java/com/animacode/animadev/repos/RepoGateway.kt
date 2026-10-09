@@ -13,7 +13,7 @@ import java.util.UUID
 
 class RepoGateway(private val context: Context) {
     companion object {
-        const val VERSION = "0.2.1"
+        const val VERSION = "0.3.0"
         const val LEGACY_SHA = "e96b432836ff0fb1f23f9455a1440a73fbcb7a675720871d323c4209bb178a4e"
         const val PROTOCOL = 2
         const val PROJECT = "animaquiz"
@@ -43,29 +43,37 @@ class RepoGateway(private val context: Context) {
         if (hash != actual || !hash.matches(Regex("[a-f0-9]{64}"))) {
             store.edit { it.put("ready", false).put("message", "Контрольная сумма встроенного runner не совпадает.") }; return
         }
+        val helper = context.assets.open("runner/gradle_tests.py").use { it.readBytes() }
+        val helperSha = context.assets.open("runner/gradle.sha256").bufferedReader().use { it.readText().trim() }
+        val helperActual = MessageDigest.getInstance("SHA-256").digest(helper).joinToString("") { "%02x".format(it) }
+        if (helperSha != helperActual || !helperSha.matches(Regex("[a-f0-9]{64}"))) {
+            store.edit { it.put("ready", false).put("message", "Контрольная сумма модуля тестов не совпадает.") }; return
+        }
+        val helperData = Base64.encodeToString(helper, Base64.NO_WRAP)
         val data = Base64.encodeToString(bytes, Base64.NO_WRAP)
         // Fixed bootstrap. No repository content, commands, paths or configuration from the UI.
         val script = """
             import pathlib,os,hashlib,base64,json,sys,tempfile
             os.umask(0o077)
-            request_id,expected,payload=sys.argv[1:]
+            request_id,expected,payload,helper_sha,helper_payload=sys.argv[1:]
             try:
                 root=pathlib.Path('$RUNNER_ROOT')
                 for p in [root,root/'releases',root/'releases'/expected]:
                     p.mkdir(parents=True,exist_ok=True,mode=0o700)
                     if p.resolve()!=p.absolute() or not p.is_dir(): raise ValueError('PATH_DENIED')
                     os.chmod(p,0o700)
-                content=base64.b64decode(payload,validate=True)
-                if len(content)>65536 or hashlib.sha256(content).hexdigest()!=expected: raise ValueError('RUNNER_CHECKSUM_MISMATCH')
-                dest=root/'releases'/expected/'animadev_runner.py'
-                if dest.is_symlink(): raise ValueError('PATH_DENIED')
-                if dest.exists():
-                    if hashlib.sha256(dest.read_bytes()).hexdigest()!=expected: raise ValueError('RUNNER_CHECKSUM_MISMATCH')
-                else:
-                    fd,tmp=tempfile.mkstemp(prefix='.install-',dir=dest.parent)
-                    with os.fdopen(fd,'wb') as f: f.write(content); f.flush(); os.fsync(f.fileno())
-                    os.replace(tmp,dest)
-                    dfd=os.open(dest.parent,os.O_RDONLY); os.fsync(dfd); os.close(dfd)
+                for name,digest,encoded in [('animadev_runner.py',expected,payload),('gradle_tests.py',helper_sha,helper_payload)]:
+                    content=base64.b64decode(encoded,validate=True)
+                    if len(content)>65536 or hashlib.sha256(content).hexdigest()!=digest: raise ValueError('RUNNER_CHECKSUM_MISMATCH')
+                    dest=root/'releases'/expected/name
+                    if dest.is_symlink(): raise ValueError('PATH_DENIED')
+                    if dest.exists():
+                        if hashlib.sha256(dest.read_bytes()).hexdigest()!=digest: raise ValueError('RUNNER_CHECKSUM_MISMATCH')
+                    else:
+                        fd,tmp=tempfile.mkstemp(prefix='.install-',dir=dest.parent)
+                        with os.fdopen(fd,'wb') as f: f.write(content); f.flush(); os.fsync(f.fileno())
+                        os.replace(tmp,dest)
+                        dfd=os.open(dest.parent,os.O_RDONLY); os.fsync(dfd); os.close(dfd)
                 print(json.dumps({'protocol_version':2,'runner_version':'$VERSION','request_id':request_id,'ok':True,'sha256':expected}))
             except Exception as e:
                 print(json.dumps({'protocol_version':2,'runner_version':'$VERSION','request_id':request_id,'ok':False,'error_code':str(e) if isinstance(e,ValueError) else 'STORAGE_UNAVAILABLE','message':'Не удалось установить локальный runner.'}))
@@ -75,16 +83,17 @@ class RepoGateway(private val context: Context) {
             .put("transport_runner_version", VERSION)
             .put("sent_at", System.currentTimeMillis()).put("message", "Устанавливаем локальный помощник вне Git-репозиториев…")
         if (!store.write(r)) return
-        send(request, arrayOf("-c", script, request, hash, data))
+        send(request, arrayOf("-c", script, request, hash, data, helperSha, helperData))
     }
     fun start(action: String) {
         val r = store.read()
-        if (action !in setOf("STATUS", "CHECK", "SYNC") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked()) return
+        if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked()) return
         if (action == "SYNC" && !maySync(r)) return
+        if (action == "TEST" && !mayTest(r)) return
         val job = id()
         r.put("job_id", job).put("action", action).put("state", "REQUESTED")
             .put("job_runner_sha", sha())
-            .put("message", "Отправляем Git-операцию. Успех ещё не подтверждён.")
+            .put("message", "Отправляем операцию проекта. Успех ещё не подтверждён.")
             .remove("job")
         if (!store.write(r)) return
         dispatch("START")
@@ -98,7 +107,7 @@ class RepoGateway(private val context: Context) {
         val r = store.read(); val request = id()
         val hash = RepoPolicy.runnerForQuery(mode, sha(), r.optString("job_runner_sha"), r.optString("installed_sha"), LEGACY_SHA)
         if (!hash.matches(Regex("[a-f0-9]{64}"))) return
-        val runnerVersion = if (hash == LEGACY_SHA) "0.2.0" else VERSION
+        val runnerVersion = RepoPolicy.runnerVersion(hash, VERSION)
         val payload = JSONObject().put("request_id", request).put("mode", mode)
             .put("job_id", r.getString("job_id")).put("action", r.getString("action"))
             .put("project_id", PROJECT).toString()
@@ -133,7 +142,7 @@ class RepoGateway(private val context: Context) {
             putExtra("com.termux.RUN_COMMAND_ARGUMENTS", args)
             putExtra("com.termux.RUN_COMMAND_WORKDIR", TermuxGateway.HOME)
             putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
-            putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "AnimaDev · Git")
+            putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "AnimaDev · операция проекта")
             putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", callback)
         }
         try { check(context.startService(command) != null) }
@@ -144,6 +153,11 @@ class RepoGateway(private val context: Context) {
                     .put("message", "Android не подтвердил отправку. Результат неизвестен. Проверьте разрешение Termux; запуск не повторяем.")
             }
         }
+    }
+    fun mayTest(r: JSONObject): Boolean {
+        val snapshot = r.optJSONObject("snapshot") ?: return false
+        return RepoPolicy.mayTest(snapshot.optString("branch"), snapshot.optBoolean("remote_ok"),
+            r.optBoolean("ready"), store.blocked() || r.optBoolean("pending"))
     }
     fun maySync(r: JSONObject): Boolean {
         val s = r.optJSONObject("snapshot") ?: return false

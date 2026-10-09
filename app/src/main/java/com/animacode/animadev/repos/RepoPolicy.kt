@@ -1,6 +1,24 @@
 package com.animacode.animadev.repos
 
 object RepoPolicy {
+    fun runnerVersion(sha: String, current: String): String = when (sha) {
+        "e96b432836ff0fb1f23f9455a1440a73fbcb7a675720871d323c4209bb178a4e" -> "0.2.0"
+        "7239fd9dd4979342bdfec98f0a10ef198358e8f8e6ecc8b3696be6ca0df5b0b2" -> "0.2.1"
+        else -> current
+    }
+    fun mayTest(branch: String, remote: Boolean, ready: Boolean, blocked: Boolean): Boolean =
+        branch == "test/decomposition-v1" && remote && ready && !blocked
+    fun validCounts(total: Long, passed: Long, failed: Long, skipped: Long, duration: Long): Boolean =
+        listOf(total, passed, failed, skipped, duration).all { it >= 0 && it <= 1_000_000_000L } &&
+            passed + failed + skipped == total
+    fun testState(state: String): String = when (state) {
+        "REQUESTED", "QUEUED" -> "Ожидание"
+        "RUNNING" -> "Выполнение"
+        "SUCCEEDED" -> "Успешно"
+        "FAILED", "TIMED_OUT", "INTERRUPTED" -> "Ошибка"
+        "UNKNOWN" -> "Результат неизвестен"
+        else -> "Не запускались"
+    }
     fun runnerForQuery(mode: String, current: String, job: String, installed: String, legacy: String): String =
         if (mode == "START") current else job.ifEmpty { installed.ifEmpty { legacy } }
     val activeStates = setOf("REQUESTED", "QUEUED", "RUNNING", "UNKNOWN")
