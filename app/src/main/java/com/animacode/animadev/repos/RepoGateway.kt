@@ -100,7 +100,10 @@ class RepoGateway(private val context: Context) {
         if (action == "BUILD_DEBUG" && !mayBuild(r,projectId)) return
         val previousProject = r.optString("project_id",PROJECT)
         if (previousProject != projectId) {
-            r.remove("snapshot").remove("job").remove("test_job").remove("build_job")
+            r.remove("snapshot")
+            r.remove("job")
+            r.remove("test_job")
+            r.remove("build_job")
         }
         r.put("project_id",projectId)
         if (projectId == PROJECT) r.remove("profile")
