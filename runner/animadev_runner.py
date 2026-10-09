@@ -353,8 +353,22 @@ class Engine:
         self.monitor = {'__file__':str(module_path), '__name__':'verified_job_monitor'}
         exec(compile(data,str(module_path),'exec'), self.monitor)
         self.journal = self.monitor['Journal'](self.store, redact)
+    def register_profile(self, project_id, profile):
+        verified = validate_profile(profile)
+        if project_id != profile['id'] or project_id in REGISTRY:
+            raise Denied('PROJECT_NOT_FOUND')
+        registered = self.registry.get(project_id)
+        if registered is not None and registered != verified:
+            raise Denied('REPLAY_CONFLICT')
+        self.registry[project_id] = verified
+
     def validate(self, jid, project, action):
         if not HEX_ID.fullmatch(jid): raise Denied('RESULT_MALFORMED')
+        if project not in self.registry:
+            with self.store.transaction() as c:
+                old = self.store.get(c, jid)
+            if old and old['project_id'] == project and old.get('profile'):
+                self.register_profile(project, old['profile'])
         if project not in self.registry: raise Denied('PROJECT_NOT_FOUND')
         if action not in ACTIONS: raise Denied('ACTION_DENIED')
     def reserve(self, jid, project, action, reconcile=False):
@@ -372,6 +386,10 @@ class Engine:
             if c.execute('SELECT COUNT(*) FROM jobs').fetchone()[0] >= 100:
                 raise Denied('HISTORY_FULL')
             j = {'job_id': jid, 'project_id': project, 'action': action, 'fingerprint': fp,
+                'profile': {'id':project,'name':self.registry[project]['name'],
+                   'root':self.registry[project]['root'],'remote':self.registry[project]['origin'],
+                   'branch':self.registry[project]['branch']}
+                   if self.registry[project].get('dynamic') else None,
                 'state': 'NOT_STARTED' if reconcile else 'QUEUED', 'created_at': time.time(),
                 'started_at': None, 'ended_at': time.time() if reconcile else None,
                 'pid': None, 'process_identity': None, 'child_pid': None, 'child_identity': None, 'exit_code': None, 'error_code': '',
@@ -410,6 +428,7 @@ class Engine:
         with self.store.transaction() as c:
             j = self.store.get(c, jid)
             if not j or j['state'] != 'QUEUED': return
+            if j.get('profile'): self.register_profile(j['project_id'],j['profile'])
             j.update(state='RUNNING', pid=os.getpid(), process_identity=identity(os.getpid()), started_at=time.time())
             self.store.save(c, j)
         lock_path = self.store.root / ('project-' + j['project_id'] + '.lock')
@@ -428,7 +447,7 @@ class Engine:
             with self.store.transaction() as c:
                 row=self.store.get(c,jid); row[channel]=(row.get(channel,'')+'\n'+safe)[-4096:]
                 self.store.save(c,row)
-        log('event','Запуск '+j['action']+' · AnimaQuiz · Job ID '+jid)
+        log('event','Запуск '+j['action']+' · '+self.registry[j['project_id']]['name']+' · Job ID '+jid)
         log('event','Рабочий каталог: '+self.registry[j['project_id']]['root'])
         self.store.update(jid,last_progress_at=time.time(),stage='Проверка проекта')
         try:
@@ -499,14 +518,17 @@ def main():
         return 0
     request_id = ''
     try:
-        if len(sys.argv)!=2 or len(sys.argv[1])>2048: raise Denied('RESULT_MALFORMED')
+        if len(sys.argv)!=2 or len(sys.argv[1])>4096: raise Denied('RESULT_MALFORMED')
         p=json.loads(sys.argv[1])
         keys={'request_id','mode','job_id','project_id','action'}
         if p.get('mode') in ('LOG','HISTORY'): keys |= {'offset','view'}
+        if p.get('mode')=='START' and 'profile' in p: keys.add('profile')
         if set(p) != keys: raise Denied('RESULT_MALFORMED')
         request_id=p['request_id']
         if not isinstance(request_id,str) or not HEX_ID.fullmatch(request_id): raise Denied('RESULT_MALFORMED')
         engine=Engine()
+        if p['mode']=='START' and 'profile' in p:
+            engine.register_profile(p['project_id'], p['profile'])
         if p['mode'] in ('LOG','HISTORY'):
             engine.validate(p['job_id'],p['project_id'],p['action'])
             if p['mode']=='HISTORY': result=engine.journal.history(p['project_id'],p['offset'])
