@@ -9,9 +9,15 @@ object ProjectPolicy {
         val parts=path.removePrefix("$HOME/").split('/')
         return parts.size in 1..6 && parts.none { it.isBlank() || it.startsWith('.') || it in excluded }
     }
-    fun supported(id: String,path: String)=id=="animaquiz" && path==QUIZ
-    fun canExecute(id: String,path: String,action: String,worktree:Boolean=false)=!worktree && supported(id,path) && action in setOf("STATUS","CHECK","SYNC","TEST","BUILD_DEBUG")
-    fun validId(id: String,path: String)=permittedPath(path) && (if(path==QUIZ) id=="animaquiz" else id.matches(Regex("[a-f0-9]{32}")))
+    private val originLabel=Regex("github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+    fun supported(id:String,path:String,remote:String=""):Boolean =
+        (id=="animaquiz" && path==QUIZ) || (validId(id,path) && originLabel.matches(remote))
+    fun stableId(path:String):String {
+        val bytes=java.security.MessageDigest.getInstance("SHA-256").digest(path.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it.toInt() and 0xff) }.take(32)
+    }
+    fun canExecute(id: String,path: String,action: String,worktree:Boolean=false,remote:String="")=!worktree && supported(id,path,remote) && action in setOf("STATUS","CHECK","SYNC","TEST","BUILD_DEBUG")
+    fun validId(id: String,path: String)=permittedPath(path) && (if(path==QUIZ) id=="animaquiz" else id==stableId(path))
     fun nextSelection(ids: List<String>,selected: String)=selected.takeIf { it in ids } ?: ""
 }
 
