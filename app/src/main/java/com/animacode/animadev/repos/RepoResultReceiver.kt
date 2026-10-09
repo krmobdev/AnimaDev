@@ -50,14 +50,14 @@ class RepoResultReceiver : BroadcastReceiver() {
                 if (code == "RUNNER_CHECKSUM_MISMATCH") record.put("ready", false)
                 val active = j.optJSONObject("active_job")
                 if (code == "JOB_BUSY" && active != null) {
-                    check(active.getString("project_id") == RepoGateway.PROJECT)
+                    check(active.getString("project_id") == record.optString("project_id",RepoGateway.PROJECT))
                     check(active.getString("action") in setOf("STATUS", "CHECK", "SYNC", "TEST", "BUILD_DEBUG"))
                     check(active.getString("job_id").matches(Regex("[a-f0-9]{32}")))
                     record.put("job_id", active.getString("job_id")).put("action", active.getString("action"))
                 }
             } else {
                 val job = j.getJSONObject("job")
-                check(job.getString("project_id") == RepoGateway.PROJECT)
+                check(job.getString("project_id") == record.optString("project_id",RepoGateway.PROJECT))
                 check(RepoPolicy.validJob(record.getString("job_id"), record.getString("action"),
                     job.getString("job_id"), job.getString("action"), job.getString("state")))
                 if (job.getString("state") == "SUCCEEDED") check(job.getInt("exit_code") == 0)
