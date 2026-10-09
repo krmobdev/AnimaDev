@@ -92,12 +92,20 @@ class RepoGateway(private val context: Context) {
     }
     fun start(action: String, projectId: String, projectPath: String) {
         val project=com.animacode.animadev.projects.ProjectStore(context).all().find {it.id==projectId && it.path==projectPath} ?: return
-        if (!ProjectPolicy.canExecute(projectId,projectPath,action,project.worktree)) return
+        if (!ProjectPolicy.canExecute(projectId,projectPath,action,project.worktree,project.remote)) return
         val r = store.read()
         if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST", "BUILD_DEBUG") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked()) return
-        if (action == "SYNC" && !maySync(r)) return
-        if (action == "TEST" && !mayTest(r)) return
-        if (action == "BUILD_DEBUG" && !mayBuild(r)) return
+        if (action == "SYNC" && !maySync(r,projectId)) return
+        if (action == "TEST" && !mayTest(r,projectId)) return
+        if (action == "BUILD_DEBUG" && !mayBuild(r,projectId)) return
+        val previousProject = r.optString("project_id",PROJECT)
+        if (previousProject != projectId) {
+            r.remove("snapshot").remove("job").remove("test_job").remove("build_job")
+        }
+        r.put("project_id",projectId)
+        if (projectId == PROJECT) r.remove("profile")
+        else r.put("profile",JSONObject().put("id",project.id).put("name",project.name)
+            .put("root",project.path).put("remote",project.remote).put("branch",project.branch))
         val job = id()
         r.put("job_id", job).put("action", action).put("state", "REQUESTED")
             .put("job_runner_sha", sha())
@@ -125,7 +133,8 @@ class RepoGateway(private val context: Context) {
         val runnerVersion = RepoPolicy.runnerVersion(hash, VERSION)
         val payload = JSONObject().put("request_id", request).put("mode", mode)
             .put("job_id", target.ifEmpty { r.getString("job_id") }).put("action", targetAction.ifEmpty { r.getString("action") })
-            .put("project_id", PROJECT)
+            .put("project_id", r.optString("project_id",PROJECT))
+        if (mode=="START" && r.has("profile")) payload.put("profile",r.getJSONObject("profile"))
         if (mode in setOf("LOG","HISTORY")) payload.put("offset",offset).put("view",view)
         val script = """
             import pathlib,hashlib,json,sys
@@ -172,21 +181,24 @@ class RepoGateway(private val context: Context) {
             }
         }
     }
-    fun mayTest(r: JSONObject): Boolean {
+    fun mayTest(r: JSONObject, projectId:String=PROJECT): Boolean {
+        if(r.optString("project_id",PROJECT)!=projectId)return false
         val snapshot = r.optJSONObject("snapshot") ?: return false
         return RepoPolicy.mayTest(snapshot.optString("branch"), snapshot.optBoolean("remote_ok"),
-            r.optBoolean("ready"), store.blocked() || r.optBoolean("pending"))
+            r.optBoolean("ready"), store.blocked() || r.optBoolean("pending"),projectId)
     }
-    fun mayBuild(r: JSONObject): Boolean {
+    fun mayBuild(r: JSONObject, projectId:String=PROJECT): Boolean {
+        if(r.optString("project_id",PROJECT)!=projectId)return false
         val s = r.optJSONObject("snapshot") ?: return false
         return RepoPolicy.mayBuild(s.optString("branch"),s.optBoolean("dirty",true),s.optBoolean("remote_ok"),
             r.optBoolean("ready"),store.blocked() || r.optBoolean("pending"),s.optBoolean("checked"),
-            s.optInt("ahead",-1),s.optInt("behind",-1),s.optString("local_commit"),s.optString("remote_commit"))
+            s.optInt("ahead",-1),s.optInt("behind",-1),s.optString("local_commit"),s.optString("remote_commit"),projectId)
     }
-    fun maySync(r: JSONObject): Boolean {
+    fun maySync(r: JSONObject, projectId:String=PROJECT): Boolean {
+        if(r.optString("project_id",PROJECT)!=projectId)return false
         val s = r.optJSONObject("snapshot") ?: return false
         return RepoPolicy.maySync(s.optString("branch"), s.optBoolean("dirty", true), s.optBoolean("remote_ok"),
             s.optInt("ahead", -1), s.optInt("behind", -1), s.optBoolean("checked"), s.optBoolean("can_sync"),
-            store.blocked() || r.optBoolean("pending") || !r.optBoolean("ready"))
+            store.blocked() || r.optBoolean("pending") || !r.optBoolean("ready"),projectId)
     }
 }
