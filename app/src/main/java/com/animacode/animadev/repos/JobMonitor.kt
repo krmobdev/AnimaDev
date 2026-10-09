@@ -1,0 +1,80 @@
+package com.animacode.animadev.repos
+
+import android.content.Context
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@Composable
+fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJournal: (String)->Unit) {
+    val settings=remember { context.getSharedPreferences("monitor_settings",Context.MODE_PRIVATE) }
+    val store=remember { RepoStore(context) }; val gateway=remember { RepoGateway(context) }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while(true) { delay(1000);now=System.currentTimeMillis() } }
+    val jid=record.optString("job_id"); if(jid.isEmpty())return
+    val job=record.optJSONObject("job")
+    val state=record.optString("state")
+    val start=((job?.optDouble("started_at",job.optDouble("created_at",0.0)) ?: record.optDouble("sent_at",0.0)/1000)*1000).toLong()
+    val progress=((job?.optDouble("last_progress_at",0.0) ?: 0.0)*1000).toLong()
+    val ended=((job?.optDouble("ended_at",0.0) ?: 0.0)*1000).toLong()
+    val elapsed=(if(ended>0)ended else now)-start
+    val minutes=MonitorPolicy.minutes(settings.getInt("warning_minutes",10))
+    val until=settings.getLong("snooze_$jid",0)
+    var snoozeGeneration by remember { mutableIntStateOf(0) }
+    val warning=remember(now,state,progress,until,snoozeGeneration) { MonitorPolicy.warning(now,progress,start,until,minutes,state) }
+    val quiet=progress>0 && now-progress>60_000L
+    val manual=MonitorPolicy.manualVisible(state,record.optLong("last_confirmed",record.optLong("sent_at")),now)
+    Card {
+        Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text("Задание AnimaQuiz · ${if(record.optString("action")=="TEST")"TEST" else "Git / ${record.optString("action")}"}",style=MaterialTheme.typography.titleMedium)
+            Text(MonitorPolicy.label(state,quiet,warning))
+            Text("Job ID: $jid",style=MaterialTheme.typography.bodySmall)
+            Text("Начало: ${if(start>0)SimpleDateFormat("dd.MM HH:mm:ss",Locale.getDefault()).format(Date(start)) else "не подтверждено"}")
+            Text("Прошло: ${maxOf(0,elapsed)/60_000} мин ${maxOf(0,elapsed)/1000%60} с")
+            Text("Последний прогресс: ${if(progress>0)"${maxOf(0,now-progress)/1000} с назад" else "пока не подтверждён"}",style=MaterialTheme.typography.bodySmall)
+            Text(job?.optString("stage")?.ifEmpty { "Ожидаем подтверждение этапа" } ?: "Ожидаем подтверждение этапа",maxLines=2)
+            val alive=job?.let { if(it.isNull("process_alive") || !it.has("process_alive"))null else it.optBoolean("process_alive") }
+            Text("Процесс: ${when(alive) { true->"жив";false->"не обнаружен";else->"состояние недоступно" }} · CPU: ${when { job?.optBoolean("computing")==true->"вычисляет";job?.optBoolean("cpu_available")==true->"новый прирост не подтверждён";else->"показатель недоступен" }}",style=MaterialTheme.typography.bodySmall)
+            if(state in setOf("REQUESTED","QUEUED","RUNNING")) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if(job!=null && !job.isNull("exit_code"))Text("Exit code: ${job.optInt("exit_code")}")
+            Text(record.optString("message"),style=MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick={openJournal(jid)}) { Text("Открыть журнал") }
+                if(manual) OutlinedButton(onClick={gateway.query(true)},enabled=permitted && !record.optBoolean("pending")) {
+                    Text(if(record.optBoolean("pending") && record.optBoolean("manual_query"))"Проверяем…" else "Проверить состояние задания")
+                }
+            }
+            if(record.optString("query_result").isNotEmpty())Text(record.optString("query_result"),style=MaterialTheme.typography.bodySmall)
+        }
+    }
+    if(warning) AlertDialog(onDismissRequest={settings.edit().putLong("snooze_$jid",MonitorPolicy.snooze(now,minutes)).apply();snoozeGeneration++},title={Text("Давно нет подтверждённого прогресса")},
+        text={Text("Задание выполняется ${maxOf(0,elapsed)/60_000} минут. Последняя подтверждённая активность — ${maxOf(0,now-maxOf(progress,start))/60_000} минут назад. Процесс может продолжать вычисления.")},
+        confirmButton={TextButton(onClick={settings.edit().putLong("snooze_$jid",MonitorPolicy.snooze(now,minutes)).apply();snoozeGeneration++}) { Text("Продолжить ждать") }},
+        dismissButton={TextButton(onClick={settings.edit().putLong("snooze_$jid",MonitorPolicy.snooze(now,minutes)).apply();snoozeGeneration++;openJournal(jid)}) { Text("Открыть журнал") }})
+}
+
+@Composable
+fun MonitorSettings(context: Context) {
+    val prefs=remember { context.getSharedPreferences("monitor_settings",Context.MODE_PRIVATE) }
+    var minutes by remember { mutableIntStateOf(MonitorPolicy.minutes(prefs.getInt("warning_minutes",10))) }
+    val notifications=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+        Text("Настройки",style=MaterialTheme.typography.headlineMedium)
+        Text("Предупреждать при отсутствии признаков прогресса")
+        MonitorPolicy.thresholds.forEach { value ->
+            Row { RadioButton(selected=minutes==value,onClick={minutes=value;prefs.edit().putInt("warning_minutes",value).apply()});Text("$value минут",Modifier.padding(top=12.dp)) }
+        }
+        Text("Это предупреждение, а не остановка. Защитный предел TEST — 90 минут.",style=MaterialTheme.typography.bodySmall)
+        OutlinedButton(onClick={if(android.os.Build.VERSION.SDK_INT>=33)notifications.launch(android.Manifest.permission.POST_NOTIFICATIONS) else context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,context.packageName))}) { Text("Разрешить уведомления") }
+        Text("Уведомления отражают полученное состояние. Закрытие приложения не останавливает Termux; Android может завершить его независимо от уведомления.",style=MaterialTheme.typography.bodySmall)
+    }
+}

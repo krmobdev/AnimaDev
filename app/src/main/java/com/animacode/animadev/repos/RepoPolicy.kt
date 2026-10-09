@@ -4,6 +4,7 @@ object RepoPolicy {
     fun runnerVersion(sha: String, current: String): String = when (sha) {
         "e96b432836ff0fb1f23f9455a1440a73fbcb7a675720871d323c4209bb178a4e" -> "0.2.0"
         "7239fd9dd4979342bdfec98f0a10ef198358e8f8e6ecc8b3696be6ca0df5b0b2" -> "0.2.1"
+        "bcca823e689fd56e05993fe9e61d8b2f7d904c054eb34964d39b3828cd24fa4b" -> "0.3.0"
         else -> current
     }
     fun mayTest(branch: String, remote: Boolean, ready: Boolean, blocked: Boolean): Boolean =

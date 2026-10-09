@@ -12,7 +12,7 @@ import time
 import xml.etree.ElementTree as ET
 
 COMMAND = ('./gradlew', ':app:testDebugUnitTest', '--offline', '--no-daemon', '--rerun-tasks', '--console=plain')
-TIMEOUT = 1200
+TIMEOUT = 5400
 MAX_XML = 2 * 1024 * 1024
 MAX_FILES = 500
 MESSAGES = {
@@ -21,7 +21,7 @@ MESSAGES = {
  'TESTS_FAILED': 'Есть проваленные unit-тесты. Посмотрите результаты и диагностику.',
  'REPORTS_MISSING': 'Новые JUnit XML не получены. Успех тестов не подтверждён.',
  'REPORTS_INVALID': 'Отчёт JUnit повреждён или превышает безопасный размер. Успех не подтверждён.',
- 'TEST_TIMEOUT_UNKNOWN': 'Превышен лимит 20 минут. Gradle мог оставить дочерние процессы; результат неизвестен, повтор заблокирован.',
+ 'TEST_TIMEOUT_UNKNOWN': 'Превышен лимит 90 минут. Gradle мог оставить дочерние процессы; результат неизвестен, повтор заблокирован.',
  'TEST_STATE_CHANGED': 'Ветка или коммит изменились во время тестов. Результат не подтверждён.',
  'RUNNER_CHECKSUM_MISMATCH': 'Контрольная сумма модуля тестов не совпадает. Запуск отменён.',
 }
@@ -90,7 +90,7 @@ class SafeLines:
         self.suppressed=True
         return '[Длинная строка диагностики пропущена; дальнейший вывод канала скрыт]'
 
-def process(root, env, log, on_process, identity, redact, timeout=TIMEOUT):
+def process(root, env, log, on_process, identity, redact, timeout=TIMEOUT, observe=lambda:None):
     # A permission gate records the child before it may execute the fixed command.
     gate = "import os,sys\nif sys.stdin.buffer.read(1)!=b'1': sys.exit(1)\nos.execvpe(sys.argv[1],sys.argv[1:],os.environ)"
     bash = '/data/data/com.termux/files/usr/bin/bash' if sys.platform == 'android' else '/bin/bash'
@@ -116,10 +116,12 @@ def process(root, env, log, on_process, identity, redact, timeout=TIMEOUT):
             if piece.endswith(b'\n'):
                 if dropping[channel]: line=filters[channel].oversized()+'\n'
                 else: line=filters[channel].feed(fragments[channel].decode('utf-8','replace'))+'\n'
-                tails[channel]=(tails[channel]+line)[-4096:];fragments[channel].clear();dropping[channel]=False
+                if line.strip(): log(channel,line)
+                fragments[channel].clear();dropping[channel]=False
     try:
         on_process(p.pid,identity(p.pid));p.stdin.write(b'1');p.stdin.flush();p.stdin.close()
         while selector.get_map():
+            observe()
             if time.monotonic()>=deadline:
                 try: os.killpg(p.pid,signal.SIGKILL)
                 except ProcessLookupError: pass
@@ -152,8 +154,8 @@ def execute(guard, log, on_process, identity, redact, timeout=TIMEOUT):
     env=dict(guard.env)
     # Avoid environment-provided arbitrary Gradle init options; retain established Java/SDK paths.
     for key in ('JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','GRADLE_OPTS','JAVA_OPTS'):env.pop(key,None)
-    log('stdout','Запуск :app:testDebugUnitTest — offline, no-daemon, rerun-tasks.')
-    code,unknown=process(guard.root,env,log,on_process,identity,redact,timeout)
+    log('command','bash ./gradlew :app:testDebugUnitTest --offline --no-daemon --rerun-tasks --console=plain')
+    code,unknown=process(guard.root,env,log,on_process,identity,redact,timeout,getattr(guard,'observe',lambda:None))
     if unknown:return dict(state='UNKNOWN',error_code='TEST_TIMEOUT_UNKNOWN',exit_code=None,snapshot=snapshot,tests=None,unresolved=True)
     result=dict(state='FAILED',error_code='GRADLE_FAILED',exit_code=code,snapshot=snapshot,tests=None)
     try:result['tests']=summary(before,reports(guard.root))

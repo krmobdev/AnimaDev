@@ -13,7 +13,7 @@ import java.util.UUID
 
 class RepoGateway(private val context: Context) {
     companion object {
-        const val VERSION = "0.3.0"
+        const val VERSION = "0.3.1"
         const val LEGACY_SHA = "e96b432836ff0fb1f23f9455a1440a73fbcb7a675720871d323c4209bb178a4e"
         const val PROTOCOL = 2
         const val PROJECT = "animaquiz"
@@ -49,20 +49,24 @@ class RepoGateway(private val context: Context) {
         if (helperSha != helperActual || !helperSha.matches(Regex("[a-f0-9]{64}"))) {
             store.edit { it.put("ready", false).put("message", "Контрольная сумма модуля тестов не совпадает.") }; return
         }
+        val monitor = context.assets.open("runner/job_monitor.py").use { it.readBytes() }
+        val monitorSha = context.assets.open("runner/monitor.sha256").bufferedReader().use { it.readText().trim() }
+        check(MessageDigest.getInstance("SHA-256").digest(monitor).joinToString("") { "%02x".format(it) } == monitorSha)
+        val monitorData = Base64.encodeToString(monitor, Base64.NO_WRAP)
         val helperData = Base64.encodeToString(helper, Base64.NO_WRAP)
         val data = Base64.encodeToString(bytes, Base64.NO_WRAP)
         // Fixed bootstrap. No repository content, commands, paths or configuration from the UI.
         val script = """
             import pathlib,os,hashlib,base64,json,sys,tempfile
             os.umask(0o077)
-            request_id,expected,payload,helper_sha,helper_payload=sys.argv[1:]
+            request_id,expected,payload,helper_sha,helper_payload,monitor_sha,monitor_payload=sys.argv[1:]
             try:
                 root=pathlib.Path('$RUNNER_ROOT')
                 for p in [root,root/'releases',root/'releases'/expected]:
                     p.mkdir(parents=True,exist_ok=True,mode=0o700)
                     if p.resolve()!=p.absolute() or not p.is_dir(): raise ValueError('PATH_DENIED')
                     os.chmod(p,0o700)
-                for name,digest,encoded in [('animadev_runner.py',expected,payload),('gradle_tests.py',helper_sha,helper_payload)]:
+                for name,digest,encoded in [('animadev_runner.py',expected,payload),('gradle_tests.py',helper_sha,helper_payload),('job_monitor.py',monitor_sha,monitor_payload)]:
                     content=base64.b64decode(encoded,validate=True)
                     if len(content)>65536 or hashlib.sha256(content).hexdigest()!=digest: raise ValueError('RUNNER_CHECKSUM_MISMATCH')
                     dest=root/'releases'/expected/name
@@ -83,7 +87,7 @@ class RepoGateway(private val context: Context) {
             .put("transport_runner_version", VERSION)
             .put("sent_at", System.currentTimeMillis()).put("message", "Устанавливаем локальный помощник вне Git-репозиториев…")
         if (!store.write(r)) return
-        send(request, arrayOf("-c", script, request, hash, data, helperSha, helperData))
+        send(request, arrayOf("-c", script, request, hash, data, helperSha, helperData, monitorSha, monitorData))
     }
     fun start(action: String) {
         val r = store.read()
@@ -98,19 +102,27 @@ class RepoGateway(private val context: Context) {
         if (!store.write(r)) return
         dispatch("START")
     }
-    fun query() {
+    fun query(manual: Boolean = false) {
         val r = store.read()
-        if (!r.optBoolean("ready") || r.optBoolean("pending") || r.optString("job_id").isEmpty()) return
+        if (!r.optBoolean("ready") || !MonitorPolicy.queryAllowed(r.optBoolean("pending"),r.optString("job_id").isNotEmpty())) return
+        store.edit { it.put("manual_query", manual) }
         dispatch("QUERY")
     }
-    private fun dispatch(mode: String) {
+    fun journal(mode: String, job: String, action: String, offset: Long, view: String) {
+        val r = store.read()
+        if (r.optBoolean("pending") || !r.optBoolean("ready") || r.optString("installed_sha") != sha()) return
+        if (mode !in setOf("LOG", "HISTORY") || !job.matches(Regex("[a-f0-9]{32}")) || action !in setOf("STATUS","CHECK","SYNC","TEST")) return
+        dispatch(mode, job, action, offset, view)
+    }
+    private fun dispatch(mode: String, target: String = "", targetAction: String = "", offset: Long = 0, view: String = "ALL") {
         val r = store.read(); val request = id()
-        val hash = RepoPolicy.runnerForQuery(mode, sha(), r.optString("job_runner_sha"), r.optString("installed_sha"), LEGACY_SHA)
+        val hash = if (mode in setOf("LOG","HISTORY")) sha() else RepoPolicy.runnerForQuery(mode, sha(), r.optString("job_runner_sha"), r.optString("installed_sha"), LEGACY_SHA)
         if (!hash.matches(Regex("[a-f0-9]{64}"))) return
         val runnerVersion = RepoPolicy.runnerVersion(hash, VERSION)
         val payload = JSONObject().put("request_id", request).put("mode", mode)
-            .put("job_id", r.getString("job_id")).put("action", r.getString("action"))
-            .put("project_id", PROJECT).toString()
+            .put("job_id", target.ifEmpty { r.getString("job_id") }).put("action", targetAction.ifEmpty { r.getString("action") })
+            .put("project_id", PROJECT)
+        if (mode in setOf("LOG","HISTORY")) payload.put("offset",offset).put("view",view)
         val script = """
             import pathlib,hashlib,json,sys
             source=pathlib.Path(sys.argv[1]); expected=sys.argv[2]; payload=sys.argv[3]
@@ -125,10 +137,10 @@ class RepoGateway(private val context: Context) {
             sys.argv=[str(source),payload]
             exec(compile(data,str(source),'exec'),{'__name__':'__main__','__file__':str(source),'EXPECTED_SHA':expected})
         """.trimIndent()
-        r.put("transport_id", request).put("mode", mode).put("pending", true).put("sent_at", System.currentTimeMillis())
+        r.put("transport_id", request).put("mode", mode).put("page_job", target).put("page_view", view).put("page_offset",offset).put("pending", true).put("sent_at", System.currentTimeMillis())
             .put("transport_runner_version", runnerVersion)
         if (!store.write(r)) return
-        send(request, arrayOf("-c", script, path(hash), hash, payload))
+        send(request, arrayOf("-c", script, path(hash), hash, payload.toString()))
     }
     private fun send(request: String, args: Array<String>) {
         val callbackIntent = Intent(context, RepoResultReceiver::class.java).apply {
@@ -149,7 +161,9 @@ class RepoGateway(private val context: Context) {
         catch (_: Exception) {
             callback.cancel()
             store.edit {
-                it.put("pending", false).put("state", "UNKNOWN")
+                if(it.optString("mode") in setOf("LOG","HISTORY")) {
+                    it.put("pending",false).put("journal_message","Android не подтвердил чтение журнала. Сохранённые данные доступны.").remove("transport_id")
+                } else it.put("pending", false).put("state", "UNKNOWN")
                     .put("message", "Android не подтвердил отправку. Результат неизвестен. Проверьте разрешение Termux; запуск не повторяем.")
             }
         }

@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,6 +24,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.animacode.animadev.termux.*
+import com.animacode.animadev.repos.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.animacode.animadev.repos.RepositoriesScreen
 import com.animacode.animadev.repos.RepoStore
 import com.animacode.animadev.repos.RepoPolicy
@@ -31,6 +36,8 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     private var permitted by mutableStateOf(false)
     private var version by mutableStateOf<String?>(null)
+    private var requestedJournal by mutableStateOf("")
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent);requestedJournal=intent.getStringExtra("journal_job") ?: "" }
     private val gateway by lazy { TermuxGateway(this) }
 
     override fun onResume() {
@@ -40,28 +47,61 @@ class MainActivity : ComponentActivity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedJournal=intent.getStringExtra("journal_job") ?: ""
         enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = lightColorScheme(
                 primary = Color(0xFF3559D5), background = Color(0xFFF5F6FA),
                 surface = Color.White, onSurface = Color(0xFF192033))) {
-                var repositoryTab by rememberSaveable { mutableStateOf(true) }
+                var screen by rememberSaveable { mutableStateOf("projects") }
+                var journalJob by rememberSaveable { mutableStateOf("") }
+                val repoStore=remember { RepoStore(this@MainActivity) }
+                val repoGateway=remember { RepoGateway(this@MainActivity) }
+                val owner=LocalLifecycleOwner.current
+                var resumed by remember { mutableStateOf(false) }
+                DisposableEffect(owner) {
+                    val observer=LifecycleEventObserver { _,_->resumed=owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) }
+                    owner.lifecycle.addObserver(observer)
+                    resumed=owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                    onDispose { owner.lifecycle.removeObserver(observer) }
+                }
+                LaunchedEffect(requestedJournal) { if(requestedJournal.isNotEmpty()) { journalJob=requestedJournal;screen="journal" } }
+                LaunchedEffect(resumed,permitted) {
+                    if(!resumed || !permitted)return@LaunchedEffect
+                    var restore=true
+                    while(true) {
+                        repoStore.expire()
+                        val r=repoStore.read()
+                        if(!r.optBoolean("pending") && r.optBoolean("ready") && r.optString("job_id").isNotEmpty() &&
+                            (restore || (repoStore.blocked() && System.currentTimeMillis()-r.optLong("last_confirmed")>=5_000))) {
+                            repoGateway.query();restore=false
+                        }
+                        delay(2000)
+                    }
+                }
                 var confirmExit by rememberSaveable { mutableStateOf(false) }
                 var operationMayContinue by rememberSaveable { mutableStateOf(false) }
                 BackHandler {
+                    if(screen=="journal" || screen=="settings") { screen="projects";return@BackHandler }
                     val record = RepoStore(this@MainActivity).read()
                     operationMayContinue = RepoPolicy.blocked(record.optString("job_id"), record.optString("state")) || record.optBoolean("pending")
                     confirmExit = true
                 }
                 Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { repositoryTab = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Репозитории") }
-                        TextButton(onClick = { repositoryTab = false }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Связь Termux") }
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { screen = "projects" }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Репозитории") }
+                        TextButton(onClick={screen="journal";journalJob=""}) { Text("Журнал") }
+                        TextButton(onClick={screen="settings"}) { Text("Настройки") }
+                        TextButton(onClick = { screen = "probe" }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Связь Termux") }
                     }
                     HorizontalDivider()
                     Box(Modifier.weight(1f)) {
-                        if (repositoryTab) RepositoriesScreen(this@MainActivity, permitted, version) { permitted = gateway.permitted() }
-                        else ProbeScreen()
+                        when(screen) {
+                            "journal" -> JournalScreen(this@MainActivity,journalJob)
+                            "settings" -> MonitorSettings(this@MainActivity)
+                            "projects" -> RepositoriesScreen(this@MainActivity,permitted,version,{permitted=gateway.permitted()}) { id ->journalJob=id;screen="journal" }
+                            else -> ProbeScreen()
+                        }
                     }
                 }
                 if (confirmExit) AlertDialog(
@@ -160,7 +200,7 @@ class MainActivity : ComponentActivity() {
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                Text("0.3.0 · Без серверов", style = MaterialTheme.typography.bodySmall)
+                Text("0.3.1 · Без серверов", style = MaterialTheme.typography.bodySmall)
             }
     }
     @Composable private fun OutputBlock(label: String, output: String) {

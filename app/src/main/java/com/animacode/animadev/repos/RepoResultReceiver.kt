@@ -20,6 +20,20 @@ class RepoResultReceiver : BroadcastReceiver() {
             check(result.containsKey("exitCode") && result.containsKey("err"))
             val j = JSONObject(out)
             check(j.getInt("protocol_version") == RepoGateway.PROTOCOL && j.getString("runner_version") == record.optString("transport_runner_version", "0.2.0") && j.getString("request_id") == id)
+            if (record.optString("mode") in setOf("LOG","HISTORY")) {
+                val successful = result.getInt("exitCode") == 0 && result.getInt("err") == -1 && j.optBoolean("ok")
+                if(successful) JournalCache(context).use { cache ->
+                    if(record.optString("mode") == "HISTORY") cache.history(j.getJSONObject("page"))
+                    else cache.receive(j.getJSONObject("page"),record.getString("page_job"),record.getString("page_view"),record.getLong("page_offset"))
+                }
+                record.put("pending",false).put("journal_message",if(successful) "Журнал получен" else "Журнал пока недоступен. Повторите чтение; команды не запускаются.")
+                    .put("journal_more",j.optJSONObject("page")?.optBoolean("more") ?: false)
+                    .put("history_next",j.optJSONObject("page")?.optLong("next_offset") ?: 0)
+                    .put("journal_generation",record.optLong("journal_generation")+1)
+                record.remove("transport_id")
+                store.write(record)
+                return
+            }
             record.put("pending", false).put("callback_exit", result.getInt("exitCode"))
                 .put("termux_err", result.getInt("err")).put("transport_stdout", out.take(24_000))
                 .put("transport_stderr", redact(err).take(8192))
@@ -54,8 +68,10 @@ class RepoResultReceiver : BroadcastReceiver() {
                     if (job.getString("state") == "SUCCEEDED") check(tests != null && tests.getLong("failed") == 0L)
                     record.put("test_job", job)
                 }
+                if(record.optBoolean("manual_query")) record.put("query_result","Состояние задания проверено: ${MonitorPolicy.label(job.getString("state"),false,false)}")
                 record.put("state", job.getString("state")).put("job", job)
                     .put("message", job.optString("message")).put("runner_version", j.getString("runner_version"))
+                    .put("last_confirmed",System.currentTimeMillis()).put("manual_query",false)
                 val snapshot = job.optJSONObject("snapshot")
                 if (snapshot != null) {
                     check(snapshot.getString("local_commit").matches(Regex("[a-f0-9]{40,64}")))
@@ -72,7 +88,11 @@ class RepoResultReceiver : BroadcastReceiver() {
                 record.put("ready", false)
             }
             store.write(record)
+            JobNotifications.publish(context,record)
         } catch (_: Exception) {
+            if(record.optString("mode") in setOf("LOG","HISTORY")) {
+                store.edit { it.put("pending",false).put("journal_message","Ответ журнала не подтверждён; сохранённые данные доступны.").remove("transport_id") }; return
+            }
             store.edit { it.put("pending", false).put("state", "UNKNOWN")
                 .put("message", "RESULT_MALFORMED: ответ Termux не подтверждён. Уточняем состояние по ID; не повторяем запуск.") }
         }

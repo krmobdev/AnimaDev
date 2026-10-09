@@ -21,7 +21,7 @@ import com.animacode.animadev.termux.TermuxGateway
 import kotlinx.coroutines.delay
 
 @Composable
-fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: String?, onPermissionUpdated: () -> Unit) {
+fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: String?, onPermissionUpdated: () -> Unit, openJournal: (String)->Unit) {
     val store = remember { RepoStore(context) }
     val gateway = remember { RepoGateway(context) }
     var record by remember { mutableStateOf(store.read()) }
@@ -37,16 +37,6 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
         store.prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { owner.lifecycle.removeObserver(observer); store.prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    LaunchedEffect(resumed, permitted, record.optString("job_id"), record.optString("state"), record.optBoolean("pending")) {
-        while (resumed && permitted) {
-            delay(3_000)
-            store.expire()
-            val current = store.read()
-            if (RepoPolicy.blocked(current.optString("job_id"), current.optString("state")) && !current.optBoolean("pending")) gateway.query()
-            record = store.read()
-            if (!current.optBoolean("pending") && !store.blocked()) break
-        }
-    }
     val grant = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onPermissionUpdated() }
     val snapshot = record.optJSONObject("snapshot")
     val job = record.optJSONObject("job")
@@ -60,9 +50,8 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
     val ahead = snapshot?.optInt("ahead") ?: 0
     val behind = snapshot?.optInt("behind") ?: 0
     val label = when {
-        blocked -> if (record.optString("state") == "UNKNOWN") "Результат неизвестен" else "Операция проекта выполняется"
         snapshot == null -> "Не проверено"
-        !branchAllowed || !remoteOk || record.optString("state") in setOf("FAILED", "TIMED_OUT", "INTERRUPTED") -> "Ошибка"
+        !branchAllowed || !remoteOk -> "Ошибка"
         dirty -> "Есть локальные изменения"
         ahead > 0 -> "Есть локальные коммиты"
         behind > 0 -> "Есть обновления"
@@ -71,8 +60,7 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Text("Репозитории", style = MaterialTheme.typography.headlineMedium)
-        Text("Связь Termux — диагностика, не обязательная перед каждым действием.", style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        JobMonitor(context,record,permitted,openJournal)
         Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("AnimaQuiz", style = MaterialTheme.typography.headlineSmall)
@@ -85,7 +73,6 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
                 Text("Последний коммит: ${snapshot?.optString("local_commit")?.take(8)?.ifEmpty { "—" } ?: "—"}")
                 Text("Origin: ${when { snapshot == null -> "не проверен"; remoteOk -> "совпадает с ожидаемым"; else -> "не совпадает" }}")
                 if (snapshot?.optBoolean("checked") == true) Text("Удалённых новых: $behind · локальных новых: $ahead")
-                if (blocked || pending) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 if (termuxVersion == null) Text("Termux не найден. Восстановите установленный Termux.")
                 else if (!permitted) Button(onClick = { grant.launch(TermuxGateway.PERMISSION) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text("Разрешить доступ к Termux")
@@ -101,11 +88,10 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Проверить обновления") }
                 OutlinedButton(onClick = { confirmSync = true }, enabled = gateway.maySync(record),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Синхронизировать") }
-                Text("«Проверить обновления» — проверяет GitHub, не изменяя исходники. «Синхронизировать» — получает новые коммиты после подтверждения.", style = MaterialTheme.typography.bodySmall)
+                Text("CHECK проверяет GitHub. SYNC получает коммиты после подтверждения.", style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(onClick = { gateway.start("TEST") }, enabled = controls && gateway.mayTest(record),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Запустить тесты") }
-                Text("«Запустить тесты» — проверяет проект, не изменяя его исходный код. Gradle обновляет только рабочие файлы сборки и отчёты.", style = MaterialTheme.typography.bodySmall)
-                Text("Проверки и тесты можно повторять после завершения. Пока задание выполняется или результат неизвестен, новые действия заблокированы. «Уточнить состояние» повторно проверяет тот же ID и не запускает задание заново.", style = MaterialTheme.typography.bodySmall)
+                Text("Тесты проверяют проект без изменения исходников.", style = MaterialTheme.typography.bodySmall)
                 val reason = when {
                     blocked -> "Новый запуск заблокирован до подтверждения результата текущей операции."
                     snapshot == null -> "Сначала обновите состояние репозитория."
@@ -117,8 +103,7 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
                     else -> "Сначала проверьте обновления. Перед синхронизацией состояние будет проверено повторно."
                 }
                 Text(reason, style = MaterialTheme.typography.bodySmall)
-                if (blocked) OutlinedButton(onClick = { gateway.query() }, enabled = !pending && permitted && ready,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Уточнить состояние") }
+
             }
         }
         val testJob = if (record.optString("action") == "TEST" && blocked) org.json.JSONObject(job?.toString() ?: "{}").put("state", record.optString("state")).put("job_id", record.optString("job_id")) else record.optJSONObject("test_job")
@@ -131,36 +116,7 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
                 Text("Время тестов по JUnit: ${counts.optLong("duration_ms")} мс")
             } else Text("Статистика ещё не подтверждена JUnit XML.")
         }
-        Text("Последняя операция", style = MaterialTheme.typography.titleMedium)
-        Text(record.optString("message", "Пока не запускалась."))
-        if (job != null) {
-            val start = job.optDouble("started_at", Double.NaN)
-            val end = job.optDouble("ended_at", Double.NaN)
-            if (!start.isNaN() && !end.isNaN()) Text("Длительность: ${((end - start) * 1000).toLong()} мс")
-            if (job.has("exit_code") && !job.isNull("exit_code")) Text("Код операции: ${job.optInt("exit_code")}")
-            else if (job.optString("state") in RepoPolicy.terminalStates) Text("Код операции не получен; успех не подтверждён.")
-            if (job.optString("action") != "TEST" && job.optString("stdout").isNotBlank()) Text(job.optString("stdout").lineSequence().takeLastLines(5), style = MaterialTheme.typography.bodySmall)
-        }
-        TextButton(onClick = { details = !details }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (details) "Скрыть технические подробности" else "Технические подробности") }
-        if (details) SelectionContainer {
-            Column(Modifier.fillMaxWidth().background(Color.White, MaterialTheme.shapes.medium).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Runner ${record.optString("runner_version", if (ready) RepoGateway.VERSION else "не установлен")}")
-                Text("Код причины: ${job?.optString("error_code")?.ifEmpty { "—" } ?: "—"}")
-                // Git diagnostics are deliberately not rendered: show fixed classified messages instead.
-                Text("Job ID: ${record.optString("job_id", "—")}", fontFamily = FontFamily.Monospace)
-                Text("State: ${record.optString("state", "—")} · Action: ${record.optString("action", "—")}")
-                Text("Короткий запрос Termux: exit=${record.optString("callback_exit", "—")}, err=${record.optString("termux_err", "—")}")
-                Text("Рабочая папка: ~/quizapp\nЛокальное состояние: ~/.local/share/animadev")
-                snapshot?.optJSONArray("changed_files")?.let { Text("Локальные изменения:\n$it", style = MaterialTheme.typography.bodySmall) }
-                if (testJob != null) {
-                    Text("Job ID тестов: ${testJob.optString("job_id")}")
-                    Text("Диагностика тестов (ограничена):\n${RepoResultReceiver.redact(testJob.optString("stdout"))}\n${RepoResultReceiver.redact(testJob.optString("stderr"))}", style = MaterialTheme.typography.bodySmall)
-                }
-                Text("stdout (журнал шагов):\n${job?.optString("stdout") ?: "—"}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-                Text("stderr Termux: ${if (record.optString("transport_stderr").isBlank()) "пусто" else "Получена диагностика; используйте сообщение об ошибке выше."}", style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        Text("AnimaDev 0.3.0 · Git и unit-тесты в Termux", style = MaterialTheme.typography.bodySmall)
+        Text("AnimaDev 0.3.1 · Git и unit-тесты в Termux", style = MaterialTheme.typography.bodySmall)
     }
     if (confirmInstall) AlertDialog(onDismissRequest = { confirmInstall = false }, title = { Text("Настроить локальный помощник?") },
         text = { Text("AnimaDev сохранит встроенный проверенный runner в ~/.local/share/animadev. Настройки Termux и файлы QuizApp не меняются.") },

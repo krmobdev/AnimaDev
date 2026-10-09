@@ -14,8 +14,9 @@ import subprocess
 import sys
 import time
 
-VERSION = '0.3.0'
-GRADLE_SHA = '321d79a9cc18eb617d34cc136a3c8a357670dda69f5fb6572b2ac90bbed9c0c9'
+VERSION = '0.3.1'
+MONITOR_SHA = 'a49424125f9b023f6c495dd90e7b6902d49d57e4d5a18f3c28f8baa7c95fb5e8'
+GRADLE_SHA = '5bf269f5cff18e1a38bcfb095a34e6578c32ec513e707b3307dbf8d5b020e7c9'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
 STATE_ROOT = HOME / '.local/share/animadev'
@@ -195,6 +196,7 @@ class GitGuard:
         if code == 0 and names.strip(): raise Denied('EXECUTABLE_CONFIG')
         if code not in (0, 1): raise Denied('REPO_MISSING', code)
     def call(self, args, timeout=30, allow_failure=False):
+        self.log('command', __import__('shlex').join(self.prefix + args))
         self.log('step', args[0])
         # Permission gate: child cannot exec Git before its identity is durably recorded.
         gate = "import os,sys\npermit=sys.stdin.buffer.read(1)\nif permit!=b'1': sys.exit(1)\nos.execvpe(sys.argv[1],sys.argv[1:],os.environ)"
@@ -209,6 +211,7 @@ class GitGuard:
             self.on_process(p.pid, identity(p.pid))
             p.stdin.write(b'1'); p.stdin.flush(); p.stdin.close()
             while selector.get_map():
+                if hasattr(self, 'observe'): self.observe()
                 if time.monotonic() >= deadline: raise Denied('TIMED_OUT')
                 for key, _ in selector.select(0.1):
                     data = os.read(key.fileobj.fileno(), 4096)
@@ -228,7 +231,9 @@ class GitGuard:
         out = bytes(buffers['stdout']).decode('utf-8', 'replace')
         err = bytes(buffers['stderr']).decode('utf-8', 'replace')
         # Only sanitized stderr and fixed step names enter the durable journal.
-        if err: self.log('stderr', redact(err))
+        if out: self.log('stdout', redact(out)+'\n')
+        if err: self.log('stderr', redact(err)+'\n')
+        self.log('event', 'Git '+args[0]+' завершён; exit='+str(code))
         if code and not allow_failure: raise Denied('GIT_FAILED', code)
         return code, out, err
     def text(self, args): return self.call(args)[1].strip()
@@ -297,6 +302,12 @@ class Engine:
         self.store = Store(root)
         self.registry = REGISTRY if registry is None else registry
         self.git_executable = FIXED_GIT if registry is None else shutil.which('git')
+        module_path = pathlib.Path(__file__).resolve().parent / 'job_monitor.py'
+        data = module_path.read_bytes()
+        if module_path.is_symlink() or hashlib.sha256(data).hexdigest() != MONITOR_SHA: raise Denied('RUNNER_CHECKSUM_MISMATCH')
+        self.monitor = {'__file__':str(module_path), '__name__':'verified_job_monitor'}
+        exec(compile(data,str(module_path),'exec'), self.monitor)
+        self.journal = self.monitor['Journal'](self.store, redact)
     def validate(self, jid, project, action):
         if not HEX_ID.fullmatch(jid): raise Denied('RESULT_MALFORMED')
         if project not in self.registry: raise Denied('PROJECT_NOT_FOUND')
@@ -322,6 +333,7 @@ class Engine:
                 'message': 'Не запускалась: отложенный START с этим ID заблокирован.' if reconcile else 'Задание принято.',
                 'snapshot': None, 'stdout': '', 'stderr': ''}
             self.store.save(c, j)
+            c.execute('INSERT OR IGNORE INTO journal_meta(job) VALUES(?)',(jid,))
             return j, not reconcile
     def start(self, jid, project, action, spawn=True):
         self.validate(jid, project, action)
@@ -361,17 +373,25 @@ class Engine:
             return
         fd = os.open(lock_path, os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW, 0o600)
         guard = None
+        signals = self.monitor['Signals'](self.store,jid,self.registry[j['project_id']]['root'])
         def log(channel, content):
+            safe = self.journal.write(jid,channel,content if str(content).endswith('\n') else str(content)+'\n',channel not in ('stdout',)) or ''
+            if channel in ('stdout','stderr'): signals.output(content)
+            if channel=='step': self.store.update(jid,stage='Git: '+str(content)[:180])
+            # Legacy wire tails are sanitized independently and intentionally small.
+            if channel not in ('stdout','stderr'): return
             with self.store.transaction() as c:
-                row = self.store.get(c, jid)
-                key = 'stderr' if channel=='stderr' else 'stdout'
-                row[key] = (row[key]+'\n'+redact(content))[-4096:]
-                self.store.save(c, row)
+                row=self.store.get(c,jid); row[channel]=(row.get(channel,'')+'\n'+safe)[-4096:]
+                self.store.save(c,row)
+        log('event','Запуск '+j['action']+' · AnimaQuiz · Job ID '+jid)
+        log('event','Рабочий каталог: '+self.registry[j['project_id']]['root'])
+        self.store.update(jid,last_progress_at=time.time(),stage='Проверка проекта')
         try:
             try: fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
             except BlockingIOError: raise Denied('JOB_BUSY')
             guard = GitGuard(self.registry[j['project_id']], log, self.git_executable,
                 lambda pid, token: self.store.update(jid, child_pid=pid, child_identity=token))
+            guard.observe = signals.tick
             if j['action'] == 'TEST':
                 module_path = pathlib.Path(__file__).resolve().parent / 'gradle_tests.py'
                 data = module_path.read_bytes()
@@ -405,7 +425,12 @@ class Engine:
                 return
             self.store.update(jid, state='FAILED', error_code='STORAGE_UNAVAILABLE',
                 message=MESSAGES['STORAGE_UNAVAILABLE'], ended_at=time.time())
-        finally: os.close(fd)
+        finally:
+            try:
+                final=self.store.update(jid,computing=False)
+                log('event','Итог: '+final['state']+' · exit='+str(final.get('exit_code'))+' · '+final.get('message',''))
+                self.journal.flush(jid)
+            finally: os.close(fd)
 
 def wire_job(job):
     result=dict(job)
@@ -429,10 +454,21 @@ def main():
     try:
         if len(sys.argv)!=2 or len(sys.argv[1])>2048: raise Denied('RESULT_MALFORMED')
         p=json.loads(sys.argv[1])
-        if set(p) != {'request_id','mode','job_id','project_id','action'}: raise Denied('RESULT_MALFORMED')
+        keys={'request_id','mode','job_id','project_id','action'}
+        if p.get('mode') in ('LOG','HISTORY'): keys |= {'offset','view'}
+        if set(p) != keys: raise Denied('RESULT_MALFORMED')
         request_id=p['request_id']
         if not isinstance(request_id,str) or not HEX_ID.fullmatch(request_id): raise Denied('RESULT_MALFORMED')
         engine=Engine()
+        if p['mode'] in ('LOG','HISTORY'):
+            engine.validate(p['job_id'],p['project_id'],p['action'])
+            if p['mode']=='HISTORY': result=engine.journal.history(p['project_id'],p['offset'])
+            else:
+                with engine.store.transaction() as c: existing=engine.store.get(c,p['job_id'])
+                if not existing or existing['project_id']!=p['project_id'] or existing['action']!=p['action']: raise Denied('RESULT_MALFORMED')
+                result=engine.journal.page(existing,p['offset'],p['view'])
+            print(json.dumps({'protocol_version':PROTOCOL,'runner_version':VERSION,'request_id':request_id,'ok':True,'page':result},ensure_ascii=False))
+            return 0
         if p['mode']=='START': job=engine.start(p['job_id'],p['project_id'],p['action'])
         elif p['mode']=='QUERY': job=engine.query(p['job_id'],p['project_id'],p['action'])
         else: raise Denied('ACTION_DENIED')

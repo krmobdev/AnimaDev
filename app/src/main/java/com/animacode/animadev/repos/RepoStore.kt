@@ -15,8 +15,9 @@ class RepoStore(context: Context) {
         val r = read()
         if (r.optBoolean("pending") && System.currentTimeMillis() - r.optLong("sent_at") > 15_000L) {
             r.put("pending", false)
-            if (r.optString("job_id").isNotEmpty()) r.put("state", "UNKNOWN")
-            r.put("message", "Ответ Termux задерживается. Результат неизвестен; повторный запуск заблокирован, уточняем состояние по ID.")
+            val journal = r.optString("mode") in setOf("LOG","HISTORY")
+            if (r.optString("job_id").isNotEmpty() && !journal) r.put("state", "UNKNOWN")
+            r.put(if (journal) "journal_message" else "message", "Ответ Termux задерживается. Результат неизвестен; повторный запуск заблокирован, уточняем состояние по ID.")
             write(r)
         }
     }
