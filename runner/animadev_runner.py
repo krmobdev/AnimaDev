@@ -223,6 +223,7 @@ class GitGuard:
         self.env.update(LC_ALL='C', GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull,
             GIT_TERMINAL_PROMPT='0', GIT_OPTIONAL_LOCKS='0', GIT_PAGER='cat',
             GIT_SSH_COMMAND=FIXED_SSH+' -oBatchMode=yes -oStrictHostKeyChecking=yes -oConnectTimeout=15')
+        self.remote_url = None
         self.prefix = [self.git, '-c', 'core.hooksPath=' + os.devnull, '-c', 'core.fsmonitor=false',
             '-c', 'core.untrackedCache=false', '-c', 'gc.auto=0', '-c', 'maintenance.auto=false',
             '-c', 'submodule.recurse=false', '-c', 'merge.autoStash=false', '-c', 'commit.gpgSign=false',
@@ -286,9 +287,14 @@ class GitGuard:
         # Read literal origin rather than get-url (URL rewrites are forbidden above).
         code, remote, _ = self.call(['config', '--local', '--no-includes', '--get-all', 'remote.origin.url'], allow_failure=True)
         remote_ok = code == 0 and remote.splitlines() == [self.project['origin']]
+        if self.project.get('dynamic'):
+            raw = remote.strip() if code == 0 and len(remote.splitlines()) == 1 else ''
+            match = re.fullmatch(r'(?:git@github[.]com:|https://github[.]com/)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:[.]git)?/?', raw)
+            remote_ok = bool(match) and 'github.com/'+match.group(1) == self.project['origin']
+            self.remote_url = raw if remote_ok else None
         changes = self.call(['status', '--porcelain=v1', '-z', '--untracked-files=all'])[1]
         names = [redact(x)[:200] for x in changes.split('\0') if x][:20]
-        allowed = branch == self.project['branch'] and branch not in ('main', 'master')
+        allowed = branch == self.project['branch'] and (self.project.get('dynamic') or branch not in ('main','master'))
         return {'name': self.project['name'], 'branch': branch, 'local_commit': sha,
             'dirty': bool(changes), 'changed_files': names, 'remote_ok': remote_ok,
             'branch_allowed': allowed, 'remote_commit': '', 'ahead': 0, 'behind': 0,
@@ -309,7 +315,7 @@ class GitGuard:
         ref = 'refs/animadev/' + jid
         # URL and refspec are fixed registry data, no configured helper or arbitrary remote.
         code, _, diagnostic = self.call(['fetch', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head',
-            self.project['origin'], 'refs/heads/'+self.project['branch']+':'+ref], timeout=180, allow_failure=True)
+            (self.remote_url if self.project.get('dynamic') else self.project['origin']), 'refs/heads/'+self.project['branch']+':'+ref], timeout=180, allow_failure=True)
         if code: raise Denied(classify_fetch_error(diagnostic), code)
         return self.text(['rev-parse', '--verify', ref+'^{commit}'])
     def execute(self, action, jid):
