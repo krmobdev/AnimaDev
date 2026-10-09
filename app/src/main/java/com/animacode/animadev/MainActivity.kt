@@ -51,6 +51,7 @@ class MainActivity:ComponentActivity() {
             var route by rememberSaveable { mutableStateOf(if(projects.selected().isEmpty())"list" else "workspace") }
             var journalJob by rememberSaveable { mutableStateOf("") }
             var journalParent by rememberSaveable { mutableStateOf("history") }
+            var settingsSection by rememberSaveable { mutableStateOf("") }
             var settingsParent by rememberSaveable { mutableStateOf("list") };var menu by remember { mutableStateOf(false) }
             var confirmExit by rememberSaveable { mutableStateOf(false) }
             var projectGeneration by remember { mutableIntStateOf(0) }
@@ -81,19 +82,31 @@ class MainActivity:ComponentActivity() {
                     requestedJournal=""
                 }
             }
+            val destination=remember {ExportDestination(context)}
+            var destinationMissing by rememberSaveable {mutableStateOf(false)}
+            var destinationError by remember {mutableStateOf("")}
+            val folderPicker=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()) {uri->
+                if(uri==null){destination.useDownloads();destinationMissing=false}
+                else if(destination.choose(uri)){destinationMissing=false;destinationError=""}
+                else destinationError="Доступ к папке не подтверждён. Выберите другую или используйте Загрузки."
+            }
+            LaunchedEffect(resumed) {
+                if(resumed)destinationMissing=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){DestinationPolicy.needsRecovery(destination.selected(),destination.available())}
+            }
             fun back() {
+                if(route=="settings" && settingsSection.isNotEmpty()){settingsSection="";return}
                 val n=NavigationState(top,route,selected,journalJob,settingsParent,journalParent).back()
                 if(n==null)confirmExit=true else {top=n.section;route=n.route;journalJob=n.job}
             }
             BackHandler { back() }
             val root=route=="list"
-            val title=when { route=="settings"->"Настройки";top=="termux"->"Termux";route=="list"->"Проекты";route=="git"->"Git";route=="tests"->"Тесты";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
+            val title=when { route=="settings"->settingsSections.find {it.first==settingsSection}?.second ?: "Настройки";top=="termux"->"Termux";route=="list"->"Проекты";route=="git"->"Git";route=="tests"->"Тесты";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
             Scaffold(
                 contentWindowInsets=WindowInsets.safeDrawing,
                 topBar={TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(!root)IconButton(onClick={back()}){Icon(AppIcons.Back,"Вернуться")}},actions={
                     Box { IconButton(onClick={menu=true}){Icon(AppIcons.More,"Меню приложения")}
                         DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
-                            DropdownMenuItem(text={Text("Настройки")},leadingIcon={Icon(AppIcons.Settings,null)},onClick={menu=false;if(route!="settings"){settingsParent=route;route="settings"}})
+                            DropdownMenuItem(text={Text("Настройки")},leadingIcon={Icon(AppIcons.Settings,null)},onClick={menu=false;if(route!="settings"){settingsParent=route;settingsSection="";route="settings"}})
                         }
                     }
                 })},
@@ -103,7 +116,7 @@ class MainActivity:ComponentActivity() {
                 }}
             ) { padding -> Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when {
-                    route=="settings"->AppearanceSettings(context,theme,dynamic,{theme=it;settings.edit().putString("theme",it).apply()},{dynamic=it;settings.edit().putBoolean("dynamic",it).apply()})
+                    route=="settings"->AppearanceSettings(context,theme,dynamic,{theme=it;settings.edit().putString("theme",it).apply()},{dynamic=it;settings.edit().putBoolean("dynamic",it).apply()},settingsSection,{settingsSection=it})
                     top=="termux"->TermuxOverview(context,permitted,version) { permitted=termux.permitted() }
                     route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
                     route=="workspace"->ProjectWorkspace(context,current,onTool={route=it})
@@ -114,6 +127,7 @@ class MainActivity:ComponentActivity() {
                     else->ProjectWorkspace(context,current,onTool={route=it})
                 }
             } }
+            if(destinationMissing)AlertDialog(onDismissRequest={destination.useDownloads();destinationMissing=false},title={Text("Папка сохранения недоступна")},text={Text(destinationError.ifEmpty {"Выберите папку повторно или вернитесь к обычным Загрузкам. История и файлы сохранятся."})},confirmButton={Button(onClick={folderPicker.launch(null)}){Text("Выбрать папку")}},dismissButton={OutlinedButton(onClick={destination.useDownloads();destinationMissing=false}){Text("Использовать Загрузки")}})
             if(confirmExit)AlertDialog(onDismissRequest={confirmExit=false},title={Text("Закрыть AnimaDev?")},text={Text(if(store.blocked())"Задание продолжится в Termux. Состояние и журнал восстановятся при следующем открытии." else "Проекты, результаты и журналы сохранятся.")},confirmButton={TextButton(onClick={confirmExit=false;finishAndRemoveTask()}){Text("Выйти")}},dismissButton={TextButton(onClick={confirmExit=false}){Text("Отмена")}})
         }
     }

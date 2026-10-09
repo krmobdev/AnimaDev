@@ -66,7 +66,7 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
 }
 
 @Composable
-fun MonitorSettings(context: Context,embedded:Boolean=false) {
+fun MonitorSettings(context: Context,embedded:Boolean=false,showNotifications:Boolean=true) {
     val prefs=remember { context.getSharedPreferences("monitor_settings",Context.MODE_PRIVATE) }
     var minutes by remember { mutableIntStateOf(MonitorPolicy.minutes(prefs.getInt("warning_minutes",10))) }
     var enabled by remember { mutableStateOf(context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()) }
@@ -83,7 +83,21 @@ fun MonitorSettings(context: Context,embedded:Boolean=false) {
             Row { RadioButton(selected=minutes==value,onClick={minutes=value;prefs.edit().putInt("warning_minutes",value).apply()});Text("$value минут",Modifier.padding(top=12.dp)) }
         }
         Text("Это предупреждение, а не остановка. Защитный предел TEST — 90 минут.",style=MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick={if(context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)notifications.launch(android.Manifest.permission.POST_NOTIFICATIONS) else context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,context.packageName))}) { Text(if(enabled)"Уведомления разрешены · настройки" else "Разрешить уведомления") }
-        Text("Уведомления отражают полученное состояние. Закрытие приложения не останавливает Termux; Android может завершить его независимо от уведомления.",style=MaterialTheme.typography.bodySmall)
+        if(showNotifications)NotificationSettings(context)
+    }
+}
+
+@Composable fun NotificationSettings(context:Context) {
+    var enabled by remember { mutableStateOf(context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()) }
+    val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(owner) {
+        val listener=androidx.lifecycle.LifecycleEventObserver { _,event -> if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME)enabled=context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled() }
+        owner.lifecycle.addObserver(listener);onDispose {owner.lifecycle.removeObserver(listener)}
+    }
+    val permission=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {enabled=context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()}
+    Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Text(if(enabled)"Уведомления разрешены" else "Уведомления отключены",style=MaterialTheme.typography.titleMedium)
+        OutlinedButton(onClick={if(context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)permission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,context.packageName))},modifier=Modifier.fillMaxWidth()) { Text(if(enabled)"Настройки уведомлений" else "Разрешить уведомления") }
+        Text("Отказ не блокирует задания. Уведомление показывает полученное состояние и не гарантирует сохранение процесса Termux.",style=MaterialTheme.typography.bodySmall)
     }
 }

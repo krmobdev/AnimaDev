@@ -67,6 +67,7 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
     val store=remember { RepoStore(context) }; val gateway=remember { RepoGateway(context) }
     val cache=remember { JournalCache(context) }; val prefs=remember { context.getSharedPreferences("monitor_settings",Context.MODE_PRIVATE) }
     val scope=rememberCoroutineScope()
+    var exporting by remember { mutableStateOf(false) }
     var record by remember { mutableStateOf(store.read()) }
     var jobs by remember { mutableStateOf(emptyList<JSONObject>()) }
     var jobId by rememberSaveable { mutableStateOf(requestedJob.ifEmpty { prefs.getString("journal_job",store.read().optString("job_id")) ?: "" }) }
@@ -159,9 +160,6 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
             }
         }
     }
-    val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-        if(uri!=null) scope.launch { message=withContext(Dispatchers.IO) { try { context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } ?: error("storage"); "Отчёт сохранён · "+java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date()) } catch(_:Exception) { "Не удалось сохранить отчёт" } } }
-    }
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal=16.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
@@ -177,7 +175,7 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                 } catch(error:Exception) {
                     android.util.Log.w("AnimaDevShare","File attachment failed: "+error.javaClass.simpleName,error)
                     try {
-                        val body=if(content.length>100_000)content.take(100_000)+"\n\n[Текст сокращён. Полный отчёт доступен через «Сохранить в Загрузки».]" else content
+                        val body=if(content.length>100_000)content.take(100_000)+"\n\n[Текст сокращён. Полный отчёт доступен через «Сохранить отчёт».]" else content
                         val fallback=Intent(Intent.ACTION_SEND).setType("text/plain")
                             .putExtra(Intent.EXTRA_TEXT,body)
                             .putExtra(Intent.EXTRA_SUBJECT,"AnimaDev · журнал "+jobId.take(8))
@@ -185,7 +183,7 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                         message="Вложение недоступно ("+error.javaClass.simpleName+"). Открыта отправка текстом."
                     } catch(second:Exception) {
                         android.util.Log.e("AnimaDevShare","Text sharing also failed",second)
-                        message="Не удалось поделиться ("+second.javaClass.simpleName+"). Сохраните отчёт в Загрузки."
+                        message="Не удалось поделиться ("+second.javaClass.simpleName+"). Сохраните отчёт через меню журнала."
                     }
                 }
             }},enabled=text.isNotEmpty() && jobId.matches(Regex("[a-f0-9]{32}"))) { Icon(AppIcons.Share,"Поделиться отчётом") }
@@ -193,20 +191,20 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                     IconButton(onClick={menu=true}) {Icon(AppIcons.More,"Действия с журналом")}
                     DropdownMenu(menu,{menu=false}) {
                         DropdownMenuItem(text={Text("Копировать доступный журнал")},leadingIcon={Icon(AppIcons.Copy,null)},enabled=text.isNotEmpty(),onClick={menu=false;context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("AnimaDev",notice+"\n"+text));message="Журнал скопирован"})
-            DropdownMenuItem(text={Text("Сохранить в Загрузки")},leadingIcon={Icon(AppIcons.Download,null)},onClick={
-                menu=false;
-                if(Build.VERSION.SDK_INT<29)export.launch("AnimaDev_${jobId.take(8)}_${view}.txt")
-                else scope.launch { message=withContext(Dispatchers.IO) {
-                    var uri:android.net.Uri?=null
-                    try {
-                        val values=ContentValues().apply { put(MediaStore.Downloads.DISPLAY_NAME,"AnimaDev_${jobId.take(8)}_${view}_${System.currentTimeMillis()}.txt");put(MediaStore.Downloads.MIME_TYPE,"text/plain");put(MediaStore.Downloads.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS);put(MediaStore.Downloads.IS_PENDING,1) }
-                        uri=context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values) ?: error("storage")
-                        context.contentResolver.openOutputStream(uri!!)?.use { it.write(text.toByteArray()) } ?: error("storage")
-                        context.contentResolver.update(uri!!,ContentValues().apply { put(MediaStore.Downloads.IS_PENDING,0) },null,null)
-                        "Сохранено в Загрузки · "+java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date())
-                    } catch(_:Exception) { uri?.let { context.contentResolver.delete(it,null,null) };"Не удалось сохранить отчёт" }
-                } }
-            },enabled=text.isNotEmpty())
+                        DropdownMenuItem(text={Text("Сохранить отчёт")},leadingIcon={Icon(AppIcons.Download,null)},enabled=text.isNotEmpty() && !exporting,onClick={
+                            menu=false;exporting=true
+                            scope.launch {
+                                message=withContext(Dispatchers.IO) {
+                                    val destination=com.animacode.animadev.projects.ExportDestination(context)
+                                    try {
+                                        val safe=RepoResultReceiver.redact(notice+"\n"+text)
+                                        destination.save("AnimaDev_${jobId.take(8)}_$view","txt","text/plain",safe.toByteArray(Charsets.UTF_8))
+                                        "Сохранено: ${destination.label()} · "+java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date())
+                                    } catch(_:Exception) { "Папка недоступна или запись не удалась. Проверьте «Настройки → Файлы и загрузки»." }
+                                }
+                                exporting=false
+                            }
+                        })
                     }
                 }
             }
@@ -217,7 +215,7 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
             if(showSearch)OutlinedTextField(search,{search=it},label={Text("Поиск по доступному журналу")},singleLine=true,modifier=Modifier.fillMaxWidth())
             if(notice.isNotEmpty())Text(notice,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
         }
-        if(loadAll || historyLoading)LinearProgressIndicator(Modifier.fillMaxWidth()) else HorizontalDivider()
+        if(loadAll || historyLoading || exporting)LinearProgressIndicator(Modifier.fillMaxWidth()) else HorizontalDivider()
         Box(Modifier.weight(1f)) {
             LazyColumn(Modifier.fillMaxSize().padding(horizontal=16.dp),state=scroll,contentPadding=PaddingValues(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 items(displayed) {chunk->HighlightedLogChunk(chunk)}
