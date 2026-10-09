@@ -28,7 +28,7 @@ object JobNotifications {
         val duration=if(start>0) (if(end>0)end else System.currentTimeMillis())-start else 0
         val status=MonitorPolicy.label(record.optString("state"),false,false)
         manager.notify(jid.hashCode(),NotificationCompat.Builder(context,"jobs")
-            .setSmallIcon(android.R.drawable.stat_notify_sync).setContentTitle("AnimaQuiz · ${record.optString("action")}")
+            .setSmallIcon(android.R.drawable.stat_notify_sync).setContentTitle((com.animacode.animadev.projects.ProjectStore(context).all().find { it.id==record.optString("project_id","animaquiz") }?.name ?: "AnimaDev")+" · "+record.optString("action"))
             .setContentText("$status · ${duration/60_000} мин ${duration/1000%60} с")
             .setContentIntent(click).setOnlyAlertOnce(true).setOngoing(running).setAutoCancel(!running).build())
     }

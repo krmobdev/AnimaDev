@@ -78,7 +78,8 @@ class MainActivity:ComponentActivity() {
             }
             LaunchedEffect(requestedJournal) {
                 if(requestedJournal.isNotEmpty()) {
-                    val quiz=projects.all().find { it.supported }
+                    val savedProject=store.read().optString("project_id","animaquiz")
+                    val quiz=projects.all().find { it.id==savedProject && it.supported }
                     if(quiz!=null) { selected=quiz.id;projects.select(quiz.id);journalJob=requestedJournal;journalParent="history";top="projects";route="journal" }
                     requestedJournal=""
                 }
@@ -127,7 +128,7 @@ class MainActivity:ComponentActivity() {
                     route=="workspace"->ProjectWorkspace(context,current,onTool={route=it})
                     route=="build"->BuildScreen(context,current,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent="build";route="journal"})
                     route=="git" || route=="tests"->ProjectTools(context,current,route,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent=route;route="journal"},{route="wait"})
-                    route=="history"->if(current.supported)HistoryScreen(context,{id->journalJob=id;journalParent="history";route="journal"}) else UnavailableTool("История", "У этого проекта пока нет заданий AnimaDev.")
+                    route=="history"->if(current.supported)HistoryScreen(context,current,{id->journalJob=id;journalParent="history";route="journal"}) else UnavailableTool("История", "У этого проекта пока нет заданий AnimaDev.")
                     route=="journal"->if(current.supported)JournalScreen(context,journalJob) else UnavailableTool("Журнал","Нет безопасного профиля этого проекта.")
                     route=="wait"->MonitorSettings(context)
                     else->ProjectWorkspace(context,current,onTool={route=it})

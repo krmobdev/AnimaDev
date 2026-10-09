@@ -19,16 +19,17 @@ import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
-@Composable fun HistoryScreen(context:Context,onOpen:(String)->Unit) {
+@Composable fun HistoryScreen(context:Context,project:LocalProject,onOpen:(String)->Unit) {
     val store=remember {RepoStore(context)};val gateway=remember {RepoGateway(context)};val cache=remember {JournalCache(context)}
     val record=rememberRepoRecord(context);var jobs by remember {mutableStateOf(emptyList<JSONObject>())};var filter by rememberSaveable {mutableStateOf("ALL")}
     var refreshing by remember {mutableStateOf(true)};var message by remember {mutableStateOf("")}
     DisposableEffect(Unit) {onDispose {cache.close()} }
-    LaunchedEffect(record.optLong("journal_generation"),record.optString("state"),record.optString("job_id")) {
-        jobs=withContext(Dispatchers.IO) {(listOfNotNull(record.optJSONObject("job"),record.optJSONObject("test_job"),record.optJSONObject("build_job"))+cache.jobs()).filter {it.optString("job_id").matches(Regex("[a-f0-9]{32}"))}.distinctBy {it.optString("job_id")}.sortedByDescending {it.optDouble("created_at")} }
+    LaunchedEffect(project.id,record.optLong("journal_generation"),record.optString("state"),record.optString("job_id")) {
+        jobs=withContext(Dispatchers.IO) {(listOfNotNull(record.optJSONObject("job"),record.optJSONObject("test_job"),record.optJSONObject("build_job"))+cache.jobs()).filter {it.optString("job_id").matches(Regex("[a-f0-9]{32}")) && it.optString("project_id")==project.id}.distinctBy {it.optString("job_id")}.sortedByDescending {it.optDouble("created_at")} }
     }
     LaunchedEffect(refreshing) {
         if(!refreshing)return@LaunchedEffect
+        if(record.optString("project_id","animaquiz")!=project.id){message="Для получения истории сначала проверьте Git этого проекта.";refreshing=false;return@LaunchedEffect}
         var offset=0L
         while(true) {
             while(store.read().optBoolean("pending")){delay(500);store.expire()}
@@ -43,7 +44,7 @@ import java.util.Locale
         refreshing=false
     }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-        item {Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {Text("Задания AnimaQuiz",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);IconButton(onClick={refreshing=true},enabled=!refreshing){Icon(AppIcons.Refresh,"Обновить историю")}} }
+        item {Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {Text("Задания "+project.name,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);IconButton(onClick={refreshing=true},enabled=!refreshing){Icon(AppIcons.Refresh,"Обновить историю")}} }
         item {androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf("ALL" to "Все","TEST" to "Тесты","BUILD_DEBUG" to "Сборки","GIT" to "Git").forEach {(id,label)->FilterChip(filter==id,{filter=id},label={Text(label)})}} }
         if(refreshing)item {LinearProgressIndicator(Modifier.fillMaxWidth())}
         if(message.isNotEmpty())item {Text(message,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
