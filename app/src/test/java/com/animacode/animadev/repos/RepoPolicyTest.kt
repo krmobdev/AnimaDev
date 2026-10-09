@@ -33,6 +33,9 @@ class RepoPolicyTest {
     @Test fun testsWrongRemoteBlocked() { assertFalse(RepoPolicy.mayTest("test/decomposition-v1",false,true,false)) }
     @Test fun testsMissingRunnerBlocked() { assertFalse(RepoPolicy.mayTest("test/decomposition-v1",true,false,false)) }
     @Test fun testsConflictBlocked() { assertFalse(RepoPolicy.mayTest("test/decomposition-v1",true,true,true)) }
+    private fun build(dirty:Boolean=false, checked:Boolean=true, local:String="abc", remote:String="abc", ahead:Int=0, behind:Int=0) =
+        RepoPolicy.mayBuild("test/decomposition-v1",dirty,true,true,false,checked,ahead,behind,local,remote)
+    @Test fun debugBuildAllowedOnlyOnConfirmedMatchingSHA() {assertTrue(build());assertFalse(build(dirty=true));assertFalse(build(checked=false));assertFalse(build(local="abc",remote="def"));assertFalse(build(behind=1));assertFalse(build(ahead=1))}
     @Test fun junitCountsValid() { assertTrue(RepoPolicy.validCounts(3,1,1,1,125)) }
     @Test fun junitCountsMismatchRejected() { assertFalse(RepoPolicy.validCounts(4,1,1,1,125)) }
     @Test fun junitNegativeRejected() { assertFalse(RepoPolicy.validCounts(3,-1,1,3,125)) }

@@ -130,4 +130,53 @@ class GradleFixture(unittest.TestCase):
         with patch.object(runner,'GRADLE_SHA','0'*64):j=self.run_action('TEST')
         self.assertEqual(j['error_code'],'RUNNER_CHECKSUM_MISMATCH');self.assertFalse((self.repo/'app/build/args.txt').exists())
 
+
+class DebugBuildFixture(unittest.TestCase):
+    setUp=base.Fixture.setUp
+    tearDown=base.Fixture.tearDown
+    run_action=base.Fixture.run_action
+    remote_commit=base.Fixture.remote_commit
+    def setUp(self):
+        base.Fixture.setUp(self)
+        self.downloads=self.base/'Downloads'
+        self.downloads.mkdir()
+        self.sample=self.base/'sample.apk'
+        import zipfile
+        with zipfile.ZipFile(self.sample,'w') as apk:
+            apk.writestr('AndroidManifest.xml',b'x'*2048)
+    def script(self, create=True, code=0):
+        cmd='#!/bin/sh\nmkdir -p app/build/outputs/apk/debug\n'
+        if create: cmd += 'cp '+str(self.sample)+' app/build/outputs/apk/debug/app-debug.apk\n'
+        cmd += 'exit '+str(code)+'\n'
+        (self.repo/'gradlew').write_text(cmd)
+    def test_build_real_artifact_and_sha(self):
+        self.script()
+        with patch.object(gt,'DOWNLOADS',self.downloads):
+            result=self.run_action('BUILD_DEBUG')
+        self.assertEqual(result['state'],'SUCCEEDED',result)
+        artifact=result['artifact']
+        self.assertEqual(artifact['commit'],self.before)
+        target=pathlib.Path(artifact['path'])
+        self.assertTrue(target.is_file())
+        import hashlib
+        self.assertEqual(artifact['sha256'],hashlib.sha256(target.read_bytes()).hexdigest())
+    def test_remote_ahead_blocks_before_gradle(self):
+        self.script();self.remote_commit()
+        with patch.object(gt,'DOWNLOADS',self.downloads):
+            result=self.run_action('BUILD_DEBUG')
+        self.assertEqual(result['error_code'],'BUILD_OUTDATED',result)
+        self.assertFalse(list(self.downloads.glob('*.apk')))
+    def test_dirty_tree_blocks_without_overwriting(self):
+        self.script();(self.repo/'file.txt').write_text('changed')
+        with patch.object(gt,'DOWNLOADS',self.downloads):
+            result=self.run_action('BUILD_DEBUG')
+        self.assertEqual(result['error_code'],'REPO_DIRTY',result)
+        self.assertFalse(list(self.downloads.glob('*.apk')))
+    def test_gradle_success_without_apk_not_accepted(self):
+        self.script(create=False)
+        with patch.object(gt,'DOWNLOADS',self.downloads):
+            result=self.run_action('BUILD_DEBUG')
+        self.assertEqual(result['error_code'],'BUILD_ARTIFACT_MISSING',result)
+        self.assertFalse(list(self.downloads.glob('*.apk')))
+
 if __name__=='__main__':unittest.main()
