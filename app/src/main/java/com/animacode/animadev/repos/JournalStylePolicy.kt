@@ -32,7 +32,10 @@ object JournalStylePolicy {
         lines.forEachIndexed { i,line ->
             val part=line+if(i<lines.lastIndex)"\n" else ""
             if(buffer.isNotEmpty() && buffer.length+part.length>target){result.add(buffer.toString());buffer.clear()}
-            buffer.append(part)
+            if(part.length>24_000) {
+                if(buffer.isNotEmpty()){result.add(buffer.toString());buffer.clear()}
+                result.addAll(part.chunked(24_000))
+            } else buffer.append(part)
         }
         if(buffer.isNotEmpty())result.add(buffer.toString())
         return result
