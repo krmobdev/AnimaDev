@@ -27,6 +27,7 @@ import org.json.JSONObject
         item {Button(onClick={gateway.read("BRANCHES",project.path)},enabled=permitted && !pending,modifier=Modifier.fillMaxWidth()){Text(if(pending)"Читаем…" else "Обновить список веток")};if(pending)LinearProgressIndicator(Modifier.fillMaxWidth())}
         item {Text(gateway.prefs.getString("message","") ?: "",style=MaterialTheme.typography.bodySmall)}
         if(metadata!=null) {
+            item {Text("Локальный снимок: "+java.text.SimpleDateFormat("dd.MM HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date((data.optDouble("scanned_at",0.0)*1000).toLong())),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
             item {Text(when {metadata.optBoolean("dirty")->"Есть незакоммиченные изменения";metadata.optString("error").isNotEmpty()->"Метаданные не подтверждены";else->"Рабочее дерево чистое"},style=MaterialTheme.typography.bodyMedium)
                 if(metadata.optString("default_branch").isEmpty())Text("Главная удалённая ветка не определена: нет подтверждённого origin/HEAD. main/master не угадываются.",style=MaterialTheme.typography.bodySmall)
                 if(metadata.optBoolean("branches_limited"))Text("Список ограничен 40 ветками.",color=MaterialTheme.colorScheme.error)}

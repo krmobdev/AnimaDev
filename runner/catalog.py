@@ -200,7 +200,7 @@ def explicit(path,home=HOME,git=None,branches=False):
     root=pathlib.Path(value)
     if not permitted(root,home):return dict(projects=[],issues=[dict(path='',reason='Путь запрещён: разрешён HOME, глубина до 6, без скрытых/служебных каталогов и ссылок.')])
     item=inspect(root,home,git,branches=branches)
-    return dict(projects=[item] if item else [],issues=[] if item else [dict(path=str(root),reason='Безопасный Git-репозиторий или worktree не найден.')])
+    return dict(projects=[item] if item else [],issues=[] if item else [dict(path=str(root),reason='Безопасный Git-репозиторий или worktree не найден.')],scanned_at=time.time())
 
 def environment():
     def version(path,args):
