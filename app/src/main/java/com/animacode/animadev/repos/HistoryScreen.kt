@@ -25,7 +25,7 @@ import java.util.Locale
     var refreshing by remember {mutableStateOf(true)};var message by remember {mutableStateOf("")}
     DisposableEffect(Unit) {onDispose {cache.close()} }
     LaunchedEffect(record.optLong("journal_generation"),record.optString("state"),record.optString("job_id")) {
-        jobs=withContext(Dispatchers.IO) {(listOfNotNull(record.optJSONObject("job"),record.optJSONObject("test_job"))+cache.jobs()).filter {it.optString("job_id").matches(Regex("[a-f0-9]{32}"))}.distinctBy {it.optString("job_id")}.sortedByDescending {it.optDouble("created_at")} }
+        jobs=withContext(Dispatchers.IO) {(listOfNotNull(record.optJSONObject("job"),record.optJSONObject("test_job"),record.optJSONObject("build_job"))+cache.jobs()).filter {it.optString("job_id").matches(Regex("[a-f0-9]{32}"))}.distinctBy {it.optString("job_id")}.sortedByDescending {it.optDouble("created_at")} }
     }
     LaunchedEffect(refreshing) {
         if(!refreshing)return@LaunchedEffect
@@ -44,15 +44,15 @@ import java.util.Locale
     }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         item {Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {Text("Задания AnimaQuiz",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);IconButton(onClick={refreshing=true},enabled=!refreshing){Icon(AppIcons.Refresh,"Обновить историю")}} }
-        item {androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf("ALL" to "Все","TEST" to "Тесты","GIT" to "Git").forEach {(id,label)->FilterChip(filter==id,{filter=id},label={Text(label)})}} }
+        item {androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf("ALL" to "Все","TEST" to "Тесты","BUILD_DEBUG" to "Сборки","GIT" to "Git").forEach {(id,label)->FilterChip(filter==id,{filter=id},label={Text(label)})}} }
         if(refreshing)item {LinearProgressIndicator(Modifier.fillMaxWidth())}
         if(message.isNotEmpty())item {Text(message,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-        val visible=jobs.filter {filter=="ALL" || (filter=="TEST")== (it.optString("action")=="TEST")}
+        val visible=jobs.filter {filter=="ALL" || when(filter) {"TEST"->it.optString("action")=="TEST";"BUILD_DEBUG"->it.optString("action")=="BUILD_DEBUG";else->it.optString("action") !in setOf("TEST","BUILD_DEBUG")}}
         if(visible.isEmpty() && !refreshing)item {Text("Заданий в этом разделе пока нет.",style=MaterialTheme.typography.bodyMedium)}
         items(visible,key={it.optString("job_id")}) {job->
             val state=job.optString("state");val start=job.optDouble("started_at",job.optDouble("created_at",0.0));val end=job.optDouble("ended_at")
             Card(onClick={onOpen(job.optString("job_id"))},colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
-                ListItem(headlineContent={Text(if(job.optString("action")=="TEST")"Unit-тесты" else "Git · ${job.optString("action")}",style=MaterialTheme.typography.titleMedium)},supportingContent={Column(verticalArrangement=Arrangement.spacedBy(3.dp)) {Text(MonitorPolicy.label(state,false,false));Text((if(start>0)SimpleDateFormat("dd MMM, HH:mm",Locale.getDefault()).format(Date((start*1000).toLong())) else "Время не сохранено")+if(end>start)" · ${((end-start)/60).toInt()} мин ${((end-start)%60).toInt()} с" else "",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}},leadingContent={Icon(if(state=="SUCCEEDED")AppIcons.Success else if(state in RepoPolicy.terminalStates)AppIcons.Error else AppIcons.History,null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow))
+                ListItem(headlineContent={Text(when(job.optString("action")) {"TEST"->"Unit-тесты";"BUILD_DEBUG"->"Debug APK";else->"Git · ${job.optString("action")}"},style=MaterialTheme.typography.titleMedium)},supportingContent={Column(verticalArrangement=Arrangement.spacedBy(3.dp)) {Text(MonitorPolicy.label(state,false,false));Text((if(start>0)SimpleDateFormat("dd MMM, HH:mm",Locale.getDefault()).format(Date((start*1000).toLong())) else "Время не сохранено")+if(end>start)" · ${((end-start)/60).toInt()} мин ${((end-start)%60).toInt()} с" else "",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}},leadingContent={Icon(if(state=="SUCCEEDED")AppIcons.Success else if(state in RepoPolicy.terminalStates)AppIcons.Error else AppIcons.History,null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow))
             }
         }
     }
