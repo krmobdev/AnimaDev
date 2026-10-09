@@ -12,6 +12,7 @@ class JournalStylePolicyTest {
         assertEquals(LogTone.WARNING,JournalStylePolicy.styles("stdout: w: deprecated").single().tone)
         assertEquals(LogTone.SUCCESS,JournalStylePolicy.styles("event: SUCCEEDED").single().tone)
     }
+    @Test fun realRunnerFinalEvent(){assertEquals(LogTone.SUCCESS,JournalStylePolicy.styles("[16:50:39] event: Итог: SUCCEEDED · exit=0").single().tone);assertEquals(LogTone.ERROR,JournalStylePolicy.styles("event: Итог: FAILED · exit=1").single().tone)}
     @Test fun timestampIsIndependent(){val s=JournalStylePolicy.styles("[16:50:39] stderr: ERROR: failed").single();assertEquals(10,s.timestampEnd);assertEquals(LogTone.ERROR,s.tone)}
     @Test fun chunksPreserveSourceAndLongLine(){val text="[16:50:39] stdout: "+"a".repeat(6000)+"\n[16:50:40] event: SUCCEEDED\n";val chunks=JournalStylePolicy.chunks(text);assertEquals(text,chunks.joinToString(""));assertTrue(chunks[0].length>6000);assertTrue(chunks[1].startsWith("[16:50:40]"))}
 }

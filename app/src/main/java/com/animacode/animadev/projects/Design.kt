@@ -1,6 +1,7 @@
 package com.animacode.animadev.projects
 
 import android.content.Context
+import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
@@ -56,11 +57,12 @@ val settingsSections=listOf("appearance" to "Внешний вид","git" to "П
     }
 }
 @Composable fun FileSettings(context:Context) {
+    val scope=rememberCoroutineScope()
     val destination=remember {ExportDestination(context)}
     var generation by remember {mutableIntStateOf(0)}
     var error by remember {mutableStateOf("")}
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) {uri->
-        if(uri!=null){if(!destination.choose(uri))error="Не удалось сохранить доступ к папке.";generation++}
+        if(uri!=null)scope.launch {if(!kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){destination.choose(uri)})error="Не удалось сохранить доступ к папке.";generation++}
     }
     val label=remember(generation){destination.label()}
     Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {

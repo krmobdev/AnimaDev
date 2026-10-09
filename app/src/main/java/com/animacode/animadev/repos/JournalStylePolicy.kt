@@ -13,7 +13,8 @@ object JournalStylePolicy {
             val prefix=stamp.find(line)?.value.orEmpty()
             val body=line.removePrefix(prefix).trimStart()
             val ch=channel.find(body)?.groupValues?.get(1)?.lowercase().orEmpty()
-            val payload=body.replaceFirst(channel,"").trimStart()
+            val raw=body.replaceFirst(channel,"").trimStart()
+            val payload=if(ch=="event")raw.removePrefix("Итог: ") else raw
             val tone=when {
                 ch=="command" -> LogTone.NORMAL
                 Regex("^(BUILD SUCCESSFUL(?:\\s|$)|SUCCEEDED(?:\\s|$)|Успешно(?:\\s|$)|(?:state|status)[=: ]+SUCCEEDED(?:\\s|$))",RegexOption.IGNORE_CASE).containsMatchIn(payload)->LogTone.SUCCESS

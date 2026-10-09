@@ -69,13 +69,6 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
 fun MonitorSettings(context: Context,embedded:Boolean=false,showNotifications:Boolean=true) {
     val prefs=remember { context.getSharedPreferences("monitor_settings",Context.MODE_PRIVATE) }
     var minutes by remember { mutableIntStateOf(MonitorPolicy.minutes(prefs.getInt("warning_minutes",10))) }
-    var enabled by remember { mutableStateOf(context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()) }
-    val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
-    DisposableEffect(owner) {
-        val listener=androidx.lifecycle.LifecycleEventObserver { _,event -> if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME)enabled=context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled() }
-        owner.lifecycle.addObserver(listener);onDispose { owner.lifecycle.removeObserver(listener) }
-    }
-    val notifications=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { enabled=context.getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled() }
     Column(if(embedded)Modifier.fillMaxWidth().padding(16.dp) else Modifier.verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text(if(embedded)"Ожидание заданий" else "Настройки ожидания",style=MaterialTheme.typography.titleMedium)
         Text("Предупреждать при отсутствии признаков прогресса")

@@ -162,7 +162,16 @@ def inspect(root,home=HOME,git=None,branches=False):
             if code:raise ValueError('GIT_FAILED')
             result['branches']=[]
             raw=rows.splitlines()
-            for row in raw[:40]:
+            preferred=[]
+            if result['branch']!='Detached HEAD':preferred.append('refs/heads/'+result['branch'])
+            if result['default_branch']:preferred.append('refs/remotes/origin/'+result['default_branch'])
+            pinned=[]
+            if preferred:
+                code,priority=call(['for-each-ref','--count=4','--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)',*preferred])
+                if code:raise ValueError('GIT_FAILED')
+                pinned=[row for row in priority.splitlines() if row.split('\t')[0] in preferred]
+            ordered=list(dict.fromkeys(pinned+raw))
+            for row in ordered[:40]:
                 parts=row.split('\t')
                 if len(parts)!=3 or not re.fullmatch('[0-9a-f]{40,64}',parts[1]):continue
                 ref,sha,date=parts
@@ -170,7 +179,7 @@ def inspect(root,home=HOME,git=None,branches=False):
                 local=ref.startswith('refs/heads/')
                 name=ref.removeprefix('refs/heads/') if local else ref.removeprefix('refs/remotes/origin/')
                 result['branches'].append(dict(name=name[:200],commit=sha,date=date[:40],local=local,active=local and name==result['branch'],default=bool(result['default_branch']) and name==result['default_branch']))
-            result['branches_limited']=len(raw)>40
+            result['branches_limited']=len(ordered)>40
             result['branches'].sort(key=lambda b:(not b['default'],not b['active'],not b['local'],b['name']))
     except (OSError,subprocess.TimeoutExpired,ValueError):result['error']='Метаданные недоступны или конфигурация требует ручной проверки'
     return result

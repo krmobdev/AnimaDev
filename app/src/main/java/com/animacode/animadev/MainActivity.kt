@@ -23,6 +23,7 @@ import com.animacode.animadev.termux.TermuxGateway
 import com.animacode.animadev.repos.*
 import com.animacode.animadev.projects.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity:ComponentActivity() {
     private var permitted by mutableStateOf(false)
@@ -82,13 +83,16 @@ class MainActivity:ComponentActivity() {
                     requestedJournal=""
                 }
             }
+            val folderScope=rememberCoroutineScope()
             val destination=remember {ExportDestination(context)}
             var destinationMissing by rememberSaveable {mutableStateOf(false)}
             var destinationError by remember {mutableStateOf("")}
             val folderPicker=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()) {uri->
                 if(uri==null){destination.useDownloads();destinationMissing=false}
-                else if(destination.choose(uri)){destinationMissing=false;destinationError=""}
-                else destinationError="Доступ к папке не подтверждён. Выберите другую или используйте Загрузки."
+                else folderScope.launch {
+                    if(kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){destination.choose(uri)}){destinationMissing=false;destinationError=""}
+                    else destinationError="Доступ к папке не подтверждён. Выберите другую или используйте Загрузки."
+                }
             }
             LaunchedEffect(resumed) {
                 if(resumed)destinationMissing=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){DestinationPolicy.needsRecovery(destination.selected(),destination.available())}
