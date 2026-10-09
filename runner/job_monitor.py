@@ -106,7 +106,7 @@ class Journal:
                 pieces.append(body);size+=n;cursor=seq
             more=c.execute('SELECT 1 FROM events WHERE job=? AND seq>? LIMIT 1',(job['job_id'],cursor)).fetchone() is not None
             meta=c.execute('SELECT bytes,truncated,migrated FROM journal_meta WHERE job=?',(job['job_id'],)).fetchone()
-        keys=('job_id','project_id','action','state','created_at','started_at','ended_at','exit_code','tests','message','error_code')
+        keys=('job_id','project_id','action','state','created_at','started_at','ended_at','exit_code','tests','message','error_code','snapshot')
         metadata={k:job.get(k) for k in keys}
         metadata['message']=self.redact(metadata.get('message') or '')[:400]
         return dict(job_id=job['job_id'],offset=offset,next_offset=cursor,text=''.join(pieces),more=more,truncated=bool(meta[1]),legacy=bool(meta[2]),metadata=metadata)

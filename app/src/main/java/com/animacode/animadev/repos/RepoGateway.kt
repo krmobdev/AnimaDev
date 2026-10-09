@@ -1,5 +1,6 @@
 package com.animacode.animadev.repos
 
+import com.animacode.animadev.projects.ProjectPolicy
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -13,7 +14,7 @@ import java.util.UUID
 
 class RepoGateway(private val context: Context) {
     companion object {
-        const val VERSION = "0.3.1"
+        const val VERSION = "0.4.0"
         const val LEGACY_SHA = "e96b432836ff0fb1f23f9455a1440a73fbcb7a675720871d323c4209bb178a4e"
         const val PROTOCOL = 2
         const val PROJECT = "animaquiz"
@@ -89,7 +90,8 @@ class RepoGateway(private val context: Context) {
         if (!store.write(r)) return
         send(request, arrayOf("-c", script, request, hash, data, helperSha, helperData, monitorSha, monitorData))
     }
-    fun start(action: String) {
+    fun start(action: String, projectId: String, projectPath: String) {
+        if (!ProjectPolicy.canExecute(projectId,projectPath,action)) return
         val r = store.read()
         if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked()) return
         if (action == "SYNC" && !maySync(r)) return

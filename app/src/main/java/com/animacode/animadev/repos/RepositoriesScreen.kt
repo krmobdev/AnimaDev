@@ -82,14 +82,14 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
                     Button(onClick = { confirmInstall = true }, enabled = !pending && !blocked,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Настроить локальный помощник") }
                 }
-                OutlinedButton(onClick = { gateway.start("STATUS") }, enabled = controls,
+                OutlinedButton(onClick = { gateway.start("STATUS", RepoGateway.PROJECT, com.animacode.animadev.projects.ProjectPolicy.QUIZ) }, enabled = controls,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Обновить состояние") }
-                Button(onClick = { gateway.start("CHECK") }, enabled = controls && (snapshot == null || (branchAllowed && remoteOk)),
+                Button(onClick = { gateway.start("CHECK", RepoGateway.PROJECT, com.animacode.animadev.projects.ProjectPolicy.QUIZ) }, enabled = controls && (snapshot == null || (branchAllowed && remoteOk)),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Проверить обновления") }
                 OutlinedButton(onClick = { confirmSync = true }, enabled = gateway.maySync(record),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Синхронизировать") }
                 Text("CHECK проверяет GitHub. SYNC получает коммиты после подтверждения.", style = MaterialTheme.typography.bodySmall)
-                OutlinedButton(onClick = { gateway.start("TEST") }, enabled = controls && gateway.mayTest(record),
+                OutlinedButton(onClick = { gateway.start("TEST", RepoGateway.PROJECT, com.animacode.animadev.projects.ProjectPolicy.QUIZ) }, enabled = controls && gateway.mayTest(record),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Запустить тесты") }
                 Text("Тесты проверяют проект без изменения исходников.", style = MaterialTheme.typography.bodySmall)
                 val reason = when {
@@ -124,7 +124,7 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
         dismissButton = { TextButton(onClick = { confirmInstall = false }) { Text("Отмена") } })
     if (confirmSync) AlertDialog(onDismissRequest = { confirmSync = false }, title = { Text("Получить изменения AnimaQuiz?") },
         text = { Text("Только test/decomposition-v1 и fast-forward. Runner повторно проверит ветку, origin и локальные изменения. При любом расхождении остановится.") },
-        confirmButton = { TextButton(onClick = { confirmSync = false; gateway.start("SYNC") }) { Text("Синхронизировать") } },
+        confirmButton = { TextButton(onClick = { confirmSync = false; gateway.start("SYNC", RepoGateway.PROJECT, com.animacode.animadev.projects.ProjectPolicy.QUIZ) }) { Text("Синхронизировать") } },
         dismissButton = { TextButton(onClick = { confirmSync = false }) { Text("Отмена") } })
 }
 private fun Sequence<String>.takeLastLines(count: Int) = toList().takeLast(count).joinToString("\n")

@@ -10,6 +10,13 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.text.style.TextOverflow
+import android.content.Intent
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyListState
@@ -29,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+@OptIn(ExperimentalLayoutApi::class,ExperimentalMaterial3Api::class)
 @Composable
 fun JournalScreen(context: Context, requestedJob: String = "") {
     val store=remember { RepoStore(context) }; val gateway=remember { RepoGateway(context) }
@@ -121,22 +129,18 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
     val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if(uri!=null) scope.launch { message=withContext(Dispatchers.IO) { try { context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } ?: error("storage"); "Отчёт сохранён" } catch(_:Exception) { "Не удалось сохранить отчёт" } } }
     }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal=20.dp),state=scroll,verticalArrangement=Arrangement.spacedBy(12.dp)) {
-      item { Column(Modifier.padding(vertical=20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Text("Журнал",style=MaterialTheme.typography.headlineMedium)
-        Text("Только задания AnimaDev. Сторонние сеансы Termux не читаются.",style=MaterialTheme.typography.bodySmall)
+    Box(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal=16.dp),state=scroll,verticalArrangement=Arrangement.spacedBy(8.dp)) {
+      item { Column(Modifier.padding(vertical=8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Box {
             OutlinedButton(onClick={expanded=true}) { Text(jobs.find { it.optString("job_id")==jobId }?.let { "${it.optString("action")} · ${jobId.take(8)}" } ?: "Выбрать задание") }
-            DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) {
-                jobs.forEach { j -> DropdownMenuItem(text={Text("${j.optString("action")} · ${j.optString("job_id").take(8)} · ${MonitorPolicy.label(j.optString("state"),false,false)}")},onClick={jobId=j.getString("job_id");expanded=false;loadAll=true}) }
-            }
         }
-        Text("AnimaQuiz · $jobId",style=MaterialTheme.typography.bodySmall)
+        Text("AnimaQuiz · ${jobId.take(8)}",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             FilterChip(selected=view=="IMPORTANT",onClick={view="IMPORTANT";loadAll=true},label={Text("Важное")})
             FilterChip(selected=view=="ALL",onClick={view="ALL";loadAll=true},label={Text("Всё")})
         }
-        OutlinedTextField(value=search,onValueChange={search=it},label={Text("Поиск по доступному журналу")},singleLine=true,modifier=Modifier.fillMaxWidth())
+        OutlinedTextField(value=search,onValueChange={search=it},label={Text("Поиск в журнале")},singleLine=true,modifier=Modifier.fillMaxWidth())
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick={loadAll=true},enabled=!loadAll && !historyLoading && jobId.isNotEmpty()) { Text(if(loadAll)"Читаем…" else "Загрузить журнал") }
             TextButton(onClick={historyLoading=true},enabled=!historyLoading && !loadAll) { Text("История") }
@@ -144,8 +148,14 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
         if(jobId==record.optString("job_id") && record.optString("state")=="RUNNING")Text("Живой журнал · обновляется автоматически",style=MaterialTheme.typography.bodySmall)
         else if(loadAll || historyLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
         if(notice.isNotEmpty())Text(notice,color=MaterialTheme.colorScheme.error)
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick={context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("AnimaDev",text));message="Доступный журнал скопирован"},enabled=text.isNotEmpty()) { Text("Копировать всё") }
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick={scope.launch { scroll.scrollToItem(0) }}) { Text("В начало") }
+            TextButton(onClick={scope.launch { scroll.scrollToItem(maxOf(0,scroll.layoutInfo.totalItemsCount-1)) }}) { Text("В конец") }
+            TextButton(onClick={scope.launch {
+                try { val intent=withContext(Dispatchers.IO) { ReportSharing.prepare(context,jobId,view,notice+"\n"+text) };context.startActivity(Intent.createChooser(intent,"Поделиться диагностикой")) }
+                catch(_:Exception) { message="Не удалось подготовить отчёт" }
+            }},enabled=text.isNotEmpty() && jobId.matches(Regex("[a-f0-9]{32}"))) { Text("Поделиться") }
+            TextButton(onClick={context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("AnimaDev",text));message="Доступный журнал скопирован"},enabled=text.isNotEmpty()) { Text("Копировать") }
             TextButton(onClick={
                 if(Build.VERSION.SDK_INT<29)export.launch("AnimaDev_${jobId.take(8)}_${view}.txt")
                 else scope.launch { message=withContext(Dispatchers.IO) {
@@ -158,11 +168,32 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                         "Отчёт сохранён в Загрузки"
                     } catch(_:Exception) { uri?.let { context.contentResolver.delete(it,null,null) };"Не удалось сохранить отчёт" }
                 } }
-            },enabled=text.isNotEmpty()) { Text("В Загрузки") }
+            },enabled=text.isNotEmpty()) { Text("Скачать") }
         }
         if(message.isNotEmpty())Text(message,style=MaterialTheme.typography.bodySmall)
-        Text("Для копирования фрагмента удерживайте текст.",style=MaterialTheme.typography.bodySmall)
+        Text("Удерживайте текст для выделения. Сохраняется и отправляется весь доступный выбранный режим.",style=MaterialTheme.typography.bodySmall)
       } }
-      items(displayed) { chunk -> SelectionContainer { Text(chunk,fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodySmall) } }
+      items(displayed) { chunk -> SelectionContainer { Text(chunk,modifier=Modifier.fillMaxWidth(),fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodySmall,softWrap=true) } }
+    }
+    val thumb=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.55f)
+    Canvas(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(5.dp)) {
+        val count=scroll.layoutInfo.totalItemsCount
+        if(count>1) {
+            val visible=maxOf(1,scroll.layoutInfo.visibleItemsInfo.size)
+            val height=maxOf(36.dp.toPx(),size.height*visible/count).coerceAtMost(size.height)
+            val fraction=scroll.firstVisibleItemIndex.toFloat()/maxOf(1,count-visible)
+            drawRoundRect(thumb,Offset(0f,(size.height-height)*fraction.coerceIn(0f,1f)),Size(size.width,height),CornerRadius(size.width/2))
+        }
+    }
+    }
+    if(expanded) ModalBottomSheet(onDismissRequest={expanded=false}) {
+        LazyColumn(Modifier.fillMaxWidth().heightIn(max=560.dp),contentPadding=PaddingValues(16.dp)) {
+            item { Text("Выбрать задание",style=MaterialTheme.typography.titleLarge) }
+            items(jobs,key={it.getString("job_id")}) { j ->
+                ListItem(headlineContent={Text("${j.optString("action")} · ${MonitorPolicy.label(j.optString("state"),false,false)}")},
+                    supportingContent={Text("${java.text.SimpleDateFormat("dd.MM HH:mm",java.util.Locale.getDefault()).format(java.util.Date((j.optDouble("created_at",0.0)*1000).toLong()))} · ${j.optString("job_id").take(8)}")},
+                    trailingContent={TextButton(onClick={jobId=j.getString("job_id");expanded=false;loadAll=true}){Text("Открыть")}})
+            }
+        }
     }
 }

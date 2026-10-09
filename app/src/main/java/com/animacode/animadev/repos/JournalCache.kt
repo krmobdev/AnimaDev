@@ -48,6 +48,10 @@ class JournalCache(context: Context) : SQLiteOpenHelper(context, "journal_cache.
             val start=j.optDouble("started_at",j.optDouble("created_at",0.0));val end=j.optDouble("ended_at",0.0)
             buildString {
                 append("AnimaQuiz · ${j.optString("action")}\nJob ID: $job\nРабочий каталог: ~/quizapp\n")
+                val snapshot=j.optJSONObject("snapshot")
+                append("Ветка: ${snapshot?.optString("branch")?.ifEmpty { "не подтверждена" } ?: "не сохранена"}\n")
+                append("Коммит: ${snapshot?.optString("local_commit")?.ifEmpty { "не подтверждён" } ?: "не сохранён"}\n")
+                append("Ошибка: ${j.optString("error_code").ifEmpty { "нет подтверждённой ошибки" }}\n")
                 append("Начало: ${java.util.Date((start*1000).toLong())}\n")
                 append("Итог: ${MonitorPolicy.label(j.optString("state"),false,false)} · Exit code: ${j.optString("exit_code")}\n")
                 if(end>0 && start>0) append("Длительность: ${((end-start)*1000).toLong()} мс\n")

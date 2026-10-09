@@ -14,8 +14,8 @@ import subprocess
 import sys
 import time
 
-VERSION = '0.3.1'
-MONITOR_SHA = 'a49424125f9b023f6c495dd90e7b6902d49d57e4d5a18f3c28f8baa7c95fb5e8'
+VERSION = '0.4.0'
+MONITOR_SHA = 'e19caf451f511782c10759b593466cc66853fe01b6999059b9c7616d8178c081'
 GRADLE_SHA = '5bf269f5cff18e1a38bcfb095a34e6578c32ec513e707b3307dbf8d5b020e7c9'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
