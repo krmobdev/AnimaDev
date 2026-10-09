@@ -89,8 +89,7 @@ class MainActivity:ComponentActivity() {
             var destinationMissing by rememberSaveable {mutableStateOf(false)}
             var destinationError by remember {mutableStateOf("")}
             val folderPicker=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()) {uri->
-                if(uri==null){destination.useDownloads();destinationMissing=false}
-                else folderScope.launch {
+                if(uri!=null)folderScope.launch {
                     if(kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){destination.choose(uri)}){destinationMissing=false;destinationError=""}
                     else destinationError="Доступ к папке не подтверждён. Выберите другую или используйте Загрузки."
                 }
@@ -134,7 +133,7 @@ class MainActivity:ComponentActivity() {
                     else->ProjectWorkspace(context,current,onTool={route=it})
                 }
             } }
-            if(destinationMissing)AlertDialog(onDismissRequest={destination.useDownloads();destinationMissing=false},title={Text("Папка сохранения недоступна")},text={Text(destinationError.ifEmpty {"Выберите папку повторно или вернитесь к обычным Загрузкам. История и файлы сохранятся."})},confirmButton={Button(onClick={folderPicker.launch(null)}){Text("Выбрать папку")}},dismissButton={OutlinedButton(onClick={destination.useDownloads();destinationMissing=false}){Text("Использовать Загрузки")}})
+            if(destinationMissing)AlertDialog(onDismissRequest={destinationMissing=false},title={Text("Папка сохранения недоступна")},text={Text(destinationError.ifEmpty {"Выберите папку повторно или вернитесь к обычным Загрузкам. История и файлы сохранятся."})},confirmButton={Button(onClick={folderPicker.launch(null)}){Text("Выбрать папку")}},dismissButton={OutlinedButton(onClick={destination.useDownloads();destinationMissing=false}){Text("Использовать Загрузки")}})
             if(confirmExit)AlertDialog(onDismissRequest={confirmExit=false},title={Text("Закрыть AnimaDev?")},text={Text(if(store.blocked())"Задание продолжится в Termux. Состояние и журнал восстановятся при следующем открытии." else "Проекты, результаты и журналы сохранятся.")},confirmButton={TextButton(onClick={confirmExit=false;finishAndRemoveTask()}){Text("Выйти")}},dismissButton={TextButton(onClick={confirmExit=false}){Text("Отмена")}})
         }
     }
