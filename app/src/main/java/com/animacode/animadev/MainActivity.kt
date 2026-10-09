@@ -104,7 +104,7 @@ class MainActivity:ComponentActivity() {
             }
             BackHandler { back() }
             val root=route=="list"
-            val title=when { route=="settings"->settingsSections.find {it.first==settingsSection}?.second ?: "Настройки";top=="termux"->"Termux";route=="list"->"Проекты";route=="branches"->"Ветки";route=="git"->"Git";route=="tests"->"Тесты";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
+            val title=when { route=="settings"->settingsSections.find {it.first==SettingsPolicy.section(settingsSection)}?.second ?: "Настройки";top=="termux"->"Termux";route=="list"->"Проекты";route=="branches"->"Ветки";route=="git"->"Git";route=="tests"->"Тесты";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
             Scaffold(
                 contentWindowInsets=WindowInsets.safeDrawing,
                 topBar={TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(!root)IconButton(onClick={back()}){Icon(AppIcons.Back,"Вернуться")}},actions={

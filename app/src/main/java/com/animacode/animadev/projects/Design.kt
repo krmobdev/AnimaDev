@@ -6,10 +6,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.animacode.animadev.repos.MonitorSettings
 import com.animacode.animadev.repos.NotificationSettings
+import com.animacode.animadev.repos.MonitorPolicy
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -21,56 +23,74 @@ import androidx.compose.ui.unit.dp
         Text(value,style=MaterialTheme.typography.bodyMedium)
     }
 }
-val settingsSections=listOf("appearance" to "Внешний вид","git" to "Проекты и Git","profiles" to "Профили тестирования и сборки","jobs" to "Выполнение заданий и ожидание","notifications" to "Уведомления","files" to "Файлы и загрузки")
+val settingsSections=listOf("appearance" to "Внешний вид","git" to "Проекты и Git","profiles" to "Профили тестирования и сборки","jobs" to "Выполнение заданий и ожидание","notifications" to "Уведомления","files" to "Файлы и загрузки","about" to "О приложении / Диагностика")
+private val descriptions=mapOf("appearance" to "Тема и динамические цвета","git" to "Получение изменений, локальные репозитории","profiles" to "Unit-тесты AnimaQuiz, доступные профили","jobs" to "Предупреждения и защитный предел","notifications" to "Разрешение Android и состояние заданий","files" to "Папка отчётов и загрузок","about" to "Версия, Android и диагностика")
 
+@Composable private fun Preference(title:String,value:String,onClick:(()->Unit)?=null,trailing:(@Composable ()->Unit)?=null) {
+    ListItem(headlineContent={Text(title)},supportingContent={Text(value)},trailingContent=trailing ?: if(onClick!=null)({Icon(AppIcons.Chevron,null)}) else null,modifier=if(onClick!=null)Modifier.clickable(onClick=onClick) else Modifier)
+}
 @Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={}) {
-    var showCommand by rememberSaveable { mutableStateOf(false) }
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    var query by rememberSaveable {mutableStateOf("")}
+    var selector by rememberSaveable {mutableStateOf("")}
+    var showCommand by rememberSaveable {mutableStateOf(false)}
+    val state=rememberLazyListState()
+    val category=SettingsPolicy.section(section)
+    LaunchedEffect(section) {state.scrollToItem(SettingsPolicy.index(section))}
+    val prefs=remember {context.getSharedPreferences("monitor_settings",Context.MODE_PRIVATE)}
+    var minutes by remember {mutableIntStateOf(MonitorPolicy.minutes(prefs.getInt("warning_minutes",10)))}
+    val themeLabel=listOf("system" to "Как в системе","light" to "Светлая","dark" to "Тёмная").toMap()[theme] ?: "Как в системе"
+    LazyColumn(Modifier.fillMaxSize().imePadding(),state=state,contentPadding=PaddingValues(bottom=24.dp)) {
         if(section.isEmpty()) {
-            settingsSections.forEach { (id,title)->item { ElevatedCard(onClick={onSection(id)},modifier=Modifier.fillMaxWidth()) { ListItem(headlineContent={Text(title)},trailingContent={Icon(AppIcons.Chevron,null)}) } } }
-            item {Text("AnimaDev 0.4.0-beta.5",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-        } else when(section) {
-            "appearance"->item { Card { Column(Modifier.padding(16.dp)) {
-                listOf("system" to "Как в системе","light" to "Светлая","dark" to "Тёмная").forEach { (id,label)->SingleChoiceRow(label,theme==id){onTheme(id)} }
-                HorizontalDivider(Modifier.padding(vertical=8.dp))
-                Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Text("Динамические цвета",Modifier.weight(1f));Switch(dynamic,onDynamic) }
-            } } }
-            "git"->item { Card { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Text("GitHub — источник истины",style=MaterialTheme.typography.titleMedium)
-                Text("Приложение получает изменения через Termux. Push и автоматическое разрешение конфликтов недоступны.")
-                Text("Проекты добавляются по существующему локальному пути. Worktree сгруппированы по Git-метаданным; неподдерживаемые проекты доступны для просмотра.",style=MaterialTheme.typography.bodyMedium)
-            } } }
-            "profiles"->{
-                item { Card { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    Text("AnimaQuiz · unit-тесты Debug",style=MaterialTheme.typography.titleMedium)
-                    Text("Ветка test/decomposition-v1 · фиксированный офлайн-профиль",style=MaterialTheme.typography.bodyMedium)
-                    OutlinedButton(onClick={showCommand=!showCommand},modifier=Modifier.fillMaxWidth()){Text(if(showCommand)"Скрыть команду" else "Команда профиля")}
-                    if(showCommand)Text("bash ./gradlew :app:testDebugUnitTest --offline --no-daemon --rerun-tasks --console=plain",style=MaterialTheme.typography.bodySmall)
-                    Text("Профили сборки APK/AAB пока недоступны.",style=MaterialTheme.typography.bodySmall)
-                } } }
-                ProjectStore(context).all().filterNot {it.supported}.forEach {p->item { DetailRow(p.name,"Нет безопасного профиля исполнения · только просмотр") } }
+            item {OutlinedTextField(query,{query=it},label={Text("Поиск настроек")},leadingIcon={Icon(AppIcons.Search,null)},trailingIcon={if(query.isNotEmpty())IconButton(onClick={query=""}){Icon(AppIcons.Close,"Очистить поиск")}},singleLine=true,modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp))}
+            if(query.isBlank())settingsSections.forEach {(id,title)->item(key=id) {
+                ListItem(headlineContent={Text(title)},supportingContent={Text(descriptions.getValue(id))},leadingContent={Icon(when(id){"git"->AppIcons.Git;"profiles"->AppIcons.Tests;"jobs"->AppIcons.History;"files"->AppIcons.Folder;"about"->AppIcons.Info;"notifications"->AppIcons.Info;else->AppIcons.Settings},null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},modifier=Modifier.clickable{onSection(id)})
+            }} else {
+                val results=SettingsPolicy.search(query)
+                if(results.isEmpty())item {DetailRow("Ничего не найдено","Попробуйте другое название или описание")}
+                results.forEach {entry->item(key=entry.section+entry.id){Preference(entry.title,entry.description,{onSection(entry.section+"/"+entry.id)})}}
             }
-            "jobs"->item {MonitorSettings(context,embedded=true,showNotifications=false)}
+        } else when(category) {
+            "appearance"->{
+                item {Preference("Тема",themeLabel,{selector="theme"})}
+                item {Preference("Динамические цвета","Палитра обоев Android",trailing={Switch(dynamic,onDynamic)})}
+            }
+            "git"->{
+                item {Preference("Получение изменений","GitHub → Termux · только безопасный fast-forward. Push и автоматическое разрешение конфликтов недоступны.")}
+                item {Preference("Локальные проекты","Worktree сгруппированы по репозиторию. Удаление из списка не удаляет файлы; дополнительные проекты доступны для просмотра.")}
+            }
+            "profiles"->{
+                item {Preference("AnimaQuiz · unit-тесты Debug","test/decomposition-v1 · фиксированный офлайн-профиль",{showCommand=!showCommand})
+                    if(showCommand)DetailRow("Команда профиля","bash ./gradlew :app:testDebugUnitTest --offline --no-daemon --rerun-tasks --console=plain")}
+                item {Preference("Профили сборки","APK/AAB пока недоступны")}
+            }
+            "jobs"->{
+                item {Preference("Предупреждать без прогресса","Через $minutes минут",{selector="warning"})}
+                item {Preference("Защитный предел TEST","90 минут. Предупреждение не останавливает процесс; UNKNOWN блокирует повтор.")}
+            }
             "notifications"->item {NotificationSettings(context)}
             "files"->item {FileSettings(context)}
+            "about"->{
+                item {Preference("AnimaDev",context.packageManager.getPackageInfo(context.packageName,0).versionName ?: "Версия недоступна")}
+                item {Preference("Диагностика","Связь и инструменты — в разделе Termux. Очищенные журналы и отправка отчётов — в истории проекта.")}
+                item {Preference("Android","${android.os.Build.VERSION.RELEASE} · API ${android.os.Build.VERSION.SDK_INT}")}
+            }
         }
     }
+    if(selector.isNotEmpty())AlertDialog(onDismissRequest={selector=""},title={Text(if(selector=="theme")"Тема" else "Предупреждение без прогресса")},text={Column {
+        if(selector=="theme")listOf("system" to "Как в системе","light" to "Светлая","dark" to "Тёмная").forEach {(id,label)->SingleChoiceRow(label,theme==id){onTheme(id);selector=""}}
+        else MonitorPolicy.thresholds.forEach {value->SingleChoiceRow("$value минут",minutes==value){minutes=value;prefs.edit().putInt("warning_minutes",value).apply();selector=""}}
+    }},confirmButton={TextButton(onClick={selector=""}){Text("Отмена")}})
 }
 @Composable fun FileSettings(context:Context) {
-    val scope=rememberCoroutineScope()
-    val destination=remember {ExportDestination(context)}
-    var generation by remember {mutableIntStateOf(0)}
-    var error by remember {mutableStateOf("")}
+    val scope=rememberCoroutineScope();val destination=remember {ExportDestination(context)}
+    var generation by remember {mutableIntStateOf(0)};var error by remember {mutableStateOf("")}
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) {uri->
         if(uri!=null)scope.launch {if(!kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){destination.choose(uri)})error="Не удалось сохранить доступ к папке.";generation++}
     }
     val label=remember(generation){destination.label()}
-    Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Text("Каталог сохранения",style=MaterialTheme.typography.titleMedium)
-        Text(label)
-        Text("Единая папка для отчётов и будущих артефактов. По умолчанию — Загрузки. Папки не создаются автоматически.",style=MaterialTheme.typography.bodyMedium)
-        Button(onClick={picker.launch(null)},modifier=Modifier.fillMaxWidth()){Text("Выбрать папку")}
-        OutlinedButton(onClick={destination.useDownloads();generation++;error=""},modifier=Modifier.fillMaxWidth()){Text("Использовать Загрузки")}
-        if(error.isNotEmpty())Text(error,color=MaterialTheme.colorScheme.error)
+    Column {
+        Preference("Папка сохранения",label,{picker.launch(null)})
+        Preference("Использовать Загрузки","Вернуть системную папку, сохранив существующие файлы",{destination.useDownloads();generation++;error=""})
+        if(error.isNotEmpty())Text(error,color=MaterialTheme.colorScheme.error,modifier=Modifier.padding(16.dp))
     }
 }
