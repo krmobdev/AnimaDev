@@ -9,7 +9,8 @@ import tempfile
 import time
 import unittest
 import uuid
-from animadev_runner import Engine, GitGuard, Denied, redact, identity, wire_job
+from unittest.mock import patch
+from animadev_runner import Engine, GitGuard, Denied, redact, identity, wire_job, classify_fetch_error, MESSAGES
 
 BRANCH='test/decomposition-v1'
 def git(root,*args):
@@ -68,8 +69,18 @@ class Fixture(unittest.TestCase):
         (self.repo/'local.txt').write_text('local');git(self.repo,'add','.');git(self.repo,'commit','-m','local');self.before=git(self.repo,'rev-parse','HEAD');self.assert_blocked('LOCAL_AHEAD')
     def test_diverged_denied(self):
         self.remote_commit();(self.repo/'local.txt').write_text('local');git(self.repo,'add','.');git(self.repo,'commit','-m','local');self.before=git(self.repo,'rev-parse','HEAD');self.assert_blocked('NON_FAST_FORWARD')
+    def test_dns_failure_and_explicit_check_retry(self):
+        original=GitGuard.call
+        def fail_fetch(guard,args,*a,**kw):
+            if args[0]=='fetch': return 128,'','ssh: Could not resolve hostname github.com: Name or service not known'
+            return original(guard,args,*a,**kw)
+        with patch.object(GitGuard,'call',fail_fetch): j=self.run_action('CHECK')
+        self.assertEqual(j['error_code'],'DNS_FAILED');self.assertEqual(j['exit_code'],128)
+        self.assertEqual(j['state'],'FAILED');self.assertEqual(j['message'],MESSAGES['DNS_FAILED'])
+        self.assertEqual(git(self.repo,'rev-parse','HEAD'),self.before)
+        self.assertEqual(self.run_action('CHECK')['state'],'SUCCEEDED')
     def test_fetch_failure_preserves_checkout(self):
-        self.project['origin']=str(self.base/'missing.git');git(self.repo,'remote','set-url','origin',self.project['origin']);self.assert_blocked('FETCH_FAILED')
+        self.project['origin']=str(self.base/'missing.git');git(self.repo,'remote','set-url','origin',self.project['origin']);self.assert_blocked('REMOTE_ACCESS_FAILED')
     def test_symlink_root_denied(self):
         alias=self.base/'alias';alias.symlink_to(self.repo,target_is_directory=True);self.project['root']=str(alias);self.assert_blocked('PATH_DENIED')
     def test_filter_config_denied(self):
@@ -154,5 +165,19 @@ class Fixture(unittest.TestCase):
         self.assertEqual(redact('ordinary Git output'), 'ordinary Git output')
     def test_snapshot_dirty_blocks_can_sync(self):
         self.remote_commit();(self.repo/'mine').write_text('mine');j=self.run_action('CHECK');self.assertTrue(j['snapshot']['dirty']);self.assertFalse(j['snapshot']['can_sync'])
+
+class ErrorClassification(unittest.TestCase):
+    def test_dns(self): self.assertEqual(classify_fetch_error('ssh: Could not resolve hostname github.com'), 'DNS_FAILED')
+    def test_dns_temporary(self): self.assertEqual(classify_fetch_error('Temporary failure in name resolution'), 'DNS_FAILED')
+    def test_network(self): self.assertEqual(classify_fetch_error('Network is unreachable'), 'NETWORK_UNAVAILABLE')
+    def test_connection_timeout(self): self.assertEqual(classify_fetch_error('Connection timed out'), 'NETWORK_UNAVAILABLE')
+    def test_ssh_auth(self): self.assertEqual(classify_fetch_error('Permission denied (publickey).'), 'SSH_AUTH_FAILED')
+    def test_host_key(self): self.assertEqual(classify_fetch_error('REMOTE HOST IDENTIFICATION HAS CHANGED'), 'SSH_HOST_KEY_FAILED')
+    def test_repository_missing(self): self.assertEqual(classify_fetch_error('Repository not found'), 'REMOTE_ACCESS_FAILED')
+    def test_branch_missing(self): self.assertEqual(classify_fetch_error("couldn't find remote ref refs/heads/test"), 'REMOTE_ACCESS_FAILED')
+    def test_unknown_is_fixed_message(self):
+        raw='unexpected internal diagnostic'
+        code=classify_fetch_error(raw)
+        self.assertEqual(code,'FETCH_FAILED');self.assertNotIn(raw,MESSAGES[code])
 
 if __name__=='__main__':unittest.main()

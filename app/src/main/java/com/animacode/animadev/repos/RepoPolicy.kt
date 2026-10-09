@@ -1,6 +1,8 @@
 package com.animacode.animadev.repos
 
 object RepoPolicy {
+    fun runnerForQuery(mode: String, current: String, job: String, installed: String, legacy: String): String =
+        if (mode == "START") current else job.ifEmpty { installed.ifEmpty { legacy } }
     val activeStates = setOf("REQUESTED", "QUEUED", "RUNNING", "UNKNOWN")
     val terminalStates = setOf("SUCCEEDED", "FAILED", "TIMED_OUT", "INTERRUPTED", "NOT_STARTED")
     fun blocked(jobId: String, state: String) = jobId.isNotEmpty() && state in activeStates

@@ -13,7 +13,8 @@ import java.util.UUID
 
 class RepoGateway(private val context: Context) {
     companion object {
-        const val VERSION = "0.2.0"
+        const val VERSION = "0.2.1"
+        const val LEGACY_SHA = "e96b432836ff0fb1f23f9455a1440a73fbcb7a675720871d323c4209bb178a4e"
         const val PROTOCOL = 2
         const val PROJECT = "animaquiz"
         const val RUNNER_ROOT = "/data/data/com.termux/files/home/.local/share/animadev"
@@ -23,6 +24,14 @@ class RepoGateway(private val context: Context) {
     private fun id() = UUID.randomUUID().toString().replace("-", "")
     private fun sha(): String = context.assets.open("runner/runner.sha256").bufferedReader().use { it.readText().trim() }
     private fun path(hash: String) = "$RUNNER_ROOT/releases/$hash/animadev_runner.py"
+    init {
+        val r = store.read()
+        if (r.optBoolean("ready") && r.optString("installed_sha").isEmpty()) r.put("installed_sha", LEGACY_SHA)
+        if (r.optBoolean("ready") && r.optString("installed_sha") != sha() && !r.optBoolean("pending") && !store.blocked()) {
+            r.put("ready", false).put("message", "Обновите локальный помощник кнопкой ниже. История заданий сохранена.")
+        }
+        store.write(r)
+    }
 
     fun install() {
         val r = store.read()
@@ -63,6 +72,7 @@ class RepoGateway(private val context: Context) {
                 sys.exit(1)
         """.trimIndent()
         r.put("transport_id", request).put("mode", "INSTALL").put("pending", true)
+            .put("transport_runner_version", VERSION)
             .put("sent_at", System.currentTimeMillis()).put("message", "Устанавливаем локальный помощник вне Git-репозиториев…")
         if (!store.write(r)) return
         send(request, arrayOf("-c", script, request, hash, data))
@@ -73,6 +83,7 @@ class RepoGateway(private val context: Context) {
         if (action == "SYNC" && !maySync(r)) return
         val job = id()
         r.put("job_id", job).put("action", action).put("state", "REQUESTED")
+            .put("job_runner_sha", sha())
             .put("message", "Отправляем Git-операцию. Успех ещё не подтверждён.")
             .remove("job")
         if (!store.write(r)) return
@@ -84,7 +95,10 @@ class RepoGateway(private val context: Context) {
         dispatch("QUERY")
     }
     private fun dispatch(mode: String) {
-        val r = store.read(); val request = id(); val hash = sha()
+        val r = store.read(); val request = id()
+        val hash = RepoPolicy.runnerForQuery(mode, sha(), r.optString("job_runner_sha"), r.optString("installed_sha"), LEGACY_SHA)
+        if (!hash.matches(Regex("[a-f0-9]{64}"))) return
+        val runnerVersion = if (hash == LEGACY_SHA) "0.2.0" else VERSION
         val payload = JSONObject().put("request_id", request).put("mode", mode)
             .put("job_id", r.getString("job_id")).put("action", r.getString("action"))
             .put("project_id", PROJECT).toString()
@@ -97,12 +111,13 @@ class RepoGateway(private val context: Context) {
                 if source.resolve()!=source.absolute() or hashlib.sha256(data).hexdigest()!=expected:
                     raise ValueError('RUNNER_CHECKSUM_MISMATCH')
             except Exception:
-                print(json.dumps({'protocol_version':2,'runner_version':'$VERSION','request_id':request_id,'ok':False,'error_code':'RUNNER_CHECKSUM_MISMATCH','message':'Runner отсутствует или изменён. Git не запускался.'}))
+                print(json.dumps({'protocol_version':2,'runner_version':'$runnerVersion','request_id':request_id,'ok':False,'error_code':'RUNNER_CHECKSUM_MISMATCH','message':'Runner отсутствует или изменён. Git не запускался.'}))
                 sys.exit(1)
             sys.argv=[str(source),payload]
             exec(compile(data,str(source),'exec'),{'__name__':'__main__','__file__':str(source),'EXPECTED_SHA':expected})
         """.trimIndent()
         r.put("transport_id", request).put("mode", mode).put("pending", true).put("sent_at", System.currentTimeMillis())
+            .put("transport_runner_version", runnerVersion)
         if (!store.write(r)) return
         send(request, arrayOf("-c", script, path(hash), hash, payload))
     }

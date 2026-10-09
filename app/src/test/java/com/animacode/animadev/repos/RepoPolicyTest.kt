@@ -23,4 +23,9 @@ class RepoPolicyTest {
     @Test fun mismatchedActionRejected() { assertFalse(RepoPolicy.validJob("one","SYNC","one","CHECK","SUCCEEDED")) }
     @Test fun unknownStateRejected() { assertFalse(RepoPolicy.validJob("one","SYNC","one","SYNC","MADE_UP")) }
     @Test fun acceptedIsNotFinished() { assertTrue(RepoPolicy.validJob("one","SYNC","one","SYNC","QUEUED")); assertTrue(RepoPolicy.blocked("one","QUEUED")) }
+    @Test fun queryUsesJobRunnerAfterUpgrade() { assertEquals("old", RepoPolicy.runnerForQuery("QUERY","new","old","new","legacy")) }
+    @Test fun queryUsesInstalledRunnerWhenJobHasNoSha() { assertEquals("old", RepoPolicy.runnerForQuery("QUERY","new","","old","legacy")) }
+    @Test fun legacyQueryPreservesRunner() { assertEquals("legacy", RepoPolicy.runnerForQuery("QUERY","new","","","legacy")) }
+    @Test fun newStartAlwaysUsesCurrentRunner() { assertEquals("new", RepoPolicy.runnerForQuery("START","new","old","old","legacy")) }
+    @Test fun failedNetworkCheckAllowsExplicitRetry() { assertFalse(RepoPolicy.blocked("id","FAILED")); assertFalse(sync(checked=false)) }
 }

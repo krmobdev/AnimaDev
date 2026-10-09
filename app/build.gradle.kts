@@ -9,8 +9,8 @@ android {
         applicationId = "com.animacode.animadev"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0-git"
+        versionCode = 3
+        versionName = "0.2.1-git"
     }
     buildFeatures { compose = true }
     compileOptions {

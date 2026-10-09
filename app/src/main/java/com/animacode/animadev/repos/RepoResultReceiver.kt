@@ -19,7 +19,7 @@ class RepoResultReceiver : BroadcastReceiver() {
             check(out.length <= 24_000 && err.length <= 8192)
             check(result.containsKey("exitCode") && result.containsKey("err"))
             val j = JSONObject(out)
-            check(j.getInt("protocol_version") == RepoGateway.PROTOCOL && j.getString("runner_version") == RepoGateway.VERSION && j.getString("request_id") == id)
+            check(j.getInt("protocol_version") == RepoGateway.PROTOCOL && j.getString("runner_version") == record.optString("transport_runner_version", "0.2.0") && j.getString("request_id") == id)
             record.put("pending", false).put("callback_exit", result.getInt("exitCode"))
                 .put("termux_err", result.getInt("err")).put("transport_stdout", out.take(24_000))
                 .put("transport_stderr", redact(err).take(8192))
@@ -28,6 +28,7 @@ class RepoResultReceiver : BroadcastReceiver() {
                 val sha = context.assets.open("runner/runner.sha256").bufferedReader().use { it.readText().trim() }
                 val ready = successfulTransport && j.optBoolean("ok") && j.optString("sha256") == sha
                 record.put("ready", ready).put("message", if (ready) "Локальный помощник готов. Нажмите «Обновить состояние»." else "Не удалось установить runner. ${j.optString("error_code")}")
+                if (ready) record.put("installed_sha", sha)
             } else if (!j.optBoolean("ok") || !successfulTransport) {
                 val code = j.optString("error_code", "RESULT_MALFORMED")
                 // Any uncertainty retains the job ID. QUERY resolves it without issuing another START.
@@ -58,6 +59,11 @@ class RepoResultReceiver : BroadcastReceiver() {
             // Never retain raw stderr or unknown diagnostic output with secrets.
             record.put("transport_stdout", redact(record.optString("transport_stdout")))
             record.remove("transport_id") // Duplicate terminal callback cannot rewrite state.
+            val currentSha = context.assets.open("runner/runner.sha256").bufferedReader().use { it.readText().trim() }
+            if (!RepoPolicy.blocked(record.optString("job_id"), record.optString("state")) &&
+                record.optBoolean("ready") && record.optString("installed_sha", RepoGateway.LEGACY_SHA) != currentSha) {
+                record.put("ready", false)
+            }
             store.write(record)
         } catch (_: Exception) {
             store.edit { it.put("pending", false).put("state", "UNKNOWN")

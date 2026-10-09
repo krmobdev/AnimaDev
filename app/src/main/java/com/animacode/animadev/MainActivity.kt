@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
@@ -16,12 +17,15 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.animacode.animadev.termux.*
 import com.animacode.animadev.repos.RepositoriesScreen
+import com.animacode.animadev.repos.RepoStore
+import com.animacode.animadev.repos.RepoPolicy
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -41,7 +45,14 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = lightColorScheme(
                 primary = Color(0xFF3559D5), background = Color(0xFFF5F6FA),
                 surface = Color.White, onSurface = Color(0xFF192033))) {
-                var repositoryTab by remember { mutableStateOf(true) }
+                var repositoryTab by rememberSaveable { mutableStateOf(true) }
+                var confirmExit by rememberSaveable { mutableStateOf(false) }
+                var operationMayContinue by rememberSaveable { mutableStateOf(false) }
+                BackHandler {
+                    val record = RepoStore(this@MainActivity).read()
+                    operationMayContinue = RepoPolicy.blocked(record.optString("job_id"), record.optString("state")) || record.optBoolean("pending")
+                    confirmExit = true
+                }
                 Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { repositoryTab = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Репозитории") }
@@ -53,6 +64,15 @@ class MainActivity : ComponentActivity() {
                         else ProbeScreen()
                     }
                 }
+                if (confirmExit) AlertDialog(
+                    onDismissRequest = { confirmExit = false },
+                    title = { Text("Закрыть AnimaDev?") },
+                    text = { Text(if (operationMayContinue)
+                        "Git-задание может ещё выполняться. Оно продолжится в Termux, а результат сохранится для следующего открытия приложения."
+                        else "Состояние и результаты сохранятся для следующего открытия приложения.") },
+                    confirmButton = { TextButton(onClick = { confirmExit = false; finishAndRemoveTask() }) { Text("Выйти") } },
+                    dismissButton = { TextButton(onClick = { confirmExit = false }) { Text("Отмена") } }
+                )
             }
         }
     }
@@ -140,7 +160,7 @@ class MainActivity : ComponentActivity() {
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                Text("0.2.0 · Без серверов и сетевых запросов", style = MaterialTheme.typography.bodySmall)
+                Text("0.2.1 · Без серверов и сетевых запросов", style = MaterialTheme.typography.bodySmall)
             }
     }
     @Composable private fun OutputBlock(label: String, output: String) {

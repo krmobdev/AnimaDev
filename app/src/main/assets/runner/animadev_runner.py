@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 
-VERSION = '0.2.0'
+VERSION = '0.2.1'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
 STATE_ROOT = HOME / '.local/share/animadev'
@@ -40,6 +40,11 @@ MESSAGES = {
  'EXECUTABLE_CONFIG': 'В Git настроены внешние фильтры или включаемые конфигурации. Автооперация заблокирована.',
  'GIT_FAILED': 'Git завершился с ошибкой. Рабочее дерево не затиралось.',
  'FETCH_FAILED': 'Не удалось получить ветку. Проверьте сеть и существующий SSH-доступ Termux.',
+ 'DNS_FAILED': 'Не удалось определить адрес GitHub (DNS). Проверьте подключение или VPN и повторите «Проверить обновления».',
+ 'NETWORK_UNAVAILABLE': 'Сеть недоступна или соединение с GitHub прервано. Проверьте подключение и повторите «Проверить обновления».',
+ 'SSH_AUTH_FAILED': 'GitHub отклонил SSH-авторизацию. Проверьте существующий SSH-доступ Termux; новые ключи и токены приложение не создаёт.',
+ 'SSH_HOST_KEY_FAILED': 'SSH не подтвердил ключ сервера. Проверка безопасности не отключалась; нужен корректный known_hosts Termux.',
+ 'REMOTE_ACCESS_FAILED': 'Удалённая ветка или репозиторий недоступны. Проверьте доступ и наличие согласованной ветки.',
  'TIMED_OUT': 'Git превысил лимит времени. Проверьте фактическое состояние перед повтором.',
  'JOB_INTERRUPTED': 'Процесс Termux прерван. Успех не подтверждён.',
  'RESULT_MALFORMED': 'Недопустимый запрос или ответ.', 'OUTPUT_LIMIT': 'Вывод Git превысил безопасный размер.',
@@ -63,6 +68,21 @@ def redact(value):
     text = re.sub(r'(https?://)[^\s/@]+:[^\s/@]+@', r'\1[REDACTED]@', text)
     text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
     return text
+
+def classify_fetch_error(stderr):
+    # Recognize bounded diagnostics only; return fixed codes, never dynamic text.
+    diagnostic = stderr[:65536].lower()
+    if any(x in diagnostic for x in ('could not resolve hostname', 'could not resolve host:', 'temporary failure in name resolution', 'name or service not known')):
+        return 'DNS_FAILED'
+    if any(x in diagnostic for x in ('host key verification failed', 'remote host identification has changed')):
+        return 'SSH_HOST_KEY_FAILED'
+    if any(x in diagnostic for x in ('permission denied (publickey', 'authentication failed', 'no supported authentication methods', 'sign_and_send_pubkey: signing failed')):
+        return 'SSH_AUTH_FAILED'
+    if any(x in diagnostic for x in ('network is unreachable', 'no route to host', 'connection timed out', 'connection refused', 'connection reset', 'connection closed', 'failed to connect')):
+        return 'NETWORK_UNAVAILABLE'
+    if any(x in diagnostic for x in ('repository not found', "couldn't find remote ref", 'does not appear to be a git repository')):
+        return 'REMOTE_ACCESS_FAILED'
+    return 'FETCH_FAILED'
 
 def secure_dir(path):
     path = pathlib.Path(path)
@@ -154,7 +174,7 @@ class GitGuard:
         if not self.root.is_dir(): raise Denied('REPO_MISSING')
         if self.root.resolve() != self.root.absolute(): raise Denied('PATH_DENIED')
         self.env = {k:v for k,v in os.environ.items() if not k.startswith('GIT_')}
-        self.env.update(GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull,
+        self.env.update(LC_ALL='C', GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull,
             GIT_TERMINAL_PROMPT='0', GIT_OPTIONAL_LOCKS='0', GIT_PAGER='cat',
             GIT_SSH_COMMAND=FIXED_SSH+' -oBatchMode=yes -oStrictHostKeyChecking=yes -oConnectTimeout=15')
         self.prefix = [self.git, '-c', 'core.hooksPath=' + os.devnull, '-c', 'core.fsmonitor=false',
@@ -238,9 +258,9 @@ class GitGuard:
     def fetch(self, jid):
         ref = 'refs/animadev/' + jid
         # URL and refspec are fixed registry data, no configured helper or arbitrary remote.
-        code, _, _ = self.call(['fetch', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head',
+        code, _, diagnostic = self.call(['fetch', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head',
             self.project['origin'], 'refs/heads/'+self.project['branch']+':'+ref], timeout=180, allow_failure=True)
-        if code: raise Denied('FETCH_FAILED', code)
+        if code: raise Denied(classify_fetch_error(diagnostic), code)
         return self.text(['rev-parse', '--verify', ref+'^{commit}'])
     def execute(self, action, jid):
         before = self.snapshot()

@@ -124,23 +124,24 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
             if (!start.isNaN() && !end.isNaN()) Text("Длительность: ${((end - start) * 1000).toLong()} мс")
             if (job.has("exit_code") && !job.isNull("exit_code")) Text("Код Git-операции: ${job.optInt("exit_code")}")
             else if (job.optString("state") in RepoPolicy.terminalStates) Text("Код Git не получен; успех не подтверждён.")
-            if (job.optString("stderr").isNotBlank()) Text(RepoResultReceiver.redact(job.optString("stderr")).takeLast(600), style = MaterialTheme.typography.bodySmall)
             if (job.optString("stdout").isNotBlank()) Text(job.optString("stdout").lineSequence().takeLastLines(5), style = MaterialTheme.typography.bodySmall)
         }
         TextButton(onClick = { details = !details }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (details) "Скрыть технические подробности" else "Технические подробности") }
         if (details) SelectionContainer {
             Column(Modifier.fillMaxWidth().background(Color.White, MaterialTheme.shapes.medium).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Runner ${record.optString("runner_version", if (ready) RepoGateway.VERSION else "не установлен")}")
+                Text("Код причины: ${job?.optString("error_code")?.ifEmpty { "—" } ?: "—"}")
+                // Git diagnostics are deliberately not rendered: show fixed classified messages instead.
                 Text("Job ID: ${record.optString("job_id", "—")}", fontFamily = FontFamily.Monospace)
                 Text("State: ${record.optString("state", "—")} · Action: ${record.optString("action", "—")}")
                 Text("Короткий запрос Termux: exit=${record.optString("callback_exit", "—")}, err=${record.optString("termux_err", "—")}")
                 Text("Рабочая папка: ~/quizapp\nЛокальное состояние: ~/.local/share/animadev")
                 snapshot?.optJSONArray("changed_files")?.let { Text("Локальные изменения:\n$it", style = MaterialTheme.typography.bodySmall) }
-                Text("stdout (короткий ответ):\n${record.optString("transport_stdout", "—")}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-                Text("stderr (короткий ответ):\n${record.optString("transport_stderr", "—")}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                Text("stdout Git (журнал шагов):\n${job?.optString("stdout") ?: "—"}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                Text("stderr Termux: ${if (record.optString("transport_stderr").isBlank()) "пусто" else "Получена диагностика; используйте сообщение об ошибке выше."}", style = MaterialTheme.typography.bodySmall)
             }
         }
-        Text("AnimaDev 0.2.0 · Git через существующий SSH Termux", style = MaterialTheme.typography.bodySmall)
+        Text("AnimaDev 0.2.1 · Git через существующий SSH Termux", style = MaterialTheme.typography.bodySmall)
     }
     if (confirmInstall) AlertDialog(onDismissRequest = { confirmInstall = false }, title = { Text("Настроить локальный помощник?") },
         text = { Text("AnimaDev сохранит встроенный проверенный runner в ~/.local/share/animadev. Настройки Termux и файлы QuizApp не меняются.") },
