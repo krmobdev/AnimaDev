@@ -145,8 +145,18 @@ def process(root, env, log, on_process, identity, redact, timeout=TIMEOUT, obser
         if not p.stdin.closed:p.stdin.close()
         on_process(None,None)
 
-def execute(guard, log, on_process, identity, redact, timeout=TIMEOUT):
-    snapshot=guard.snapshot();guard.require(snapshot)
+def execute(guard, log, on_process, identity, redact, timeout=TIMEOUT, jid=''):
+    snapshot=guard.snapshot();guard.require(snapshot, clean=bool(guard.project.get('dynamic')))
+    if guard.project.get('dynamic'):
+        if not jid: return dict(state='FAILED',error_code='TEST_STATE_CHANGED',exit_code=None,snapshot=snapshot,tests=None)
+        remote=guard.fetch(jid)
+        checked=guard.snapshot();guard.require(checked,clean=True)
+        if snapshot['branch'] != checked['branch'] or snapshot['local_commit'] != checked['local_commit']:
+            return dict(state='FAILED',error_code='TEST_STATE_CHANGED',exit_code=None,snapshot=checked,tests=None)
+        current=guard.compare(checked,remote)
+        if current['local_commit'] != remote or current['ahead'] or current['behind']:
+            return dict(state='FAILED',error_code='BUILD_OUTDATED',exit_code=None,snapshot=current,tests=None)
+        snapshot=current
     wrapper=guard.root/'gradlew'
     if not wrapper.is_file() or wrapper.is_symlink():return dict(state='FAILED',error_code='GRADLE_MISSING',exit_code=None,snapshot=snapshot,tests=None)
     try:before=reports(guard.root)
