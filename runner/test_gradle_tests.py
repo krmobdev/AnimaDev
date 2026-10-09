@@ -144,6 +144,9 @@ class DebugBuildFixture(unittest.TestCase):
         import zipfile
         with zipfile.ZipFile(self.sample,'w') as apk:
             apk.writestr('AndroidManifest.xml',b'x'*2048)
+    def run_build(self):
+        guard=runner.GitGuard(self.project,git_executable=self.engine.git_executable)
+        return gt.execute_debug(guard,lambda *a:None,lambda *a:None,runner.identity,runner.redact,uuid.uuid4().hex)
     def prepare(self, create=True, code=0):
         cmd='#!/bin/sh\nmkdir -p app/build/outputs/apk/debug\n'
         if create: cmd += 'cp '+str(self.sample)+' app/build/outputs/apk/debug/app-debug.apk\n'
@@ -157,7 +160,7 @@ class DebugBuildFixture(unittest.TestCase):
     def test_build_real_artifact_and_sha(self):
         self.prepare()
         with patch.object(gt,'DOWNLOADS',self.downloads):
-            result=self.run_action('BUILD_DEBUG')
+            result=self.run_build()
         self.assertEqual(result['state'],'SUCCEEDED',result)
         artifact=result['artifact']
         self.assertEqual(artifact['commit'],self.before)
@@ -168,19 +171,19 @@ class DebugBuildFixture(unittest.TestCase):
     def test_remote_ahead_blocks_before_gradle(self):
         self.prepare();base.git(self.seed,'pull','--ff-only','origin',base.BRANCH);self.remote_commit()
         with patch.object(gt,'DOWNLOADS',self.downloads):
-            result=self.run_action('BUILD_DEBUG')
+            result=self.run_build()
         self.assertEqual(result['error_code'],'BUILD_OUTDATED',result)
         self.assertFalse(list(self.downloads.glob('*.apk')))
     def test_dirty_tree_blocks_without_overwriting(self):
         self.prepare();(self.repo/'file.txt').write_text('changed')
         with patch.object(gt,'DOWNLOADS',self.downloads):
-            result=self.run_action('BUILD_DEBUG')
+            result=self.run_build()
         self.assertEqual(result['error_code'],'REPO_DIRTY',result)
         self.assertFalse(list(self.downloads.glob('*.apk')))
     def test_gradle_success_without_apk_not_accepted(self):
         self.prepare(create=False)
         with patch.object(gt,'DOWNLOADS',self.downloads):
-            result=self.run_action('BUILD_DEBUG')
+            result=self.run_build()
         self.assertEqual(result['error_code'],'BUILD_ARTIFACT_MISSING',result)
         self.assertFalse(list(self.downloads.glob('*.apk')))
 
