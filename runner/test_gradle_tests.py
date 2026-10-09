@@ -144,13 +144,18 @@ class DebugBuildFixture(unittest.TestCase):
         import zipfile
         with zipfile.ZipFile(self.sample,'w') as apk:
             apk.writestr('AndroidManifest.xml',b'x'*2048)
-    def script(self, create=True, code=0):
+    def prepare(self, create=True, code=0):
         cmd='#!/bin/sh\nmkdir -p app/build/outputs/apk/debug\n'
         if create: cmd += 'cp '+str(self.sample)+' app/build/outputs/apk/debug/app-debug.apk\n'
         cmd += 'exit '+str(code)+'\n'
         (self.repo/'gradlew').write_text(cmd)
+        (self.repo/'.gitignore').write_text('app/build/\n')
+        base.git(self.repo,'add','gradlew','.gitignore')
+        base.git(self.repo,'commit','-m','fixture Gradle profile')
+        base.git(self.repo,'push','origin',base.BRANCH)
+        self.before=base.git(self.repo,'rev-parse','HEAD')
     def test_build_real_artifact_and_sha(self):
-        self.script()
+        self.prepare()
         with patch.object(gt,'DOWNLOADS',self.downloads):
             result=self.run_action('BUILD_DEBUG')
         self.assertEqual(result['state'],'SUCCEEDED',result)
@@ -161,19 +166,19 @@ class DebugBuildFixture(unittest.TestCase):
         import hashlib
         self.assertEqual(artifact['sha256'],hashlib.sha256(target.read_bytes()).hexdigest())
     def test_remote_ahead_blocks_before_gradle(self):
-        self.script();self.remote_commit()
+        self.prepare();base.git(self.seed,'pull','--ff-only','origin',base.BRANCH);self.remote_commit()
         with patch.object(gt,'DOWNLOADS',self.downloads):
             result=self.run_action('BUILD_DEBUG')
         self.assertEqual(result['error_code'],'BUILD_OUTDATED',result)
         self.assertFalse(list(self.downloads.glob('*.apk')))
     def test_dirty_tree_blocks_without_overwriting(self):
-        self.script();(self.repo/'file.txt').write_text('changed')
+        self.prepare();(self.repo/'file.txt').write_text('changed')
         with patch.object(gt,'DOWNLOADS',self.downloads):
             result=self.run_action('BUILD_DEBUG')
         self.assertEqual(result['error_code'],'REPO_DIRTY',result)
         self.assertFalse(list(self.downloads.glob('*.apk')))
     def test_gradle_success_without_apk_not_accepted(self):
-        self.script(create=False)
+        self.prepare(create=False)
         with patch.object(gt,'DOWNLOADS',self.downloads):
             result=self.run_action('BUILD_DEBUG')
         self.assertEqual(result['error_code'],'BUILD_ARTIFACT_MISSING',result)
