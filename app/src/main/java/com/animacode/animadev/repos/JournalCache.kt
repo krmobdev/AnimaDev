@@ -55,7 +55,7 @@ class JournalCache(context: Context) : SQLiteOpenHelper(context, "journal_cache.
                 append("Начало: ${java.util.Date((start*1000).toLong())}\n")
                 append("Итог: ${MonitorPolicy.label(j.optString("state"),false,false)} · Exit code: ${j.optString("exit_code")}\n")
                 if(end>0 && start>0) append("Длительность: ${((end-start)*1000).toLong()} мс\n")
-                if(j.has("tests") && !j.isNull("tests"))append("JUnit: ${j.getJSONObject("tests")}\n")
+                if(j.has("tests") && !j.isNull("tests"))append(TestSummary.format(j.getJSONObject("tests")))
                 append(j.optString("message"));append("\n\n")
             }
         }

@@ -44,6 +44,11 @@ import com.animacode.animadev.projects.AppIcons
 
 @Composable
 private fun HighlightedLogChunk(chunk:String) {
+    var expanded by rememberSaveable(chunk) {mutableStateOf(false)}
+    if(JournalPresentation.isCommand(chunk) && !expanded) {
+        ListItem(headlineContent={Text(chunk.lineSequence().first().take(100),maxLines=2,overflow=TextOverflow.Ellipsis)},supportingContent={Text("Полная команда · раскрыть")},trailingContent={IconButton(onClick={expanded=true}){Icon(AppIcons.Chevron,"Раскрыть команду")}})
+        return
+    }
     val scheme=MaterialTheme.colorScheme
     val light=scheme.surface.luminance()>0.5f
     val success=if(light)Color(0xFF257A3B) else Color(0xFF81C784)
@@ -97,7 +102,7 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
     var displayed by remember { mutableStateOf(emptyList<String>()) }
     LaunchedEffect(text,search) { displayed=withContext(Dispatchers.Default) {
         val filtered=if(search.isEmpty())text else text.lineSequence().filter { it.contains(search,ignoreCase=true) }.joinToString("\n")
-        filtered.ifEmpty { if(search.isNotEmpty())"Совпадений нет" else "Журнал ещё не загружен" }.let { JournalStylePolicy.chunks(it) }
+        filtered.ifEmpty { if(search.isNotEmpty())"Совпадений нет" else "Журнал ещё не загружен" }.let { JournalPresentation.chunks(it) }
     } }
     LaunchedEffect(displayed,jobId,view,contentLoaded) {
         if(!positionRestored && contentLoaded && displayed.isNotEmpty()) {
@@ -125,11 +130,11 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                 val legacy=listOfNotNull(record.optJSONObject("job"),record.optJSONObject("test_job")).find { it.optString("job_id")==jobId }
                 if(legacy!=null) {
                     n="Старый runner сохранил только ограниченный фрагмент. Полного вывода этого задания не существует."
-                    content="AnimaQuiz · ${legacy.optString("action")}\nJob ID: $jobId\n${legacy.optString("state")} · exit=${legacy.optString("exit_code")}\nJUnit: ${legacy.optJSONObject("tests") ?: "—"}\n"+
+                    content="AnimaQuiz · ${legacy.optString("action")}\nJob ID: $jobId\n${legacy.optString("state")} · exit=${legacy.optString("exit_code")}\nJUnit: ${legacy.optJSONObject("tests")?.let {TestSummary.format(it)} ?: "—"}\n"+
                         RepoResultReceiver.redact(legacy.optString("stdout"))+"\n"+RepoResultReceiver.redact(legacy.optString("stderr"))
                 }
             }
-            withContext(Dispatchers.Main) { jobs=history; text=content;notice=n;contentLoaded=true }
+            withContext(Dispatchers.Main) { jobs=history; text=if(view=="IMPORTANT")JournalPresentation.important(content) else content;notice=n;contentLoaded=true }
         }
     }
     fun actionForJob(): String = jobs.find { it.optString("job_id")==jobId }?.optString("action")
