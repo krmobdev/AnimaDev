@@ -177,8 +177,9 @@ class DebugBuildFixture(unittest.TestCase):
     def test_dirty_tree_blocks_without_overwriting(self):
         self.prepare();(self.repo/'file.txt').write_text('changed')
         with patch.object(gt,'DOWNLOADS',self.downloads):
-            result=self.run_build()
-        self.assertEqual(result['error_code'],'REPO_DIRTY',result)
+            with self.assertRaises(runner.Denied) as caught:
+                self.run_build()
+        self.assertEqual(caught.exception.code,'REPO_DIRTY')
         self.assertFalse(list(self.downloads.glob('*.apk')))
     def test_gradle_success_without_apk_not_accepted(self):
         self.prepare(create=False)
