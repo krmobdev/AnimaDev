@@ -8,11 +8,17 @@ object RepoPolicy {
         "8a46e5764337cc6da1674a96fe36dae27cda27ea5970fbf3e1f21cce9e249092" -> "0.3.1"
         else -> current
     }
-    fun mayTest(branch: String, remote: Boolean, ready: Boolean, blocked: Boolean): Boolean =
-        branch == "test/decomposition-v1" && remote && ready && !blocked
+    fun mayTest(branch: String, remote: Boolean, ready: Boolean, blocked: Boolean,
+                projectId: String = "animaquiz"): Boolean =
+        branch.isNotBlank() && branch != "Detached HEAD" &&
+            (projectId != "animaquiz" || branch == "test/decomposition-v1") &&
+            remote && ready && !blocked
     fun mayBuild(branch: String, dirty: Boolean, remoteOk: Boolean, ready: Boolean, blocked: Boolean,
-                 checked: Boolean, ahead: Int, behind: Int, local: String, remote: String): Boolean =
-        branch == "test/decomposition-v1" && !dirty && remoteOk && ready && !blocked && checked &&
+                 checked: Boolean, ahead: Int, behind: Int, local: String, remote: String,
+                 projectId: String = "animaquiz"): Boolean =
+        branch.isNotBlank() && branch != "Detached HEAD" &&
+            (projectId != "animaquiz" || branch == "test/decomposition-v1") &&
+            !dirty && remoteOk && ready && !blocked && checked &&
             ahead == 0 && behind == 0 && local.isNotBlank() && local == remote
     fun validCounts(total: Long, passed: Long, failed: Long, skipped: Long, duration: Long): Boolean =
         listOf(total, passed, failed, skipped, duration).all { it >= 0 && it <= 1_000_000_000L } &&
@@ -31,8 +37,11 @@ object RepoPolicy {
     val terminalStates = setOf("SUCCEEDED", "FAILED", "TIMED_OUT", "INTERRUPTED", "NOT_STARTED")
     fun blocked(jobId: String, state: String) = jobId.isNotEmpty() && state in activeStates
     fun maySync(branch: String, dirty: Boolean, remoteOk: Boolean, ahead: Int, behind: Int,
-                checked: Boolean, runnerCanSync: Boolean, blocked: Boolean): Boolean =
-        branch == "test/decomposition-v1" && !dirty && remoteOk && ahead == 0 && behind > 0 &&
+                checked: Boolean, runnerCanSync: Boolean, blocked: Boolean,
+                projectId: String = "animaquiz"): Boolean =
+        branch.isNotBlank() && branch != "Detached HEAD" &&
+            (projectId != "animaquiz" || branch == "test/decomposition-v1") &&
+            !dirty && remoteOk && ahead == 0 && behind > 0 &&
             checked && runnerCanSync && !blocked
     fun acceptCallback(expected: String, received: String) = expected.isNotEmpty() && expected == received
     fun validJob(expectedId: String, expectedAction: String, id: String, action: String, state: String) =
