@@ -16,10 +16,11 @@ import com.animacode.animadev.termux.TermuxGateway
                            onPermissionUpdated:()->Unit,onJournal:(String)->Unit) {
     val record=rememberRepoRecord(context)
     val gateway=remember {RepoGateway(context)}
-    val snapshot=record.optJSONObject("snapshot")
+    val belongs=record.optString("project_id","animaquiz")==project.id
+    val snapshot=if(belongs)record.optJSONObject("snapshot") else null
     val blocked=RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
     val ready=HelperPolicy.mayRun(permitted,termuxVersion!=null,record.optBoolean("ready"),record.optBoolean("pending"),blocked)
-    val canDebug=project.supported && ready && gateway.mayBuild(record)
+    val canDebug=project.supported && ready && gateway.mayBuild(record,project.id)
     val signing=remember {SigningStore(context)}
     val path=signing.path(project.id)
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
@@ -53,7 +54,7 @@ import com.animacode.animadev.termux.TermuxGateway
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }}
-        val job=record.optJSONObject("job")
+        val job=if(belongs)record.optJSONObject("job") else null
         if(job?.optString("action")=="BUILD_DEBUG")item {
             Text("Задание: "+MonitorPolicy.label(job.optString("state"),false,false),style=MaterialTheme.typography.titleSmall)
             Text(job.optString("message"),style=MaterialTheme.typography.bodySmall)

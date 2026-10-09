@@ -20,7 +20,9 @@ import com.animacode.animadev.repos.*
         return
     }
     val gateway=remember {RepoGateway(context)};val r=rememberRepoRecord(context);val store=remember {RepoStore(context)}
-    val snap=r.optJSONObject("snapshot");val pending=r.optBoolean("pending");val blocked=store.blocked();val ready=r.optBoolean("ready")
+    val belongs=r.optString("project_id","animaquiz")==project.id
+    val snap=if(belongs)r.optJSONObject("snapshot") else null
+    val pending=r.optBoolean("pending");val blocked=store.blocked();val ready=r.optBoolean("ready")
     val available=HelperPolicy.mayRun(permitted,termuxVersion!=null,ready,pending,blocked)
     var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)}
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
@@ -43,17 +45,17 @@ import com.animacode.animadev.repos.*
             }} }
             item {Button(onClick={gateway.start("CHECK",project.id,project.path)},enabled=available && (snap==null || (snap.optBoolean("remote_ok") && snap.optBoolean("branch_allowed"))),modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Проверить GitHub")} }
             item {OutlinedButton(onClick={gateway.start("STATUS",project.id,project.path)},enabled=available,modifier=Modifier.fillMaxWidth()){Text("Обновить локальное состояние")} }
-            item {FilledTonalButton(onClick={confirmSync=true},enabled=permitted && termuxVersion!=null && gateway.maySync(r),modifier=Modifier.fillMaxWidth()){Text("Получить изменения")} }
-            item {Text(when {blocked->"Новое действие заблокировано текущим заданием.";!ready->"Операции доступны после подключения помощника.";snap==null->"Обновите локальное состояние.";!snap.optBoolean("branch_allowed")->"Ветка не разрешена профилем. Переключение не выполняется.";!snap.optBoolean("remote_ok")->"Origin не соответствует профилю AnimaQuiz.";snap.optBoolean("dirty")->"Получение изменений заблокировано: есть локальные правки.";snap.optInt("ahead")>0->"Есть локальные коммиты. Объединение запрещено.";snap.optInt("behind")==0->"Проверка GitHub не изменяет исходники.";else->"Обновление — только fast-forward после подтверждения."},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+            item {FilledTonalButton(onClick={confirmSync=true},enabled=permitted && termuxVersion!=null && gateway.maySync(r,project.id),modifier=Modifier.fillMaxWidth()){Text("Получить изменения")} }
+            item {Text(when {blocked->"Новое действие заблокировано текущим заданием.";!ready->"Операции доступны после подключения помощника.";snap==null->"Обновите локальное состояние.";!snap.optBoolean("branch_allowed")->"Ветка не разрешена профилем. Переключение не выполняется.";!snap.optBoolean("remote_ok")->"Origin не соответствует профилю проекта.";snap.optBoolean("dirty")->"Получение изменений заблокировано: есть локальные правки.";snap.optInt("ahead")>0->"Есть локальные коммиты. Объединение запрещено.";snap.optInt("behind")==0->"Проверка GitHub не изменяет исходники.";else->"Обновление — только fast-forward после подтверждения."},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
             if(snap?.optBoolean("dirty")==true)item {TextButton(onClick={changedFiles=true}){Text("Посмотреть изменённые файлы")}}
         } else {
             item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text("Unit-тесты · Debug",style=MaterialTheme.typography.titleMedium)
-                Text("Фиксированный профиль AnimaQuiz",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick={gateway.start("TEST",project.id,project.path)},enabled=available && gateway.mayTest(r),modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Tests,null);Spacer(Modifier.width(8.dp));Text("Запустить тесты")}
+                Text("Подтверждённый Gradle-профиль",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick={gateway.start("TEST",project.id,project.path)},enabled=available && gateway.mayTest(r,project.id),modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Tests,null);Spacer(Modifier.width(8.dp));Text("Запустить тесты")}
             }} }
-            if(!available || !gateway.mayTest(r))item {Text(if(blocked)"Повторный запуск заблокирован: задание выполняется или итог неизвестен." else "Для запуска нужны готовый помощник и проверенные ветка/origin.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-            val test=r.optJSONObject("test_job")
+            if(!available || !gateway.mayTest(r,project.id))item {Text(if(blocked)"Повторный запуск заблокирован: задание выполняется или итог неизвестен." else "Для запуска нужны готовый помощник и проверенные ветка/origin.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+            val test=if(belongs)r.optJSONObject("test_job") else null
             if(test!=null && test.optString("state") in RepoPolicy.terminalStates)item {SectionLabel("Последний результат");Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text(MonitorPolicy.label(test.optString("state"),false,false),style=MaterialTheme.typography.titleMedium)
                 test.optJSONObject("tests")?.let {counts->Text("${counts.optLong("passed")} из ${counts.optLong("total")} успешно",style=MaterialTheme.typography.headlineSmall);Text("Ошибок ${counts.optLong("failed")} · пропущено ${counts.optLong("skipped")}",style=MaterialTheme.typography.bodyMedium)}
@@ -62,7 +64,7 @@ import com.animacode.animadev.repos.*
                 OutlinedButton(onClick={onJournal(test.optString("job_id"))},modifier=Modifier.fillMaxWidth()){Text("Открыть результат и журнал")}
             }} }
         }
-        if(r.optString("job_id").isNotEmpty() && (blocked || (tool=="git" && r.optString("action")!="TEST")))item {JobMonitor(context,r,permitted,onJournal)}
+        if(belongs && r.optString("job_id").isNotEmpty() && (blocked || (tool=="git" && r.optString("action")!="TEST")))item {JobMonitor(context,r,permitted,onJournal)}
     }
     if(confirmSync)AlertDialog(onDismissRequest={confirmSync=false},title={Text("Получить изменения?")},text={Text("${project.name}: ветка, origin и чистота проверятся повторно. Только fast-forward, без отправки на GitHub.")},confirmButton={TextButton(onClick={confirmSync=false;gateway.start("SYNC",project.id,project.path)}){Text("Получить")}},dismissButton={TextButton(onClick={confirmSync=false}){Text("Отложить")}})
     if(changedFiles)AlertDialog(onDismissRequest={changedFiles=false},title={Text("Изменённые файлы")},text={Column {Text(snap?.optJSONArray("changed_files")?.let {a->(0 until a.length()).joinToString("\n"){a.optString(it)}} ?: "Список недоступен");Text("Просмотр содержимого diff пока не подключён.",style=MaterialTheme.typography.bodySmall)}},confirmButton={TextButton(onClick={changedFiles=false}){Text("Закрыть")}})

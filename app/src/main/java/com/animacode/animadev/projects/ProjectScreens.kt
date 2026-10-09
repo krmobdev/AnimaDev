@@ -53,11 +53,11 @@ import org.json.JSONObject
             item { Text("Репозитории: ${primaryProjects.size} · worktree: ${projects.count {it.worktree}}",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(bottom=8.dp)) }
             if(projects.isEmpty())item { Text("Добавьте существующий Git-репозиторий. Его файлы останутся на месте.",style=MaterialTheme.typography.bodyLarge) }
             items(primaryProjects,key={it.id}) { p ->
-                val snapshot=if(p.supported)record.optJSONObject("snapshot") else null
+                val snapshot=if(p.supported && record.optString("project_id","animaquiz")==p.id)record.optJSONObject("snapshot") else null
                 var menu by remember { mutableStateOf(false) }
                 val branch=snapshot?.optString("branch")?.ifEmpty { p.branch } ?: p.branch
                 val dirty=snapshot?.optBoolean("dirty") ?: p.dirty
-                val active=p.supported && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
+                val active=p.supported && record.optString("project_id","animaquiz")==p.id && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
                 Card(onClick={onOpen(p)},colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
                     Row(Modifier.fillMaxWidth().padding(start=16.dp,top=12.dp,bottom=12.dp,end=4.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                         Surface(shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.secondaryContainer) { Icon(AppIcons.Folder,null,tint=MaterialTheme.colorScheme.onSecondaryContainer,modifier=Modifier.padding(10.dp)) }
@@ -111,11 +111,11 @@ import org.json.JSONObject
     val catalogInfo=rememberCatalogRecord(context).getJSONObject("catalog")
     val entries=catalogInfo.optJSONArray("projects")
     val worktrees=buildList {if(entries!=null)for(i in 0 until entries.length())runCatching {LocalProject.parse(entries.getJSONObject(i))}.getOrNull()?.takeIf {it.worktree && it.repositoryPath.isNotEmpty() && it.repositoryPath==(project.repositoryPath.ifEmpty {project.path})}?.let {add(it)}}
-    val record=rememberRepoRecord(context);val snap=if(project.supported)record.optJSONObject("snapshot") else null
+    val record=rememberRepoRecord(context);val snap=if(project.supported && record.optString("project_id","animaquiz")==project.id)record.optJSONObject("snapshot") else null
     val branch=snap?.optString("branch")?.ifEmpty {project.branch} ?: project.branch
     val sha=snap?.optString("local_commit")?.ifEmpty {project.commit} ?: project.commit
     val dirty=snap?.optBoolean("dirty") ?: project.dirty
-    val active=project.supported && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
+    val active=project.supported && record.optString("project_id","animaquiz")==project.id && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item { Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.primaryContainer) { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
             Text(branch.ifEmpty {"Ветка не проверена"},style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)
