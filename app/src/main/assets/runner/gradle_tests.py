@@ -90,11 +90,11 @@ class SafeLines:
         self.suppressed=True
         return '[Длинная строка диагностики пропущена; дальнейший вывод канала скрыт]'
 
-def process(root, env, log, on_process, identity, redact, timeout=TIMEOUT, observe=lambda:None):
+def process(root, env, log, on_process, identity, redact, timeout=TIMEOUT, observe=lambda:None, command=COMMAND):
     # A permission gate records the child before it may execute the fixed command.
     gate = "import os,sys\nif sys.stdin.buffer.read(1)!=b'1': sys.exit(1)\nos.execvpe(sys.argv[1],sys.argv[1:],os.environ)"
     bash = '/data/data/com.termux/files/usr/bin/bash' if sys.platform == 'android' else '/bin/bash'
-    p = subprocess.Popen([sys.executable,'-c',gate,bash,*COMMAND], cwd=root, env=env,
+    p = subprocess.Popen([sys.executable,'-c',gate,bash,*command], cwd=root, env=env,
         stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
     selector = selectors.DefaultSelector()
     selector.register(p.stdout,selectors.EVENT_READ,'stdout'); selector.register(p.stderr,selectors.EVENT_READ,'stderr')
@@ -170,3 +170,77 @@ def execute(guard, log, on_process, identity, redact, timeout=TIMEOUT):
     elif code==0 and result['tests'] is not None:
         result.update(state='SUCCEEDED',error_code='')
     return result
+
+
+DEBUG_COMMAND = ('./gradlew', ':app:assembleDebug', '--offline', '--no-daemon', '--rerun-tasks', '--console=plain')
+DEBUG_APK = 'app/build/outputs/apk/debug/app-debug.apk'
+DOWNLOADS = pathlib.Path('/storage/emulated/0/Download')
+
+def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT):
+    """Build only clean exact GitHub SHA and persist a verified fresh APK."""
+    import zipfile
+    initial = guard.snapshot()
+    guard.require(initial, clean=True)
+    remote = guard.fetch(jid)
+    checked = guard.snapshot()
+    guard.require(checked, clean=True)
+    if checked['branch'] != initial['branch'] or checked['local_commit'] != initial['local_commit']:
+        return dict(state='FAILED', error_code='TEST_STATE_CHANGED', exit_code=None, snapshot=checked)
+    checked = guard.compare(checked, remote)
+    if checked['local_commit'] != remote or checked['ahead'] or checked['behind']:
+        return dict(state='FAILED', error_code='BUILD_OUTDATED', exit_code=None, snapshot=checked)
+    wrapper = guard.root / 'gradlew'
+    if not wrapper.is_file() or wrapper.is_symlink():
+        return dict(state='FAILED', error_code='GRADLE_MISSING', exit_code=None, snapshot=checked)
+    apk = guard.root / DEBUG_APK
+    if apk.is_symlink() or apk.parent.resolve() != apk.parent.absolute():
+        return dict(state='FAILED', error_code='BUILD_PATH_DENIED', exit_code=None, snapshot=checked)
+    stamp = None
+    if apk.exists():
+        if not apk.is_file(): return dict(state='FAILED', error_code='BUILD_PATH_DENIED', exit_code=None, snapshot=checked)
+        s = apk.stat()
+        stamp = (s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+    env = dict(guard.env)
+    for key in ('JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','GRADLE_OPTS','JAVA_OPTS'): env.pop(key,None)
+    log('event','Проверен GitHub SHA '+remote[:12])
+    log('command','bash ./gradlew :app:assembleDebug --offline --no-daemon --rerun-tasks --console=plain')
+    code, unknown = process(guard.root,env,log,on_process,identity,redact,
+                            timeout,getattr(guard,'observe',lambda:None),DEBUG_COMMAND)
+    if unknown: return dict(state='UNKNOWN',unresolved=True,error_code='TEST_TIMEOUT_UNKNOWN',exit_code=None,snapshot=checked)
+    after = guard.snapshot()
+    guard.require(after,clean=True)
+    if after['branch'] != checked['branch'] or after['local_commit'] != remote:
+        return dict(state='FAILED',error_code='TEST_STATE_CHANGED',exit_code=code,snapshot=after)
+    if code != 0: return dict(state='FAILED',error_code='GRADLE_FAILED',exit_code=code,snapshot=after)
+    if not apk.is_file() or apk.is_symlink() or apk.parent.resolve() != apk.parent.absolute():
+        return dict(state='FAILED',error_code='BUILD_ARTIFACT_MISSING',exit_code=code,snapshot=after)
+    s = apk.stat()
+    if s.st_size < 1024 or s.st_size > 512*1024*1024 or stamp == (s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns):
+        return dict(state='FAILED',error_code='BUILD_ARTIFACT_INVALID',exit_code=code,snapshot=after)
+    try:
+        with zipfile.ZipFile(apk) as z:
+            if 'AndroidManifest.xml' not in z.namelist(): raise ValueError()
+    except (OSError,ValueError,zipfile.BadZipFile):
+        return dict(state='FAILED',error_code='BUILD_ARTIFACT_INVALID',exit_code=code,snapshot=after)
+    if not DOWNLOADS.is_dir() or DOWNLOADS.is_symlink():
+        return dict(state='FAILED',error_code='DOWNLOADS_UNAVAILABLE',exit_code=code,snapshot=after)
+    target = DOWNLOADS / ('AnimaQuiz_'+remote[:12]+'_'+jid[:8]+'_debug.apk')
+    tmp = DOWNLOADS / ('.animadev-'+jid+'.part')
+    digest=hashlib.sha256()
+    try:
+        fd=os.open(tmp,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
+        with os.fdopen(fd,'wb') as output, apk.open('rb') as source:
+            while True:
+                buf=source.read(1024*1024)
+                if not buf: break
+                digest.update(buf);output.write(buf)
+            output.flush();os.fsync(output.fileno())
+        if target.exists() or target.is_symlink(): raise OSError()
+        os.rename(tmp,target)
+    except OSError:
+        try: tmp.unlink()
+        except OSError: pass
+        return dict(state='FAILED',error_code='ARTIFACT_EXPORT_FAILED',exit_code=code,snapshot=after)
+    return dict(state='SUCCEEDED',error_code='',exit_code=0,snapshot=after,
+                artifact={'kind':'DEBUG_APK','path':str(target),'size':s.st_size,
+                          'sha256':digest.hexdigest(),'commit':remote,'branch':checked['branch']})

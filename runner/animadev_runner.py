@@ -24,7 +24,7 @@ FIXED_GIT = str(HOME.parent / 'usr/bin/git')
 FIXED_SSH = str(HOME.parent / 'usr/bin/ssh')
 REGISTRY = {'animaquiz': {'name': 'AnimaQuiz', 'root': str(HOME / 'quizapp'),
     'origin': 'git@github.com:krmobdev/quizapp.git', 'branch': 'test/decomposition-v1'}}
-ACTIONS = {'STATUS', 'CHECK', 'SYNC', 'TEST'}
+ACTIONS = {'STATUS', 'CHECK', 'SYNC', 'TEST', 'BUILD_DEBUG'}
 TERMINAL = {'SUCCEEDED', 'FAILED', 'TIMED_OUT', 'INTERRUPTED', 'NOT_STARTED'}
 HEX_ID = re.compile(r'^[0-9a-f]{32}$')
 SHA = re.compile(r'^[0-9a-f]{40,64}$')
@@ -55,6 +55,12 @@ MESSAGES = {
  'STORAGE_UNAVAILABLE': 'Не удалось сохранить состояние задания.',
  'PROCESS_IDENTITY_UNAVAILABLE': 'Termux не позволяет проверить идентичность процессов. Запуск заблокирован.',
  'HISTORY_FULL': 'Журнал достиг лимита 100 заданий. Очистка автоматически не выполняется.',
+ 'BUILD_OUTDATED': 'Локальный SHA устарел: обновите GitHub.',
+ 'BUILD_PATH_DENIED': 'Небезопасный путь APK.',
+ 'BUILD_ARTIFACT_MISSING': 'Gradle не создал APK.',
+ 'BUILD_ARTIFACT_INVALID': 'Новый APK не подтверждён.',
+ 'DOWNLOADS_UNAVAILABLE': 'Загрузки недоступны из Termux.',
+ 'ARTIFACT_EXPORT_FAILED': 'Не удалось скопировать APK в Загрузки.',
 }
 
 class Denied(Exception):
@@ -153,7 +159,7 @@ class Store:
                 j.update(state='UNKNOWN', message='Контроллер недоступен; дочерний процесс может ещё выполняться. Повторный запуск заблокирован.')
                 self.save(c, j)
                 continue
-            if active and j.get('action') == 'TEST' and (dead or j.get('unresolved')):
+            if active and j.get('action') in ('TEST','BUILD_DEBUG') and (dead or j.get('unresolved')):
                 j.update(state='UNKNOWN', unresolved=True, message='Контроллер Gradle потерян или задача превысила таймаут. Результат неизвестен; новый запуск заблокирован.')
                 self.save(c, j)
                 continue
@@ -392,17 +398,19 @@ class Engine:
             guard = GitGuard(self.registry[j['project_id']], log, self.git_executable,
                 lambda pid, token: self.store.update(jid, child_pid=pid, child_identity=token))
             guard.observe = signals.tick
-            if j['action'] == 'TEST':
+            if j['action'] in ('TEST','BUILD_DEBUG'):
                 module_path = pathlib.Path(__file__).resolve().parent / 'gradle_tests.py'
                 data = module_path.read_bytes()
                 if module_path.is_symlink() or hashlib.sha256(data).hexdigest() != GRADLE_SHA:
                     raise Denied('RUNNER_CHECKSUM_MISMATCH')
                 module = {'__file__':str(module_path), '__name__':'verified_gradle_tests'}
                 exec(compile(data,str(module_path),'exec'), module)
-                result = module['execute'](guard, log,
+                result = (module['execute'](guard,log,
                     lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact)
+                    if j['action']=='TEST' else module['execute_debug'](guard,log,
+                    lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid))
                 code = result.get('error_code','')
-                result['message'] = module['MESSAGES'].get(code,'Unit-тесты завершены; результаты получены из JUnit XML.')
+                result['message'] = MESSAGES.get(code,module['MESSAGES'].get(code,'Debug APK готов.' if j['action']=='BUILD_DEBUG' else 'Unit-тесты завершены.'))
                 self.store.update(jid,ended_at=time.time(),**result)
                 return
             snap = guard.execute(j['action'], jid)
@@ -420,7 +428,7 @@ class Engine:
                 error_code=e.code, message=MESSAGES.get(e.code, 'Ошибка Git.'), exit_code=e.exit_code,
                 ended_at=time.time(), snapshot=snap)
         except Exception:
-            if j['action'] == 'TEST':
+            if j['action'] in ('TEST','BUILD_DEBUG'):
                 self.store.update(jid,state='UNKNOWN',unresolved=True,error_code='RESULT_MALFORMED',message='Результат Gradle не подтверждён; повторный запуск заблокирован.',ended_at=time.time())
                 return
             self.store.update(jid, state='FAILED', error_code='STORAGE_UNAVAILABLE',
