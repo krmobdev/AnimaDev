@@ -16,6 +16,9 @@ data class NavigationState(val section:String="projects",val route:String="list"
         route=="workspace"->copy(route="list")
         else->null
     }
-    companion object { fun notificationTarget(job:String,restored:Boolean)=if(restored)"" else job }
+    companion object {
+        /** Fresh launcher navigation keeps selection, never auto-opens it. Saved Compose state restores separately. */
+        fun freshLaunch(selectedProject:String)=NavigationState(project=selectedProject)
+        fun notificationTarget(job:String,restored:Boolean)=if(restored)"" else job }
     val root get()=route=="list"
 }

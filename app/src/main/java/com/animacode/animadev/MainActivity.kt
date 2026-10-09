@@ -49,7 +49,7 @@ class MainActivity:ComponentActivity() {
             val projects=remember { ProjectStore(context) }
             var selected by rememberSaveable { mutableStateOf(projects.selected()) }
             var top by rememberSaveable { mutableStateOf("projects") }
-            var route by rememberSaveable { mutableStateOf(if(projects.selected().isEmpty())"list" else "workspace") }
+            var route by rememberSaveable { mutableStateOf(NavigationState.freshLaunch(projects.selected()).route) }
             var journalJob by rememberSaveable { mutableStateOf("") }
             var journalParent by rememberSaveable { mutableStateOf("history") }
             var settingsSection by rememberSaveable { mutableStateOf("") }

@@ -11,6 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -104,6 +107,7 @@ import org.json.JSONObject
     remove?.let { p->AlertDialog(onDismissRequest={remove=null},title={Text("Убрать проект?")},text={Text("${p.name} исчезнет из списка приложения. Файлы и история останутся в Termux.")},confirmButton={TextButton(onClick={store.remove(p.id);remove=null}){Text("Убрать")}},dismissButton={TextButton(onClick={remove=null}){Text("Отмена")}}) }
 }
 @Composable fun ProjectWorkspace(context:Context,project:LocalProject,onTool:(String)->Unit) {
+    var worktreesExpanded by rememberSaveable(project.id) { mutableStateOf(false) }
     val catalogInfo=rememberCatalogRecord(context).getJSONObject("catalog")
     val entries=catalogInfo.optJSONArray("projects")
     val worktrees=buildList {if(entries!=null)for(i in 0 until entries.length())runCatching {LocalProject.parse(entries.getJSONObject(i))}.getOrNull()?.takeIf {it.worktree && it.repositoryPath.isNotEmpty() && it.repositoryPath==(project.repositoryPath.ifEmpty {project.path})}?.let {add(it)}}
@@ -120,10 +124,6 @@ import org.json.JSONObject
         } } }
         if(active)item { Surface(onClick={onTool(if(record.optString("action")=="TEST")"tests" else "git")},shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.secondaryContainer) { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {Text("${record.optString("action")} · ${MonitorPolicy.label(record.optString("state"),false,false)}",style=MaterialTheme.typography.titleSmall);LinearProgressIndicator(Modifier.fillMaxWidth())} } }
         item { OutlinedButton(onClick={onTool("branches")},modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Git,null);Spacer(Modifier.width(8.dp));Text("Ветки · просмотр")} }
-        if(worktrees.isNotEmpty())item { Card {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            SectionLabel("Worktree (${worktrees.size})")
-            worktrees.forEach {wt->Text(wt.branch+" · "+wt.commit.take(8),style=MaterialTheme.typography.titleSmall);Text(wt.path.removePrefix(ProjectPolicy.HOME+"/"),style=MaterialTheme.typography.bodySmall);Text(if(wt.dirty==true)"Локальные изменения" else if(wt.dirty==false)"Чисто · только просмотр" else "Не проверено",style=MaterialTheme.typography.labelSmall)}
-        } } }
         item { Column { SectionLabel("Инструменты")
             Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
                 val tools=listOf(Triple("git","Git",AppIcons.Git),Triple("tests","Тесты",AppIcons.Tests),Triple("build","Сборка",AppIcons.Build),Triple("history","История",AppIcons.History))
@@ -135,6 +135,16 @@ import org.json.JSONObject
                 }
             }
         } }
+        if(worktrees.isNotEmpty()) {
+            item {
+                Surface(onClick={worktreesExpanded=!worktreesExpanded},shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceContainerLow,modifier=Modifier.fillMaxWidth().semantics {stateDescription=if(worktreesExpanded)"Раскрыто" else "Свёрнуто"}) {
+                    ListItem(headlineContent={Text("Worktree (${worktrees.size})",style=MaterialTheme.typography.titleSmall)},leadingContent={Icon(AppIcons.Git,null)},trailingContent={Icon(AppIcons.Chevron,null,modifier=Modifier.rotate(if(worktreesExpanded)90f else 0f))},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow))
+                }
+            }
+            items(WorktreePresentation.rows(worktrees,worktreesExpanded),key={"worktree:"+it.path}) {wt->
+                ListItem(headlineContent={Text(wt.branch+" · "+wt.commit.take(8),style=MaterialTheme.typography.titleSmall)},supportingContent={Text(wt.path.removePrefix(ProjectPolicy.HOME+"/")+"\n"+if(wt.dirty==true)"Локальные изменения · только просмотр" else if(wt.dirty==false)"Чисто · только просмотр" else "Не проверено · только просмотр")})
+            }
+        }
         item { Text(project.remote.ifEmpty {"Origin не проверен"},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
