@@ -50,6 +50,7 @@ class MainActivity:ComponentActivity() {
             var top by rememberSaveable { mutableStateOf("projects") }
             var route by rememberSaveable { mutableStateOf(if(projects.selected().isEmpty())"list" else "workspace") }
             var journalJob by rememberSaveable { mutableStateOf("") }
+            var journalParent by rememberSaveable { mutableStateOf("history") }
             var settingsParent by rememberSaveable { mutableStateOf("list") };var menu by remember { mutableStateOf(false) }
             var confirmExit by rememberSaveable { mutableStateOf(false) }
             var projectGeneration by remember { mutableIntStateOf(0) }
@@ -76,12 +77,12 @@ class MainActivity:ComponentActivity() {
             LaunchedEffect(requestedJournal) {
                 if(requestedJournal.isNotEmpty()) {
                     val quiz=projects.all().find { it.supported }
-                    if(quiz!=null) { selected=quiz.id;projects.select(quiz.id);journalJob=requestedJournal;top="projects";route="journal" }
+                    if(quiz!=null) { selected=quiz.id;projects.select(quiz.id);journalJob=requestedJournal;journalParent="history";top="projects";route="journal" }
                     requestedJournal=""
                 }
             }
             fun back() {
-                val n=NavigationState(top,route,selected,journalJob,settingsParent).back()
+                val n=NavigationState(top,route,selected,journalJob,settingsParent,journalParent).back()
                 if(n==null)confirmExit=true else {top=n.section;route=n.route;journalJob=n.job}
             }
             BackHandler { back() }
@@ -106,8 +107,8 @@ class MainActivity:ComponentActivity() {
                     top=="termux"->TermuxOverview(context,permitted,version) { permitted=termux.permitted() }
                     route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
                     route=="workspace"->ProjectWorkspace(context,current,onTool={route=it})
-                    route=="git" || route=="tests"->ProjectTools(context,current,route,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;route="journal"},{route="wait"})
-                    route=="history"->if(current.supported)HistoryScreen(context,{id->journalJob=id;route="journal"}) else UnavailableTool("История", "У этого проекта пока нет заданий AnimaDev.")
+                    route=="git" || route=="tests"->ProjectTools(context,current,route,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent=route;route="journal"},{route="wait"})
+                    route=="history"->if(current.supported)HistoryScreen(context,{id->journalJob=id;journalParent="history";route="journal"}) else UnavailableTool("История", "У этого проекта пока нет заданий AnimaDev.")
                     route=="journal"->if(current.supported)JournalScreen(context,journalJob) else UnavailableTool("Журнал","Нет безопасного профиля этого проекта.")
                     route=="wait"->MonitorSettings(context)
                     else->ProjectWorkspace(context,current,onTool={route=it})

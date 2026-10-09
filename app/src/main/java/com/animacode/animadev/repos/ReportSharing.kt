@@ -17,8 +17,15 @@ object ReportSharing {
         val safe=RepoResultReceiver.redact(report)
         FileOutputStream(file).use { it.write(safe.toByteArray(Charsets.UTF_8));it.fd.sync() }
         val uri=FileProvider.getUriForFile(context,"${context.packageName}.reports",file)
-        return Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_STREAM,uri)
-            .putExtra(Intent.EXTRA_SUBJECT,"AnimaDev · диагностика задания ${jobId.take(8)}")
-            .apply { clipData=ClipData.newUri(context.contentResolver,"AnimaDev",uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        val attachment=ClipData.newUri(context.contentResolver,"AnimaDev",uri)
+        val send=Intent(Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(Intent.EXTRA_STREAM,uri)
+            .putExtra(Intent.EXTRA_SUBJECT,"AnimaDev · отчёт ${jobId.take(8)}")
+            .putExtra(Intent.EXTRA_TEXT,"Отчёт AnimaDev · ${jobId.take(8)} · ${if(view=="ALL")"Полный журнал" else "Важное"}")
+            .apply { clipData=attachment;addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        return Intent.createChooser(send,"Поделиться отчётом").apply {
+            clipData=attachment
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
     }
 }

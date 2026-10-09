@@ -50,6 +50,14 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
     var search by rememberSaveable { mutableStateOf("") }
     var text by remember { mutableStateOf("") }; var notice by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") };var menu by remember { mutableStateOf(false) };var showSearch by rememberSaveable { mutableStateOf(false) }
+    val snackbarHostState=remember { SnackbarHostState() }
+    LaunchedEffect(message) {
+        val shown=message
+        if(shown.isNotBlank()) {
+            snackbarHostState.showSnackbar(shown,duration=SnackbarDuration.Short)
+            if(message==shown)message=""
+        }
+    }
     var loadAll by rememberSaveable { mutableStateOf(true) }
     var historyLoading by remember { mutableStateOf(false) }
     val scroll=remember(jobId,view) { LazyListState() }
@@ -128,8 +136,9 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
         }
     }
     val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-        if(uri!=null) scope.launch { message=withContext(Dispatchers.IO) { try { context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } ?: error("storage"); "Отчёт сохранён" } catch(_:Exception) { "Не удалось сохранить отчёт" } } }
+        if(uri!=null) scope.launch { message=withContext(Dispatchers.IO) { try { context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } ?: error("storage"); "Отчёт сохранён · "+java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date()) } catch(_:Exception) { "Не удалось сохранить отчёт" } } }
     }
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal=16.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -137,9 +146,15 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                 IconButton(onClick={showSearch=!showSearch;if(!showSearch)search=""}) {Icon(AppIcons.Search,"Поиск в журнале")}
                 IconButton(onClick={loadAll=true},enabled=!loadAll && jobId.isNotEmpty()){Icon(AppIcons.Refresh,"Обновить журнал")}
             IconButton(onClick={scope.launch {
-                try { val intent=withContext(Dispatchers.IO) { ReportSharing.prepare(context,jobId,view,notice+"\n"+text) };context.startActivity(Intent.createChooser(intent,"Поделиться диагностикой")) }
-                catch(_:Exception) { message="Не удалось подготовить отчёт" }
-            }},enabled=text.isNotEmpty() && jobId.matches(Regex("[a-f0-9]{32}"))) { Icon(AppIcons.Share,"Поделиться диагностикой") }
+                try {
+                    val intent=withContext(Dispatchers.IO) { ReportSharing.prepare(context,jobId,view,notice+"\n"+text) }
+                    context.startActivity(intent)
+                } catch(_:android.content.ActivityNotFoundException) {
+                    message="Нет приложения для отправки отчёта"
+                } catch(_:Exception) {
+                    message="Не удалось поделиться. Можно сохранить отчёт в Загрузки."
+                }
+            }},enabled=text.isNotEmpty() && jobId.matches(Regex("[a-f0-9]{32}"))) { Icon(AppIcons.Share,"Поделиться отчётом") }
                 Box {
                     IconButton(onClick={menu=true}) {Icon(AppIcons.More,"Действия с журналом")}
                     DropdownMenu(menu,{menu=false}) {
@@ -154,7 +169,7 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                         uri=context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values) ?: error("storage")
                         context.contentResolver.openOutputStream(uri!!)?.use { it.write(text.toByteArray()) } ?: error("storage")
                         context.contentResolver.update(uri!!,ContentValues().apply { put(MediaStore.Downloads.IS_PENDING,0) },null,null)
-                        "Отчёт сохранён в Загрузки"
+                        "Сохранено в Загрузки · "+java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date())
                     } catch(_:Exception) { uri?.let { context.contentResolver.delete(it,null,null) };"Не удалось сохранить отчёт" }
                 } }
             },enabled=text.isNotEmpty())
@@ -167,7 +182,6 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
             }
             if(showSearch)OutlinedTextField(search,{search=it},label={Text("Поиск по доступному журналу")},singleLine=true,modifier=Modifier.fillMaxWidth())
             if(notice.isNotEmpty())Text(notice,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
-            if(message.isNotEmpty())Text(message,style=MaterialTheme.typography.bodySmall)
         }
         if(loadAll || historyLoading)LinearProgressIndicator(Modifier.fillMaxWidth()) else HorizontalDivider()
         Box(Modifier.weight(1f)) {
@@ -190,5 +204,7 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
         IconButton(onClick={scope.launch {scroll.scrollToItem(0)}}) {Icon(AppIcons.Top,"В начало журнала")}
         IconButton(onClick={scope.launch {scroll.scrollToItem(maxOf(0,scroll.layoutInfo.totalItemsCount-1))}}) {Icon(AppIcons.Bottom,"В конец журнала")}
     }
+    }
+    SnackbarHost(snackbarHostState,Modifier.align(Alignment.BottomCenter).padding(horizontal=16.dp).padding(bottom=8.dp))
     }
 }
