@@ -25,6 +25,39 @@ FIXED_SSH = str(HOME.parent / 'usr/bin/ssh')
 REGISTRY = {'animaquiz': {'name': 'AnimaQuiz', 'root': str(HOME / 'quizapp'),
     'origin': 'git@github.com:krmobdev/quizapp.git', 'branch': 'test/decomposition-v1'}}
 ACTIONS = {'STATUS', 'CHECK', 'SYNC', 'TEST', 'BUILD_DEBUG'}
+# Dynamic profiles are validated against catalog-derived path and GitHub rules.
+DYNAMIC_REMOTE = re.compile(r'^github[.]com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)$')
+DYNAMIC_BRANCH = re.compile(r'^[A-Za-z0-9_./-]{1,200}$')
+DYNAMIC_DENIED = {'storage','android-sdk','sdk','bin','lib','node_modules','venv','env',
+    'tmp','Downloads','Android','build','dist','target','cache','caches',
+    'secrets','credentials','keystores','gradle','__pycache__'}
+
+def validate_profile(p):
+    if type(p) is not dict or set(p) != {'id','name','root','remote','branch'}:
+        raise Denied('RESULT_MALFORMED')
+    if not all(type(v) is str for v in p.values()): raise Denied('RESULT_MALFORMED')
+    root = pathlib.Path(p['root'])
+    try:
+        parts = root.relative_to(HOME).parts
+        if not 1 <= len(parts) <= 6 or any(not part or part.startswith('.') or
+                                            part in DYNAMIC_DENIED for part in parts):
+            raise ValueError()
+        if root.resolve() != root.absolute() or not root.is_dir(): raise ValueError()
+        marker = root / '.git'
+        if marker.is_symlink() or not marker.is_dir() or marker.resolve()!=marker.absolute():
+            raise ValueError()
+    except (OSError, ValueError): raise Denied('PATH_DENIED')
+    if p['id'] != hashlib.sha256(str(root).encode()).hexdigest()[:32]:
+        raise Denied('PROJECT_NOT_FOUND')
+    if not DYNAMIC_REMOTE.fullmatch(p['remote']): raise Denied('REMOTE_MISMATCH')
+    branch = p['branch']
+    if (not DYNAMIC_BRANCH.fullmatch(branch) or branch.startswith('-') or
+            branch.endswith(('/', '.', '.lock')) or '//' in branch or '..' in branch):
+        raise Denied('BRANCH_DENIED')
+    if not 1 <= len(p['name']) <= 80: raise Denied('RESULT_MALFORMED')
+    return {'name':p['name'],'root':str(root),'origin':p['remote'],
+            'branch':branch,'dynamic':True}
+
 TERMINAL = {'SUCCEEDED', 'FAILED', 'TIMED_OUT', 'INTERRUPTED', 'NOT_STARTED'}
 HEX_ID = re.compile(r'^[0-9a-f]{32}$')
 SHA = re.compile(r'^[0-9a-f]{40,64}$')
