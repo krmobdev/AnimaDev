@@ -159,5 +159,10 @@ class CatalogTests(unittest.TestCase):
     def test_branch_count_limit_is_explicit(self):
         for i in range(45):self.run_git('branch','fixture'+str(i))
         r=catalog.inspect(self.repo,self.home,self.git,branches=True)
-        self.assertLessEqual(len(r['branches']),40);self.assertTrue(r['branches_limited']);self.assertTrue(any(b['active'] for b in r['branches']))
+        self.assertTrue(r['branches_more']);self.assertFalse(r['branches_limited']);self.assertTrue(any(b['active'] for b in r['branches']))
+        seen={(b['name'],b['local']) for b in r['branches']}
+        while r['branches_more']:
+            r=catalog.inspect(self.repo,self.home,self.git,branches=True,branch_offset=r['branches_next'])
+            seen.update((b['name'],b['local']) for b in r['branches'])
+        self.assertGreater(len(seen),40)
 

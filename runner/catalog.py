@@ -95,7 +95,42 @@ def remote_label(value):
     match=re.fullmatch(r'https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?',value)
     return 'github.com/'+match.group(1) if match else 'Remote скрыт: нестандартный адрес или данные авторизации'
 
-def inspect(root,home=HOME,git=None,branches=False):
+BRANCH_PAGE_SIZE=32
+
+def ref_page(prefix,root,env,offset):
+    """Bounded streaming page, not a cap on the repository's total refs."""
+    if type(offset) is not int or offset<0:raise ValueError('BAD_OFFSET')
+    args=['for-each-ref','--sort=refname','--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)','refs/heads','refs/remotes/origin']
+    p=subprocess.Popen(prefix+args,cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,start_new_session=True)
+    selector=selectors.DefaultSelector();selector.register(p.stdout,selectors.EVENT_READ)
+    deadline=time.monotonic()+2;pending=bytearray();rows=[];seen=0;more=False;budget=0
+    try:
+        while selector.get_map() and not more:
+            if time.monotonic()>deadline:raise ValueError('READ_TIMEOUT')
+            for key,_ in selector.select(.1):
+                chunk=os.read(key.fileobj.fileno(),4096)
+                if not chunk:selector.unregister(key.fileobj);continue
+                pending.extend(chunk)
+                while b'\n' in pending:
+                    line,_,rest=pending.partition(b'\n');pending=bytearray(rest)
+                    if len(line)>2048:raise ValueError('REF_BYTES_LIMIT')
+                    seen+=1
+                    if seen<=offset:continue
+                    if len(rows)==BRANCH_PAGE_SIZE:more=True;break
+                    budget+=len(line)
+                    if budget>16000:raise ValueError('PAGE_BYTES_LIMIT')
+                    rows.append(line.decode('utf-8','strict'))
+                if len(pending)>4096:raise ValueError('REF_BYTES_LIMIT')
+                if more:break
+        if not more and p.wait(timeout=max(.1,deadline-time.monotonic()))!=0:raise ValueError('GIT_FAILED')
+        return rows,offset+len(rows),more
+    finally:
+        if p.poll() is None:
+            try:os.killpg(p.pid,signal.SIGKILL)
+            except ProcessLookupError:pass
+        p.wait();selector.close();p.stdout.close()
+
+def inspect(root,home=HOME,git=None,branches=False,branch_offset=0):
     root=pathlib.Path(root)
     if not permitted(root,home):return None
     marker=root/'.git'
@@ -158,28 +193,27 @@ def inspect(root,home=HOME,git=None,branches=False):
             confirmed=code==0 and default.startswith('refs/remotes/origin/') and call(['show-ref','--verify','--quiet',default])[0]==0
             result['default_branch']=default.removeprefix('refs/remotes/origin/') if confirmed else ''
             # Remote HEAD is evidence; main/master names are never guessed.
-            code,rows=call(['for-each-ref','--count=41','--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)','refs/heads','refs/remotes/origin'])
-            if code:raise ValueError('GIT_FAILED')
+            raw,next_offset,more=ref_page(prefix,root,env,branch_offset)
             result['branches']=[]
-            raw=rows.splitlines()
-            preferred=[]
-            if result['branch']!='Detached HEAD':preferred.append('refs/heads/'+result['branch'])
-            if result['default_branch']:preferred.append('refs/remotes/origin/'+result['default_branch'])
+            # Pin exact refs on the first page; normal streaming offsets stay unchanged.
             pinned=[]
-            if preferred:
-                code,priority=call(['for-each-ref','--count=4','--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)',*preferred])
-                if code:raise ValueError('GIT_FAILED')
-                pinned=[row for row in priority.splitlines() if row.split('\t')[0] in preferred]
-            ordered=list(dict.fromkeys(pinned+raw))
-            for row in ordered[:40]:
+            if branch_offset==0:
+                preferred=[]
+                if result['branch']!='Detached HEAD':preferred.append('refs/heads/'+result['branch'])
+                if result['default_branch']:preferred.append('refs/remotes/origin/'+result['default_branch'])
+                for ref in preferred:
+                    code,row=call(['log','-1','--format=%H%x09%cI',ref,'--'])
+                    if code==0:pinned.append(ref+'\t'+row)
+            for row in dict.fromkeys(pinned+raw):
                 parts=row.split('\t')
                 if len(parts)!=3 or not re.fullmatch('[0-9a-f]{40,64}',parts[1]):continue
                 ref,sha,date=parts
                 if ref=='refs/remotes/origin/HEAD':continue
                 local=ref.startswith('refs/heads/')
                 name=ref.removeprefix('refs/heads/') if local else ref.removeprefix('refs/remotes/origin/')
-                result['branches'].append(dict(name=name[:200],commit=sha,date=date[:40],local=local,active=local and name==result['branch'],default=bool(result['default_branch']) and name==result['default_branch']))
-            result['branches_limited']=len(ordered)>40
+                if len(name)>200:raise ValueError('REF_NAME_LIMIT')
+                result['branches'].append(dict(name=name,commit=sha,date=date[:40],local=local,active=local and name==result['branch'],default=bool(result['default_branch']) and name==result['default_branch']))
+            result.update(branches_offset=branch_offset,branches_next=next_offset,branches_more=more,branches_limited=False)
             result['branches'].sort(key=lambda b:(not b['default'],not b['active'],not b['local'],b['name']))
     except (OSError,subprocess.TimeoutExpired,ValueError):result['error']='Метаданные недоступны или конфигурация требует ручной проверки'
     return result
@@ -194,12 +228,12 @@ def catalog(home=HOME,git=None):
         elif len(issues)<40:issues.append(dict(path=str(root),reason='.git или worktree не прошёл проверку безопасности'))
     return dict(projects=entries,issues=issues,visited=visited,limited=limited or bool(issues),depth=MAX_DEPTH,scanned_at=time.time())
 
-def explicit(path,home=HOME,git=None,branches=False):
+def explicit(path,home=HOME,git=None,branches=False,branch_offset=0):
     value=str(path)
     if value.startswith('~/'):value=str(home)+value[1:]
     root=pathlib.Path(value)
     if not permitted(root,home):return dict(projects=[],issues=[dict(path='',reason='Путь запрещён: разрешён HOME, глубина до 6, без скрытых/служебных каталогов и ссылок.')])
-    item=inspect(root,home,git,branches=branches)
+    item=inspect(root,home,git,branches=branches,branch_offset=branch_offset)
     return dict(projects=[item] if item else [],issues=[] if item else [dict(path=str(root),reason='Безопасный Git-репозиторий или worktree не найден.')],scanned_at=time.time())
 
 def environment():
@@ -218,8 +252,11 @@ def environment():
 
 def main():
     request,mode=sys.argv[1:3]
-    if not re.fullmatch('[a-f0-9]{32}',request) or mode not in ('CATALOG','ENV','PATH','BRANCHES') or len(sys.argv)!=(4 if mode in ('PATH','BRANCHES') else 3):return 1
-    try: data=catalog() if mode=='CATALOG' else explicit(sys.argv[3],branches=mode=='BRANCHES') if mode in ('PATH','BRANCHES') and len(sys.argv)==4 else environment()
+    if not re.fullmatch('[a-f0-9]{32}',request) or mode not in ('CATALOG','ENV','PATH','BRANCHES') or len(sys.argv) not in ((4,5) if mode=='BRANCHES' else (4,) if mode=='PATH' else (3,)):return 1
+    try:
+        offset=int(sys.argv[4]) if mode=='BRANCHES' and len(sys.argv)==5 else 0
+        if offset<0:raise ValueError('BAD_OFFSET')
+        data=catalog() if mode=='CATALOG' else explicit(sys.argv[3],branches=mode=='BRANCHES',branch_offset=offset) if mode in ('PATH','BRANCHES') else environment()
     except Exception:
         print(json.dumps(dict(request_id=request,mode=mode,ok=False,message='Не удалось прочитать разрешённые каталоги Termux.')));return 0
     print(json.dumps(dict(request_id=request,mode=mode,ok=True,data=data),ensure_ascii=False));return 0

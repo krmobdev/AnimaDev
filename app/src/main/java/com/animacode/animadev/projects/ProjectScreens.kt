@@ -83,7 +83,7 @@ import org.json.JSONObject
                         Icon(AppIcons.Folder,null,tint=MaterialTheme.colorScheme.primary)
                         Column(Modifier.weight(1f).padding(horizontal=12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)) {
                             Text(p.name,style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
-                            Text(p.path.removePrefix(ProjectPolicy.HOME+"/"),style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            if(p.path.removePrefix(ProjectPolicy.HOME+"/")!=p.name)Text(p.path.removePrefix(ProjectPolicy.HOME+"/"),style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis,color=MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(if(p.worktree)"Worktree · только просмотр" else p.branch.ifEmpty { "Метаданные не подтверждены" },style=MaterialTheme.typography.labelMedium)
                         }
                         Icon(AppIcons.Add,"Добавить ${p.name}")
