@@ -39,6 +39,7 @@ object ReleaseNotifications {
             status=="CANCELLED"->"Остановлено через Ctrl+C"
             status=="FAILED"->"Ошибка · требуется проверка"
             status=="UNKNOWN"->"Результат пока не подтверждён"
+            record.optString("phase")=="EXPORTING"->"AAB подписан · переносим файл"
             record.optBoolean("cancel_requested")->"Отмена отправлена · ожидаем Termux"
             record.optString("phase")=="ENROLLING"->"Создаём одноразовый ключ шифрования"
             record.optString("phase")=="DISPATCHING"->"Шифрованное задание передано"
