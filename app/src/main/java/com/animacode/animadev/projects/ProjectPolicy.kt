@@ -16,7 +16,7 @@ object ProjectPolicy {
         val bytes=java.security.MessageDigest.getInstance("SHA-256").digest(path.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it.toInt() and 0xff) }.take(32)
     }
-    fun canExecute(id: String,path: String,action: String,worktree:Boolean=false,remote:String="")=!worktree && supported(id,path,remote) && action in setOf("STATUS","CHECK","SYNC","TEST","BUILD_DEBUG")
+    fun canExecute(id: String,path: String,action: String,worktree:Boolean=false,remote:String="")=!worktree && supported(id,path,remote) && action in setOf("STATUS","CHECK","SYNC","TEST","TEST_DEVICE","BUILD_DEBUG")
     fun validId(id: String,path: String)=permittedPath(path) && (if(path==QUIZ) id=="animaquiz" else id==stableId(path))
     fun nextSelection(ids: List<String>,selected: String)=selected.takeIf { it in ids } ?: ""
 }
