@@ -64,7 +64,7 @@ try:
             stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,timeout=18,check=False)
         response=(connection.stdout+connection.stderr).decode('utf-8','replace').lower()
-        connect_status='CONNECTED' if connection.returncode==0 and 'connected' in response and not 'failed' in response else 'CONNECT_FAILED'
+        connect_status=('CONNECTED' if connection.returncode==0 and 'connected' in response and 'failed' not in response\n                        else 'CONNECT_REFUSED' if 'refused' in response else 'CONNECT_FAILED')
     else:
         connect_status='NOT_ATTEMPTED'
     p=subprocess.run(['/data/data/com.termux/files/usr/bin/adb','devices','-l'],
@@ -134,7 +134,7 @@ class AdbDeviceReceiver:BroadcastReceiver() {
             check(count in 0..32)
             serial=result.optString("device").take(128)
             connection=result.optString("connect_status","NOT_ATTEMPTED").takeIf {
-                it in setOf("CONNECTED","CONNECT_FAILED","NOT_ATTEMPTED","TRANSPORT_ERROR")
+                it in setOf("CONNECTED","CONNECT_REFUSED","CONNECT_FAILED","NOT_ATTEMPTED","TRANSPORT_ERROR")
             } ?: "TRANSPORT_ERROR"
             if(count==1)check(serial.matches(Regex("[A-Za-z0-9._:-]{4,128}")))
         } catch(_:Exception) {count=0;serial="";connection="TRANSPORT_ERROR"}
@@ -143,7 +143,7 @@ class AdbDeviceReceiver:BroadcastReceiver() {
             .putString("message",when(count) {
                 1->"Устройство готово: $serial"
                 0->when(connection) {
-                    "CONNECT_FAILED"->"ADB отклонил подключение. Проверьте актуальный IP:порт на основном экране беспроводной отладки Pixel: порт мог измениться. Убедитесь, что VPN не блокирует локальную сеть."
+                    "CONNECT_REFUSED"->"Pixel отклонил ADB-соединение: Connection refused. Проверь актуальный порт беспроводной отладки — он мог измениться."\n                    "CONNECT_FAILED"->"ADB не смог подключиться к Pixel. Проверь актуальный IP:порт на основном экране беспроводной отладки и доступ к локальной сети (в том числе через VPN)."
                     "TRANSPORT_ERROR"->"Не удалось получить ответ ADB в Termux. Проверьте доступ Termux и повторите."
                     else->"ADB не видит подключённых устройств. После сопряжения нужен adb connect с портом основного экрана беспроводной отладки Pixel."
                 }
