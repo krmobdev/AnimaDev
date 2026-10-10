@@ -22,7 +22,7 @@ import com.animacode.animadev.termux.TermuxGateway
     val ready=HelperPolicy.mayRun(permitted,termuxVersion!=null,record.optBoolean("ready"),record.optBoolean("pending"),blocked)
     val canDebug=project.supported && ready && gateway.mayBuild(record,project.id)
     val signing=remember {SigningStore(context)}
-    val path=signing.path(project.id)
+    val hasSigningKey=signing.hasDocument(project.id)
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {Text(project.name,style=MaterialTheme.typography.titleMedium)
@@ -49,8 +49,8 @@ import com.animacode.animadev.termux.TermuxGateway
             Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text("Release AAB",style=MaterialTheme.typography.titleMedium)
                 Button(onClick={},enabled=false,modifier=Modifier.fillMaxWidth()){Text("Собрать Release AAB")}
-                Text(if(path.isBlank())"Укажите путь к ключу подписи в настройках."
-                     else "Защищённая передача пароля пока не готова. Выпуск AAB заблокирован.",
+                Text(if(!hasSigningKey)"Выберите файл ключа .jks или .keystore через настройки подписи."
+                     else "Ключ выбран. Защищённая передача пароля пока не готова. Выпуск AAB заблокирован.",
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }}
