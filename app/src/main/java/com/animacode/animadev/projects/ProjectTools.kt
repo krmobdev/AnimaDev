@@ -14,6 +14,7 @@ import com.animacode.animadev.repos.*
 @Composable fun ProjectTools(context:Context,project:LocalProject,tool:String,permitted:Boolean,termuxVersion:String?,onPermissionUpdated:()->Unit,onJournal:(String)->Unit,onWait:()->Unit,
     selectedTestTab:Int?=null,onTestTabChange:((Int)->Unit)?=null) {
     val locale=androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val neon=LocalNeonSkin.current
     if(!project.supported) {
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             item {Text(project.name,style=MaterialTheme.typography.titleMedium);Text(if(project.worktree)"Worktree · только просмотр" else "Только просмотр",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary)}
@@ -71,11 +72,19 @@ import com.animacode.animadev.repos.*
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
-            if(tool=="git")Text(project.name,style=MaterialTheme.typography.headlineMedium)
+            if(neon)NeonPanel(Modifier.fillMaxWidth(),glowing=true) {
+                NeonSection(if(tool=="git")"Git" else "Tests",
+                    if(tool=="git")AppIcons.Git else AppIcons.Tests,project.name)
+                NeonKeyValue("Branch",project.branch.ifBlank {"Not verified"},AppIcons.Git)
+                NeonKeyValue("Commit",project.commit.take(12).ifBlank {"Not verified"},AppIcons.Info)
+            }
+            else if(tool=="git")Text(project.name,style=MaterialTheme.typography.headlineMedium)
             else OperationProjectHeader(project)
         }
         if(tool!="git")item {
-            OperationTabs(listOf("Unit-тесты","На устройстве"),testTab) {
+            if(neon)NeonTabs(listOf("Unit tests","On device"),testTab) {
+                if(onTestTabChange!=null)onTestTabChange(it) else fallbackTestTab=it
+            } else OperationTabs(listOf("Unit-тесты","На устройстве"),testTab) {
                 if(onTestTabChange!=null)onTestTabChange(it) else fallbackTestTab=it
             }
         }
@@ -275,11 +284,16 @@ import com.animacode.animadev.repos.*
                 pending,blocked,adbPending,releaseBusy)
             val needStatus=r.optString("project_id","animaquiz")!=project.id || snap==null
             if(testTab==0)item {
-                OutlinedCard(shape=androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                Surface(shape=androidx.compose.foundation.shape.RoundedCornerShape(23.dp),
+                    color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainer,
+                    border=androidx.compose.foundation.BorderStroke(1.dp,
+                        if(neon)NeonGlass.outline else MaterialTheme.colorScheme.outlineVariant),
                     modifier=Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(20.dp),
                         verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Text("Unit-тесты",style=MaterialTheme.typography.titleLarge)
+                        if(neon)NeonSection("Run unit tests",AppIcons.Tests,
+                            "Gradle · :app:testDebugUnitTest")
+                        else Text("Unit-тесты",style=MaterialTheme.typography.titleLarge)
                         Text("Gradle · :app:testDebugUnitTest",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -311,7 +325,11 @@ import com.animacode.animadev.repos.*
                                 Text("Подготовить тесты · проверить проект")
                             }
                         }
-                        Button(onClick={gateway.start("TEST",project.id,project.path)},
+                        if(neon)NeonPrimaryAction(
+                            if(blocked)"Waiting for available slot" else "Run unit tests",
+                            "Verify the current source revision",AppIcons.Tests,
+                            enabled=canRun,onClick={gateway.start("TEST",project.id,project.path)})
+                        else Button(onClick={gateway.start("TEST",project.id,project.path)},
                             enabled=canRun,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
                             Icon(AppIcons.Tests,null)
                             Spacer(Modifier.width(8.dp))
@@ -322,11 +340,16 @@ import com.animacode.animadev.repos.*
                 }
             }
             if(testTab==1)item {
-                OutlinedCard(shape=androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                Surface(shape=androidx.compose.foundation.shape.RoundedCornerShape(23.dp),
+                    color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainer,
+                    border=androidx.compose.foundation.BorderStroke(1.dp,
+                        if(neon)NeonGlass.outline else MaterialTheme.colorScheme.outlineVariant),
                     modifier=Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(20.dp),
                         verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Text("Инструментальные тесты",style=MaterialTheme.typography.titleLarge)
+                        if(neon)NeonSection("Instrumentation tests",AppIcons.Tests,
+                            "Run tests on a real device or emulator")
+                        else Text("Инструментальные тесты",style=MaterialTheme.typography.titleLarge)
                         if(project.id=="animaquiz")Text("Обычный набор · OS backup/restore проверяется отдельно",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -334,6 +357,7 @@ import com.animacode.animadev.repos.*
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
                         TestOperationResult(context,r,project,"TEST_DEVICE",permitted,onJournal)
+                        if(neon)NeonStatus(if(deviceReady)"Device ready" else "Device not verified",deviceReady)
                         Text(adbState,style=MaterialTheme.typography.bodyMedium,
                             color=if(deviceReady)MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -380,7 +404,13 @@ import com.animacode.animadev.repos.*
                         // The device runner checks the branch, origin, clean worktree,
                         // GitHub SHA and ADB immediately before running Gradle. It does
                         // not need the separate Unit-tests STATUS screen or cached ADB age.
-                        Button(onClick={
+                        if(neon)NeonPrimaryAction(
+                            if(blocked)"Waiting for free build slot" else "Run instrumentation tests",
+                            "Git and ADB verified at launch",AppIcons.Tests,
+                            enabled=canRunDevice,onClick={
+                                deviceActionMessage=gateway.startDeviceWithFeedback(project.id,project.path)
+                            })
+                        else Button(onClick={
                             deviceActionMessage=gateway.startDeviceWithFeedback(project.id,project.path)
                         },enabled=canRunDevice,
                             modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
