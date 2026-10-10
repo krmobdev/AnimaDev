@@ -11,13 +11,13 @@ object RepoPolicy {
     fun mayTest(branch: String, remote: Boolean, ready: Boolean, blocked: Boolean,
                 projectId: String = "animaquiz"): Boolean =
         branch.isNotBlank() && branch != "Detached HEAD" &&
-            (projectId != "animaquiz" || branch == "test/decomposition-v1") &&
+            (projectId != "animaquiz" || branch in setOf("main","test/decomposition-v1")) &&
             remote && ready && !blocked
     fun mayBuild(branch: String, dirty: Boolean, remoteOk: Boolean, ready: Boolean, blocked: Boolean,
                  checked: Boolean, ahead: Int, behind: Int, local: String, remote: String,
                  projectId: String = "animaquiz"): Boolean =
         branch.isNotBlank() && branch != "Detached HEAD" &&
-            (projectId != "animaquiz" || branch == "test/decomposition-v1") &&
+            (projectId != "animaquiz" || branch in setOf("main","test/decomposition-v1")) &&
             !dirty && remoteOk && ready && !blocked && checked &&
             ahead == 0 && behind == 0 && local.isNotBlank() && local == remote
     fun validCounts(total: Long, passed: Long, failed: Long, skipped: Long, duration: Long): Boolean =
@@ -40,7 +40,7 @@ object RepoPolicy {
                 checked: Boolean, runnerCanSync: Boolean, blocked: Boolean,
                 projectId: String = "animaquiz"): Boolean =
         branch.isNotBlank() && branch != "Detached HEAD" &&
-            (projectId != "animaquiz" || branch == "test/decomposition-v1") &&
+            (projectId != "animaquiz" || branch in setOf("main","test/decomposition-v1")) &&
             !dirty && remoteOk && ahead == 0 && behind > 0 &&
             checked && runnerCanSync && !blocked
     fun acceptCallback(expected: String, received: String) = expected.isNotEmpty() && expected == received
