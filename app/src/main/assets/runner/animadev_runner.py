@@ -16,7 +16,7 @@ import time
 
 VERSION = '0.4.0'
 MONITOR_SHA = 'f95d91e7170ab96df4ad9731e48e3f8bae77a23055424ed834d4a0299c55e5e5'
-GRADLE_SHA = '2adbd1cbe06b87b0639437f7529b7ec89866406215c2c4b53704c98a25f212ab'
+GRADLE_SHA = '20603791f63b79693501a3b70258ea893163cac7b1368aedccc93adaa3a09fa7'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
 STATE_ROOT = HOME / '.local/share/animadev'
@@ -24,7 +24,7 @@ FIXED_GIT = str(HOME.parent / 'usr/bin/git')
 FIXED_SSH = str(HOME.parent / 'usr/bin/ssh')
 REGISTRY = {'animaquiz': {'name': 'AnimaQuiz', 'root': str(HOME / 'quizapp'),
     'origin': 'git@github.com:krmobdev/quizapp.git', 'branch': 'test/decomposition-v1', 'allow_main': True}}
-ACTIONS = {'STATUS', 'CHECK', 'SYNC', 'TEST', 'BUILD_DEBUG'}
+ACTIONS = {'STATUS', 'CHECK', 'SYNC', 'TEST', 'TEST_DEVICE', 'BUILD_DEBUG'}
 # Dynamic profiles are validated against catalog-derived path and GitHub rules.
 DYNAMIC_REMOTE = re.compile(r'^github[.]com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)$')
 DYNAMIC_BRANCH = re.compile(r'^[A-Za-z0-9_./-]{1,200}$')
@@ -193,7 +193,7 @@ class Store:
                 j.update(state='UNKNOWN', message='Контроллер недоступен; дочерний процесс может ещё выполняться. Повторный запуск заблокирован.')
                 self.save(c, j)
                 continue
-            if active and j.get('action') in ('TEST','BUILD_DEBUG') and (dead or j.get('unresolved')):
+            if active and j.get('action') in ('TEST','TEST_DEVICE','BUILD_DEBUG') and (dead or j.get('unresolved')):
                 j.update(state='UNKNOWN', unresolved=True, message='Контроллер Gradle потерян или задача превысила таймаут. Результат неизвестен; новый запуск заблокирован.')
                 self.save(c, j)
                 continue
@@ -389,9 +389,9 @@ class Engine:
                 if any(x['state'] not in TERMINAL for x in active): raise Denied('JOB_BUSY')
                 # All build/test jobs share the same Termux Gradle resource pool,
                 # even when different projects have independent checkout paths.
-                if action in ('TEST', 'BUILD_DEBUG'):
+                if action in ('TEST', 'TEST_DEVICE', 'BUILD_DEBUG'):
                     jobs = [json.loads(x[0]) for x in c.execute('SELECT data FROM jobs')]
-                    if any(x['state'] not in TERMINAL and x.get('action') in ('TEST', 'BUILD_DEBUG') for x in jobs):
+                    if any(x['state'] not in TERMINAL and x.get('action') in ('TEST', 'TEST_DEVICE', 'BUILD_DEBUG') for x in jobs):
                         raise Denied('JOB_BUSY')
             if c.execute('SELECT COUNT(*) FROM jobs').fetchone()[0] >= 100:
                 raise Denied('HISTORY_FULL')
@@ -437,7 +437,7 @@ class Engine:
     def cancel(self, jid, project, action):
         """Idempotent cancellation ONLY for the exact build/test job identity."""
         self.validate(jid, project, action)
-        if action not in ('TEST','BUILD_DEBUG'): raise Denied('ACTION_DENIED')
+        if action not in ('TEST','TEST_DEVICE','BUILD_DEBUG'): raise Denied('ACTION_DENIED')
         with self.store.transaction() as c:
             current=self.store.get(c,jid)
             if (not current or current['project_id']!=project or
@@ -481,7 +481,7 @@ class Engine:
         log('event','Рабочий каталог: '+self.registry[j['project_id']]['root'])
         self.store.update(jid,last_progress_at=time.time(),stage='Проверка проекта')
         try:
-            if j['action'] in ('TEST', 'BUILD_DEBUG'):
+            if j['action'] in ('TEST', 'TEST_DEVICE', 'BUILD_DEBUG'):
                 global_path = self.store.root / '.build-global.lock'
                 if global_path.is_symlink(): raise Denied('PATH_DENIED')
                 global_fd = os.open(global_path, os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW, 0o600)
@@ -500,7 +500,7 @@ class Engine:
                 return bool(current and current['state'] in ('RUNNING','QUEUED')
                             and current.get('cancel_requested'))
             guard.observe = observe
-            if j['action'] in ('TEST','BUILD_DEBUG'):
+            if j['action'] in ('TEST','TEST_DEVICE','BUILD_DEBUG'):
                 module_path = pathlib.Path(__file__).resolve().parent / 'gradle_tests.py'
                 data = module_path.read_bytes()
                 if module_path.is_symlink() or hashlib.sha256(data).hexdigest() != GRADLE_SHA:
@@ -509,10 +509,12 @@ class Engine:
                 exec(compile(data,str(module_path),'exec'), module)
                 result = (module['execute'](guard,log,
                     lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid=jid)
-                    if j['action']=='TEST' else module['execute_debug'](guard,log,
+                    if j['action']=='TEST' else module['execute_device'](guard,log,
+                    lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid=jid)
+                    if j['action']=='TEST_DEVICE' else module['execute_debug'](guard,log,
                     lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid))
                 code = result.get('error_code','')
-                result['message'] = MESSAGES.get(code,module['MESSAGES'].get(code,'Debug APK готов.' if j['action']=='BUILD_DEBUG' else 'Unit-тесты завершены.'))
+                result['message'] = MESSAGES.get(code,module['MESSAGES'].get(code,'Debug APK готов.' if j['action']=='BUILD_DEBUG' else 'Инструментальные тесты завершены.' if j['action']=='TEST_DEVICE' else 'Unit-тесты завершены.'))
                 with self.store.transaction() as c: latest=self.store.get(c,jid)
                 if latest.get('cancel_requested') and result['state'] != 'SUCCEEDED':
                     result.update(state='INTERRUPTED',error_code='CANCELLED',
@@ -534,7 +536,7 @@ class Engine:
                 error_code=e.code, message=MESSAGES.get(e.code, 'Ошибка Git.'), exit_code=e.exit_code,
                 ended_at=time.time(), snapshot=snap)
         except Exception:
-            if j['action'] in ('TEST','BUILD_DEBUG'):
+            if j['action'] in ('TEST','TEST_DEVICE','BUILD_DEBUG'):
                 self.store.update(jid,state='UNKNOWN',unresolved=True,error_code='RESULT_MALFORMED',message='Результат Gradle не подтверждён; повторный запуск заблокирован.',ended_at=time.time())
                 return
             self.store.update(jid, state='FAILED', error_code='STORAGE_UNAVAILABLE',
