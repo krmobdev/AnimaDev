@@ -102,12 +102,12 @@ object ArtifactGateway {
         }
     }
 
-    suspend fun install(context:Context,artifact:JSONObject,uri:Uri) {
+    suspend fun install(context:Context,artifact:JSONObject,uri:Uri):Boolean {
         val path=artifact.optString("path")
         val sha=artifact.optString("sha256")
         val size=artifact.optLong("size")
         if(!path.endsWith(".apk") || !ArtifactPolicy.valid(path,sha,size)) {
-            message(context,"Нет проверенного APK.");return
+            message(context,"Нет проверенного APK.");return false
         }
         val result=withContext(Dispatchers.IO) {
             runCatching {verifiedCopy(context,uri,sha,size)}
@@ -116,7 +116,7 @@ object ArtifactGateway {
         if(apk==null) {
             clearRememberedUri(context,sha)
             message(context,"Не удалось прочитать или проверить APK. Выберите файл заново в системном проводнике.")
-            return
+            return false
         }
         // Save only an authorized document URI, never a direct filesystem path.
         runCatching {
@@ -130,14 +130,16 @@ object ArtifactGateway {
                 context.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                     Uri.parse("package:"+context.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
-            return
+            return true
         }
         try {
             // Android's Package Installer receives a FileProvider content URI;
             // no termux-open, Termux service, file:// URI or shell command.
             context.startActivity(installerIntent(context,apk))
+            return true
         } catch(_:Exception) {
             message(context,"Системный установщик Android не открылся. Проверьте разрешение на установку APK.")
+            return false
         }
     }
 
