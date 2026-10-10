@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,6 +40,9 @@ class MainActivity:ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable private fun BetaApp() {
         val context=LocalContext.current
+        val feedback=remember {UiFeedback(context)}
+        val feedbackView=LocalView.current
+        fun clickFeedback(){feedback.tap(feedbackView)}
         val settings=remember { context.getSharedPreferences("interface_v1",MODE_PRIVATE) }
         var theme by remember { mutableStateOf(settings.getString("theme","system") ?: "system") }
         var dynamic by remember { mutableStateOf(settings.getBoolean("dynamic",true)) }
@@ -107,16 +111,16 @@ class MainActivity:ComponentActivity() {
             val title=when { route=="settings"->SettingsPolicy.toolbarTitle(settingsSection);top=="termux"->"Termux";route=="list"->"Проекты";route=="branches"->"Ветки";route=="git"->"Git";route=="tests"->"Тесты";route=="build"->"Сборка";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
             Scaffold(
                 contentWindowInsets=WindowInsets.safeDrawing,
-                topBar={TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(!root)IconButton(onClick={back()}){Icon(AppIcons.Back,"Вернуться")}},actions={
-                    Box { IconButton(onClick={menu=true}){Icon(AppIcons.More,"Меню приложения")}
+                topBar={TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(!root)IconButton(onClick={clickFeedback();back()}){Icon(AppIcons.Back,"Вернуться")}},actions={
+                    Box { IconButton(onClick={clickFeedback();menu=true}){Icon(AppIcons.More,"Меню приложения")}
                         DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
-                            DropdownMenuItem(text={Text("Настройки")},leadingIcon={Icon(AppIcons.Settings,null)},onClick={menu=false;if(route!="settings"){settingsParent=route;settingsSection="";route="settings"}})
+                            DropdownMenuItem(text={Text("Настройки")},leadingIcon={Icon(AppIcons.Settings,null)},onClick={clickFeedback();menu=false;if(route!="settings"){settingsParent=route;settingsSection="";route="settings"}})
                         }
                     }
                 })},
                 bottomBar={if(root)NavigationBar {
-                    NavigationBarItem(selected=top=="projects",onClick={top="projects";route="list";journalJob=""},icon={Icon(AppIcons.Folder,null)},label={Text("Проекты")})
-                    NavigationBarItem(selected=top=="termux",onClick={top="termux";route="list";journalJob=""},icon={Icon(AppIcons.Terminal,null)},label={Text("Termux")})
+                    NavigationBarItem(selected=top=="projects",onClick={clickFeedback();top="projects";route="list";journalJob=""},icon={Icon(AppIcons.Folder,null)},label={Text("Проекты")})
+                    NavigationBarItem(selected=top=="termux",onClick={clickFeedback();top="termux";route="list";journalJob=""},icon={Icon(AppIcons.Terminal,null)},label={Text("Termux")})
                 }}
             ) { padding -> Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when {
@@ -136,9 +140,9 @@ class MainActivity:ComponentActivity() {
                             }
                         })
                     top=="termux"->TermuxOverview(context,permitted,version) { permitted=termux.permitted() }
-                    route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
+                    route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->clickFeedback();projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
                     route=="branches"->BranchesScreen(context,current,permitted)
-                    route=="workspace"->ProjectWorkspace(context,current,onTool={route=it})
+                    route=="workspace"->ProjectWorkspace(context,current,onTool={clickFeedback();route=it})
                     route=="build"->BuildScreen(context,current,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent="build";route="journal"})
                     route=="git" || route=="tests"->ProjectTools(context,current,route,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent=route;route="journal"},{route="wait"})
                     route=="history"->if(current.supported)HistoryScreen(context,current,{id->journalJob=id;journalParent="history";route="journal"}) else UnavailableTool("История", "У этого проекта пока нет заданий AnimaDev.")
