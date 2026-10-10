@@ -108,44 +108,101 @@ import org.json.JSONObject
 }
 @Composable fun ProjectWorkspace(context:Context,project:LocalProject,onTool:(String)->Unit) {
     var worktreesExpanded by rememberSaveable(project.id) { mutableStateOf(false) }
-    val catalogInfo=rememberCatalogRecord(context).getJSONObject("catalog")
-    val entries=catalogInfo.optJSONArray("projects")
-    val worktrees=buildList {if(entries!=null)for(i in 0 until entries.length())runCatching {LocalProject.parse(entries.getJSONObject(i))}.getOrNull()?.takeIf {it.worktree && it.repositoryPath.isNotEmpty() && it.repositoryPath==(project.repositoryPath.ifEmpty {project.path})}?.let {add(it)}}
-    val record=rememberRepoRecord(context);val snap=if(project.supported && record.optString("project_id","animaquiz")==project.id)record.optJSONObject("snapshot") else null
-    val branch=snap?.optString("branch")?.ifEmpty {project.branch} ?: project.branch
-    val sha=snap?.optString("local_commit")?.ifEmpty {project.commit} ?: project.commit
-    val dirty=snap?.optBoolean("dirty") ?: project.dirty
-    val active=project.supported && record.optString("project_id","animaquiz")==project.id && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        item { Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.primaryContainer) { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-            Text(branch.ifEmpty {"Ветка не проверена"},style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)
-            Text(sha.take(8).ifEmpty {"Коммит не проверен"}+" · "+when(dirty){true->"Локальные изменения";false->"Чисто";else->"Не проверено"},style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)
-            if(project.worktree)Text("Worktree · только просмотр",style=MaterialTheme.typography.labelMedium)
-        } } }
-        if(active)item { Surface(onClick={onTool(if(record.optString("action")=="TEST")"tests" else "git")},shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.secondaryContainer) { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {Text("${record.optString("action")} · ${MonitorPolicy.label(record.optString("state"),false,false)}",style=MaterialTheme.typography.titleSmall);LinearProgressIndicator(Modifier.fillMaxWidth())} } }
-        item { OutlinedButton(onClick={onTool("branches")},modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Git,null);Spacer(Modifier.width(8.dp));Text("Ветки · просмотр")} }
-        item { Column { SectionLabel("Инструменты")
-            Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
-                val tools=listOf(Triple("git","Git",AppIcons.Git),Triple("tests","Тесты",AppIcons.Tests),Triple("build","Сборка",AppIcons.Build),Triple("history","История",AppIcons.History))
-                tools.forEachIndexed { index,(id,title,icon)->
-                    val enabled=project.supported || id=="git"
-                    val subtitle=when(id){"git"->if(project.supported)"Состояние и обновления" else "Метаданные · только просмотр";"tests"->if(project.supported)"Gradle unit-тесты" else "Нет профиля запуска";"history"->if(project.supported)"Задания, результаты и журналы" else "Заданий пока нет";else->if(project.supported)"Debug APK · AAB после настройки подписи" else "Нет профиля сборки"}
-                    Surface(onClick={onTool(id)},enabled=enabled,color=MaterialTheme.colorScheme.surfaceContainerLow) { ListItem(headlineContent={Text(title,style=MaterialTheme.typography.titleMedium)},supportingContent={Text(subtitle)},leadingContent={Icon(icon,null,tint=if(enabled)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)},trailingContent={if(enabled)Icon(AppIcons.Chevron,null)},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) }
-                    if(index<3)HorizontalDivider(Modifier.padding(start=56.dp,end=16.dp),color=MaterialTheme.colorScheme.outlineVariant)
-                }
-            }
-        } }
-        if(worktrees.isNotEmpty()) {
-            item {
-                Surface(onClick={worktreesExpanded=!worktreesExpanded},shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceContainerLow,modifier=Modifier.fillMaxWidth().semantics {stateDescription=if(worktreesExpanded)"Раскрыто" else "Свёрнуто"}) {
-                    ListItem(headlineContent={Text("Worktree (${worktrees.size})",style=MaterialTheme.typography.titleSmall)},leadingContent={Icon(AppIcons.Git,null)},trailingContent={Icon(AppIcons.Chevron,null,modifier=Modifier.rotate(if(worktreesExpanded)90f else 0f))},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow))
-                }
-            }
-            items(WorktreePresentation.rows(worktrees,worktreesExpanded),key={"worktree:"+it.path}) {wt->
-                ListItem(headlineContent={Text(wt.branch+" · "+wt.commit.take(8),style=MaterialTheme.typography.titleSmall)},supportingContent={Text(wt.path.removePrefix(ProjectPolicy.HOME+"/")+"\n"+if(wt.dirty==true)"Локальные изменения · только просмотр" else if(wt.dirty==false)"Чисто · только просмотр" else "Не проверено · только просмотр")})
+    val catalog=rememberCatalogRecord(context)
+    val entries=catalog.getJSONObject("catalog").optJSONArray("projects")
+    val worktrees=buildList {
+        if(entries!=null) for(i in 0 until entries.length())
+            runCatching {LocalProject.parse(entries.getJSONObject(i))}.getOrNull()
+                ?.takeIf {it.worktree && it.repositoryPath.isNotEmpty() &&
+                    it.repositoryPath==(project.repositoryPath.ifEmpty {project.path})}?.let {add(it)}
+    }
+    val record=rememberRepoRecord(context)
+    val snap=if(project.supported && record.optString("project_id","animaquiz")==project.id)
+        record.optJSONObject("snapshot")?.takeIf {
+            it.optString("branch")==project.branch && it.optString("local_commit")==project.commit
+        } else null
+    val branch=project.branch.ifBlank {snap?.optString("branch").orEmpty()}
+    val sha=project.commit.ifBlank {snap?.optString("local_commit").orEmpty()}
+    val dirty=project.dirty ?: snap?.optBoolean("dirty")
+    val isActiveJob=project.supported && record.optString("project_id","animaquiz")==project.id &&
+        RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
+    val feedback=remember {UiFeedback(context)}
+    val view=androidx.compose.ui.platform.LocalView.current
+    fun open(id:String) {feedback.tap(view);onTool(id)}
+    LazyColumn(Modifier.fillMaxSize(),
+        contentPadding=PaddingValues(start=20.dp,end=20.dp,top=18.dp,bottom=48.dp),
+        verticalArrangement=Arrangement.spacedBy(22.dp)) {
+        item {
+            Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                Text("PROJECT CONTROL",style=MaterialTheme.typography.labelLarge,
+                    color=AnimaPulse.green)
+                Text(project.name,style=MaterialTheme.typography.headlineLarge,
+                    fontWeight=androidx.compose.ui.text.font.FontWeight.ExtraBold)
+                if(catalog.optBoolean("pending"))
+                    Text("Обновляем реальный HEAD из Termux…",
+                        style=MaterialTheme.typography.bodySmall)
             }
         }
-        item { Text(project.remote.ifEmpty {"Origin не проверен"},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+        item {ActiveBranchHero(branch,sha,dirty)}
+        if(isActiveJob)item {
+            Surface(onClick={open(if(record.optString("action")=="TEST")"tests" else "build")},
+                shape=androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                color=AnimaPulse.panel) {
+                Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Text("ЗАДАНИЕ В РАБОТЕ",color=AnimaPulse.green,
+                        style=MaterialTheme.typography.labelLarge)
+                    Text(MonitorPolicy.label(record.optString("state"),false,false),
+                        color=androidx.compose.ui.graphics.Color.White)
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Text("Открыть монитор →",color=AnimaPulse.muted)
+                }
+            }
+        }
+        item {
+            FilledTonalButton(onClick={open("branches")},modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {
+                Icon(AppIcons.Git,null);Spacer(Modifier.width(10.dp))
+                Text("Ветки и переключение")
+            }
+        }
+        item {
+            Column(verticalArrangement=Arrangement.spacedBy(13.dp)) {
+                Text("ИНСТРУМЕНТЫ",style=MaterialTheme.typography.titleSmall,
+                    color=MaterialTheme.colorScheme.primary)
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    PulseToolTile("Git","Проверка SHA",AppIcons.Git,Modifier.weight(1f)){open("git")}
+                    PulseToolTile("Тесты","Gradle & отчёты",AppIcons.Tests,Modifier.weight(1f)){open("tests")}
+                }
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    PulseToolTile("Сборка","APK / AAB",AppIcons.Build,Modifier.weight(1f)){open("build")}
+                    PulseToolTile("История","Результаты",AppIcons.History,Modifier.weight(1f)){open("history")}
+                }
+            }
+        }
+        if(worktrees.isNotEmpty())item {
+            OutlinedCard(onClick={worktreesExpanded=!worktreesExpanded},
+                modifier=Modifier.fillMaxWidth(),
+                shape=androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+                Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                        Text("WORKTREE",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f))
+                        Text("${worktrees.size}",color=MaterialTheme.colorScheme.primary,
+                            style=MaterialTheme.typography.titleMedium)
+                        Icon(AppIcons.Chevron,null,Modifier.rotate(if(worktreesExpanded)90f else 0f))
+                    }
+                    if(worktreesExpanded)worktrees.forEach {wt->
+                        HorizontalDivider()
+                        Text(wt.branch,style=MaterialTheme.typography.titleSmall)
+                        Text(wt.commit.take(12)+" · только просмотр",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+        item {
+            Text(project.remote.ifBlank {"Origin не подтверждён"},
+                style=MaterialTheme.typography.bodySmall,
+                color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 @Composable fun UnavailableTool(title:String,reason:String) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {Text(title,style=MaterialTheme.typography.titleMedium);Text(reason,style=MaterialTheme.typography.bodyMedium)} }
