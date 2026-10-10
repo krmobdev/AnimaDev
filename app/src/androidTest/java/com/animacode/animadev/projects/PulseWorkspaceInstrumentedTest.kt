@@ -9,6 +9,10 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performClick
 import com.animacode.animadev.repos.StopJobButton
 import org.junit.Assert.assertEquals
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import com.animacode.animadev.repos.HighlightedLogChunk
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -50,6 +54,24 @@ class PulseWorkspaceInstrumentedTest {
     @Test fun queuedStopDoesNotAllowDuplicateClicks() {
         compose.setContent {MaterialTheme {StopJobButton(true,true,"QUERY",true) {error("duplicate")}}}
         compose.onNodeWithText("Отправляем остановку…").assertIsDisplayed().assertIsNotEnabled()
+    }
+
+
+    @Test fun journalTimestampIsBlackBoldAndSuccessGreenInDarkTheme() {
+        val line="[15:24:21] stdout: Success"
+        compose.setContent {MaterialTheme(colorScheme=darkColorScheme()) {HighlightedLogChunk(line)}}
+        val rendered=compose.onNodeWithText(line).fetchSemanticsNode().config[SemanticsProperties.Text].single()
+        val timestamp=rendered.spanStyles.single {it.start==0 && it.end==10}.item
+        assertEquals(Color.Black,timestamp.color)
+        assertEquals(FontWeight.Bold,timestamp.fontWeight)
+        assertEquals(Color(0xFF81C784),rendered.spanStyles.first().item.color)
+    }
+
+    @Test fun journalSuccessIsGreenInLightTheme() {
+        val line="[15:24:21] stdout: Success"
+        compose.setContent {MaterialTheme(colorScheme=lightColorScheme()) {HighlightedLogChunk(line)}}
+        val rendered=compose.onNodeWithText(line).fetchSemanticsNode().config[SemanticsProperties.Text].single()
+        assertEquals(Color(0xFF257A3B),rendered.spanStyles.first().item.color)
     }
 
     @Test fun heroRendersInDarkTheme() {

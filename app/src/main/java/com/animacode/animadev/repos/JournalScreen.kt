@@ -43,12 +43,8 @@ import org.json.JSONObject
 import com.animacode.animadev.projects.AppIcons
 
 @Composable
-private fun HighlightedLogChunk(chunk:String) {
+fun HighlightedLogChunk(chunk:String) {
     var expanded by rememberSaveable(chunk) {mutableStateOf(false)}
-    if(JournalPresentation.isCommand(chunk) && !expanded) {
-        ListItem(headlineContent={Text(chunk.lineSequence().first().take(100),maxLines=2,overflow=TextOverflow.Ellipsis)},supportingContent={Text("Полная команда · раскрыть")},trailingContent={IconButton(onClick={expanded=true}){Icon(AppIcons.Chevron,"Раскрыть команду")}})
-        return
-    }
     val scheme=MaterialTheme.colorScheme
     val light=scheme.surface.luminance()>0.5f
     val success=if(light)Color(0xFF257A3B) else Color(0xFF81C784)
@@ -59,9 +55,13 @@ private fun HighlightedLogChunk(chunk:String) {
             JournalStylePolicy.styles(chunk).forEach { line ->
                 val color=when(line.tone) { LogTone.SUCCESS->success;LogTone.ERROR->if(light)Color(0xFFB3261E) else Color(0xFFFF8A80);LogTone.WARNING->warning;else->scheme.onSurface }
                 if(line.tone!=LogTone.NORMAL)addStyle(SpanStyle(color=color,fontWeight=FontWeight.SemiBold),line.start,line.end)
-                if(line.timestampEnd>line.start)addStyle(SpanStyle(color=if(light)Color(0xFF161616) else Color(0xFFF5F5F5),fontWeight=FontWeight.Bold),line.start,line.timestampEnd)
+                if(line.timestampEnd>line.start)addStyle(SpanStyle(color=Color.Black,background=Color(0xFFE4EBE8),fontWeight=FontWeight.Bold),line.start,line.timestampEnd)
             }
         }
+    }
+    if(JournalPresentation.isCommand(chunk) && !expanded) {
+        ListItem(headlineContent={Text(annotated.subSequence(0,minOf(100,annotated.length)),maxLines=2,overflow=TextOverflow.Ellipsis)},supportingContent={Text("Полная команда · раскрыть")},trailingContent={IconButton(onClick={expanded=true}){Icon(AppIcons.Chevron,"Раскрыть команду")}})
+        return
     }
     SelectionContainer { Text(annotated,modifier=Modifier.fillMaxWidth(),fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodySmall,softWrap=true) }
 }

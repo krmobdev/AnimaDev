@@ -17,7 +17,7 @@ object JournalStylePolicy {
             val payload=if(ch=="event")raw.removePrefix("Итог: ") else raw
             val tone=when {
                 ch=="command" -> LogTone.NORMAL
-                Regex("^(BUILD SUCCESSFUL(?:\\s|$)|SUCCEEDED(?:\\s|$)|Успешно(?:\\s|$)|(?:state|status)[=: ]+SUCCEEDED(?:\\s|$))",RegexOption.IGNORE_CASE).containsMatchIn(payload)->LogTone.SUCCESS
+                Regex("^(BUILD SUCCESSFUL(?:\\s|$)|SUCCEEDED(?:\\s|$)|SUCCESS(?:\\s|$)|Успешно(?:\\s|$)|(?:state|status)[=: ]+SUCCEEDED(?:\\s|$))",RegexOption.IGNORE_CASE).containsMatchIn(payload)->LogTone.SUCCESS
                 Regex("^(BUILD FAILED(?:\\s|$)|FAILURE:|FAILED(?:\\s|$)|ERROR(?:[: ]|$)|FATAL:|e: |(?:state|status)[=: ]+(?:FAILED|ERROR)(?:\\s|$))",RegexOption.IGNORE_CASE).containsMatchIn(payload)->LogTone.ERROR
                 Regex("^(WARNING(?:[: ]|$)|WARN(?:[: ]|$)|w: |Предупреждение(?:[: ]|$))",RegexOption.IGNORE_CASE).containsMatchIn(payload)->LogTone.WARNING
                 else -> LogTone.NORMAL
