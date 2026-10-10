@@ -36,7 +36,7 @@ class RepoGateway(private val context: Context) {
 
     fun install() {
         val r = store.read()
-        if (r.optBoolean("pending") || store.blocked()) return
+        if (r.optBoolean("pending") || store.blocked() || com.animacode.animadev.projects.ReleaseStore(context).busy()) return
         val request = id()
         val hash = sha()
         val bytes = context.assets.open("runner/animadev_runner.py").use { it.readBytes() }
@@ -94,7 +94,7 @@ class RepoGateway(private val context: Context) {
         val project=com.animacode.animadev.projects.ProjectStore(context).all().find {it.id==projectId && it.path==projectPath} ?: return
         if (!ProjectPolicy.canExecute(projectId,projectPath,action,project.worktree,project.remote)) return
         val r = store.read()
-        if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST", "BUILD_DEBUG") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked()) return
+        if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST", "BUILD_DEBUG") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked() || com.animacode.animadev.projects.ReleaseStore(context).busy()) return
         if (action == "SYNC" && !maySync(r,projectId)) return
         if (action == "TEST" && !mayTest(r,projectId)) return
         if (action == "BUILD_DEBUG" && !mayBuild(r,projectId)) return
