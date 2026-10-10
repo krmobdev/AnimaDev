@@ -9,6 +9,7 @@ import signal
 import subprocess
 import sys
 import time
+import tempfile
 import xml.etree.ElementTree as ET
 
 COMMAND = ('./gradlew', ':app:testDebugUnitTest', '--offline', '--no-daemon', '--rerun-tasks', '--console=plain')
@@ -284,6 +285,20 @@ DEVICE_COMMAND = ('./gradlew', ':app:connectedDebugAndroidTest', '--offline',
                   '--no-daemon', '--rerun-tasks', '--console=plain')
 DEVICE_RESULTS = 'app/build/outputs/androidTest-results/connected'
 
+def device_init_script(jid):
+    if not re.fullmatch(r'[a-f0-9]{32}',jid):raise ValueError('JOB_ID_INVALID')
+    suffix='.animadevtests.j'+jid
+    return """gradle.beforeProject { p ->
+    if (p.path == ':app') {
+        p.pluginManager.withPlugin('com.android.application') {
+            p.extensions.getByName('androidComponents').finalizeDsl { android ->
+                android.defaultConfig.applicationId = android.defaultConfig.applicationId + '%s'
+            }
+        }
+    }
+}
+""" % suffix
+
 def adb_devices(run=subprocess.run, adb='/data/data/com.termux/files/usr/bin/adb'):
     """Only one authorized hardware/USB/WiFi ADB device is accepted."""
     try:
@@ -400,8 +415,19 @@ def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT,a
     env['ANDROID_SERIAL']=devices[0]
     log('event','ADB: одно устройство, серийный номер '+devices[0][:24])
     log('command','bash ./gradlew :app:connectedDebugAndroidTest --offline --no-daemon --rerun-tasks --console=plain')
-    code,unknown=process(guard.root,env,log,on_process,identity,redact,
-                         timeout,getattr(guard,'observe',lambda:None),DEVICE_COMMAND)
+    # A fresh target package protects installed app databases (e.g. Room 31 -> 30).
+    # This fixed init script only changes :app applicationId; source files stay untouched.
+    if not re.fullmatch(r'[a-f0-9]{32}',jid):
+        return dict(state='FAILED',error_code='TEST_STATE_CHANGED',exit_code=None,snapshot=snapshot,tests=None)
+    with tempfile.TemporaryDirectory(prefix='animadev-device-') as folder:
+        init=pathlib.Path(folder)/'isolate.gradle'
+        init.write_text(device_init_script(jid),encoding='utf-8')
+        os.chmod(init,0o600)
+        command=DEVICE_COMMAND+('--init-script',str(init))
+        log('event','Изолированный тестовый пакет · установленное приложение и его база не изменяются')
+        log('command','bash '+ ' '.join(command))
+        code,unknown=process(guard.root,env,log,on_process,identity,redact,
+                             timeout,getattr(guard,'observe',lambda:None),command)
     if unknown:
         return dict(state='UNKNOWN',error_code='TEST_TIMEOUT_UNKNOWN',exit_code=None,snapshot=snapshot,tests=None,unresolved=True)
     result=dict(state='FAILED',error_code='GRADLE_FAILED',exit_code=code,snapshot=snapshot,tests=None)
@@ -422,3 +448,4 @@ def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT,a
     elif code==0 and result['tests'] is not None:
         result.update(state='SUCCEEDED',error_code='')
     return result
+

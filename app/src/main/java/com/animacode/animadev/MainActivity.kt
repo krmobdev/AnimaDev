@@ -65,7 +65,12 @@ class MainActivity:ComponentActivity() {
             background=Color(0xFF0B1113),onBackground=Color.White,
             surface=Color(0xFF111A1C),onSurface=Color.White,
             surfaceVariant=AnimaPulse.panel,onSurfaceVariant=AnimaPulse.muted,
-            surfaceContainerLow=AnimaPulse.panel,
+            surfaceContainerLowest=Color(0xFF0B1113),
+            surfaceContainerLow=Color(0xFF162123),
+            surfaceContainer=AnimaPulse.panel,
+            surfaceContainerHigh=Color(0xFF253335),
+            surfaceContainerHighest=Color(0xFF2D3C3E),
+            surfaceBright=Color(0xFF344547),surfaceDim=Color(0xFF0B1113),
             outline=AnimaPulse.border,outlineVariant=Color(0xFF30453E),
             error=Color(0xFFFF8279))
         else if(dynamic) { if(dark)dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }

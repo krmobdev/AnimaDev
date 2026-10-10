@@ -16,7 +16,7 @@ import time
 
 VERSION = '0.4.0'
 MONITOR_SHA = 'f95d91e7170ab96df4ad9731e48e3f8bae77a23055424ed834d4a0299c55e5e5'
-GRADLE_SHA = '90ff50b10dfa54ecedf459ce0ff33597411026551acd46d8df77727e93fd4390'
+GRADLE_SHA = 'fe40f6861c6ecf842d5b3e89af3d2dd29d208581e52d637b0abebffa5f21ca1b'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
 STATE_ROOT = HOME / '.local/share/animadev'
@@ -626,3 +626,4 @@ def main():
         return 1
 
 if __name__=='__main__': sys.exit(main())
+

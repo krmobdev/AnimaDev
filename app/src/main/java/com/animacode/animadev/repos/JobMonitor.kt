@@ -40,7 +40,7 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
     var details by remember { mutableStateOf(false) }
     var confirmCancel by remember(jid) { mutableStateOf(false) }
     val terminal=state in RepoPolicy.terminalStates
-    Card {
+    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("Задание · $projectName · "+when(record.optString("action")) {
                 "TEST"->"Unit-тесты"

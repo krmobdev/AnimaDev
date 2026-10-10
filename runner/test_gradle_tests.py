@@ -301,8 +301,40 @@ class InstrumentationFixture(unittest.TestCase):
         self.assertEqual(result['tests']['passed'],1)
         self.assertEqual((self.repo/'app/build/device-serial.txt').read_text().strip(),
                          '192.168.1.132:39721')
-        self.assertEqual((self.repo/'app/build/device-args.txt').read_text().splitlines(),
-                         list(gt.DEVICE_COMMAND[1:]))
+        args=(self.repo/'app/build/device-args.txt').read_text().splitlines()
+        self.assertEqual(args[:-2],list(gt.DEVICE_COMMAND[1:]))
+        self.assertEqual(args[-2],'--init-script')
+        self.assertFalse(pathlib.Path(args[-1]).exists())  # Only our temporary script is removed.
+        self.assertEqual(base.git(self.repo,'rev-parse','HEAD'),self.before)
+
+    def test_isolation_script_changes_only_app_id_without_database_deletion(self):
+        jid=uuid.uuid4().hex
+        script=gt.device_init_script(jid)
+        self.assertIn("p.path == ':app'",script)
+        self.assertIn(".animadevtests.j"+jid,script)
+        self.assertIn("finalizeDsl",script)
+        for forbidden in ('delete','clear','fallbackToDestructiveMigration','exec','commandLine'):
+            self.assertNotIn(forbidden,script)
+
+    def test_isolation_rejects_non_job_input(self):
+        for invalid in ('', 'x'*32, "abc';exec('rm')", '../secret'):
+            with self.assertRaises(ValueError):gt.device_init_script(invalid)
+
+    def test_command_uses_real_temporary_script_without_touching_source(self):
+        self.prepare()
+        captured=[]
+        def process(root,env,log,on_process,identity,redact,timeout,observe,command):
+            script=pathlib.Path(command[-1])
+            captured.append(script.read_text())
+            self.assertEqual(command[-2],'--init-script')
+            self.assertNotIn(self.repo,script.parents)
+            self.assertEqual(script.stat().st_mode & 0o777,0o600)
+            return 1,False
+        guard=runner.GitGuard(self.project,git_executable=self.engine.git_executable)
+        with patch.object(gt,'adb_devices',return_value=['192.168.1.132:39721']),patch.object(gt,'process',side_effect=process):
+            result=gt.execute_device(guard,lambda *a:None,lambda *a:None,runner.identity,runner.redact,jid=uuid.uuid4().hex)
+        self.assertEqual(result['state'],'FAILED')
+        self.assertEqual(len(captured),1)
         self.assertEqual(base.git(self.repo,'rev-parse','HEAD'),self.before)
 
     def test_saved_endpoint_recovers_missing_transport_before_gradle(self):
