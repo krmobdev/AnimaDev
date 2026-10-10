@@ -26,7 +26,7 @@ object ArtifactMoveGateway {
             !ArtifactPolicy.valid(source,sha,size) ||
             destination=="/storage/emulated/0/Download" ||
             !destination.startsWith("/storage/emulated/0/") ||
-            destination!=ExportDestination(context).artifactDirectory())return false
+            destination!=record.optString("output_dir"))return false
         val termux=TermuxGateway(context)
         if(!termux.permitted() || termux.installedVersion()==null)return false
         val callback=PendingIntent.getBroadcast(context,id.hashCode(),
@@ -56,8 +56,8 @@ object ArtifactMoveGateway {
     internal fun result(context:Context,record:JSONObject,ok:Boolean,path:String) {
         val store=ReleaseStore(context)
         val old=record.optJSONObject("artifact") ?:return
-        val destination=ExportDestination(context).artifactDirectory()
-        val valid=ok && destination!=null &&
+        val destination=record.optString("output_dir")
+        val valid=ok && destination.isNotBlank() &&
             path.startsWith("$destination/") &&
             path.substringAfterLast('/')==old.optString("path").substringAfterLast('/') &&
             ArtifactPolicy.valid(path,old.optString("sha256"),old.optLong("size"))
