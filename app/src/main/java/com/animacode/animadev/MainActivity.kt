@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -76,7 +77,8 @@ class MainActivity:ComponentActivity() {
         else if(dynamic) { if(dark)dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }
         else if(dark)darkColorScheme() else lightColorScheme()
         SideEffect { enableEdgeToEdge(SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT){dark},SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT){dark}) }
-        MaterialTheme(colorScheme=colors) {
+        MaterialTheme(colorScheme=colors,typography=Typography(
+            labelLarge=Typography().labelLarge.copy(textAlign=TextAlign.Center))) {
             val projects=remember { ProjectStore(context) }
             var selected by rememberSaveable { mutableStateOf(projects.selected()) }
             var top by rememberSaveable { mutableStateOf("projects") }
@@ -209,7 +211,7 @@ class MainActivity:ComponentActivity() {
                 }
             } }
             if(destinationMissing)AlertDialog(onDismissRequest={destinationMissing=false},title={Text("Папка сохранения недоступна")},text={Text(destinationError.ifEmpty {"Выберите папку повторно или вернитесь к обычным Загрузкам. История и файлы сохранятся."})},confirmButton={Button(onClick={folderPicker.launch(null)}){Text("Выбрать папку")}},dismissButton={OutlinedButton(onClick={destination.useDownloads();destinationMissing=false}){Text("Использовать Загрузки")}})
-            if(confirmExit)AlertDialog(onDismissRequest={confirmExit=false},title={Text("Закрыть AnimaDev?")},text={Text(if(store.blocked())"Задание продолжится в Termux. Состояние и журнал восстановятся при следующем открытии." else "Проекты, результаты и журналы сохранятся.")},confirmButton={TextButton(onClick={confirmExit=false;finishAndRemoveTask()}){Text("Выйти")}},dismissButton={TextButton(onClick={confirmExit=false}){Text("Отмена")}})
+            if(confirmExit)AlertDialog(onDismissRequest={confirmExit=false},title={Text("Закрыть AnimaDev?")},text={Text(if(store.blocked())"Задание продолжится в Termux. Состояние и журнал восстановятся при следующем открытии." else "Проекты, результаты и журналы сохранятся.")},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmExit=false;finishAndRemoveTask()}){Text("Выйти")}},dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmExit=false}){Text("Отмена")}})
         }
     }
 }

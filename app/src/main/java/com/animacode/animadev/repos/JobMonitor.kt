@@ -75,7 +75,9 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
             }
             if(state in setOf("REQUESTED","QUEUED","RUNNING")) LinearProgressIndicator(Modifier.fillMaxWidth())
             if(job!=null && !job.isNull("exit_code"))Text("Exit code: ${job.optInt("exit_code")}")
-            Text(record.optString("message"),style=MaterialTheme.typography.bodySmall)
+            Text(TestResultPresentation.message(record.optString("action"),
+                job?.optString("error_code").orEmpty(),record.optString("message")),
+                style=MaterialTheme.typography.bodySmall)
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
                 if(record.optString("action") in setOf("TEST","TEST_DEVICE","BUILD_DEBUG") &&
                     state in setOf("REQUESTED","QUEUED","RUNNING") &&
@@ -97,13 +99,13 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
         onDismissRequest={confirmCancel=false},
         title={Text("Остановить задачу?")},
         text={Text("Отправить Ctrl+C процессу Gradle в Termux? Отмена не удаляет исходники и не изменяет Git. Пока завершение не подтверждено, другая сборка заблокирована.")},
-        confirmButton={TextButton(onClick={confirmCancel=false;gateway.cancel()}){Text("Остановить")}},
-        dismissButton={TextButton(onClick={confirmCancel=false}){Text("Продолжить")}}
+        confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmCancel=false;gateway.cancel()}){Text("Остановить")}},
+        dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmCancel=false}){Text("Продолжить")}}
     )
     if(warning) AlertDialog(onDismissRequest={settings.edit().putLong("snooze_$jid",MonitorPolicy.snooze(now,minutes)).apply();snoozeGeneration++},title={Text("Давно нет подтверждённого прогресса")},
         text={Text("Задание выполняется ${maxOf(0,elapsed)/60_000} минут. Последняя подтверждённая активность — ${maxOf(0,now-maxOf(progress,start))/60_000} минут назад. Процесс может продолжать вычисления.")},
-        confirmButton={TextButton(onClick={settings.edit().putLong("snooze_$jid",MonitorPolicy.snooze(now,minutes)).apply();snoozeGeneration++}) { Text("Продолжить ждать") }},
-        dismissButton={TextButton(onClick={settings.edit().putLong("snooze_$jid",MonitorPolicy.snooze(now,minutes)).apply();snoozeGeneration++;openJournal(jid)}) { Text("Открыть журнал") }})
+        confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={settings.edit().putLong("snooze_$jid",MonitorPolicy.snooze(now,minutes)).apply();snoozeGeneration++}) { Text("Продолжить ждать") }},
+        dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={settings.edit().putLong("snooze_$jid",MonitorPolicy.snooze(now,minutes)).apply();snoozeGeneration++;openJournal(jid)}) { Text("Открыть журнал") }})
 }
 
 @Composable

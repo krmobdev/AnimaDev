@@ -80,7 +80,7 @@ import com.animacode.animadev.repos.*
             val installed=r.optString("installed_sha").isNotEmpty()
             Text(if(installed)"Доступно обновление локального помощника" else "Нужен локальный помощник Termux",style=MaterialTheme.typography.titleSmall)
             Text(if(blocked)"Сначала уточните прежнее задание по Job ID. Обновление сейчас заблокировано." else "Результаты и история сохранятся. После подключения обновите состояние Git.",style=MaterialTheme.typography.bodySmall)
-            FilledTonalButton(onClick={gateway.install()},enabled=HelperPolicy.mayConnect(permitted,termuxVersion!=null,pending,blocked)){Text(if(pending)"Подключаем…" else HelperPolicy.label(installed))}
+            com.animacode.animadev.projects.ActionButton(onClick={gateway.install()},enabled=HelperPolicy.mayConnect(permitted,termuxVersion!=null,pending,blocked)){Text(if(pending)"Подключаем…" else HelperPolicy.label(installed))}
         }} }
         if(TestScreenStatusPolicy.needsRecovery(r.optString("state")) &&
             r.optString("job_id").isNotBlank()) item {
@@ -120,9 +120,9 @@ import com.animacode.animadev.repos.*
             }} }
             item {Button(onClick={gateway.start("CHECK",project.id,project.path)},enabled=available && (snap==null || (snap.optBoolean("remote_ok") && snap.optBoolean("branch_allowed"))),modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Проверить GitHub")} }
             item {OutlinedButton(onClick={gateway.start("STATUS",project.id,project.path)},enabled=available,modifier=Modifier.fillMaxWidth()){Text("Обновить локальное состояние")} }
-            item {FilledTonalButton(onClick={confirmSync=true},enabled=permitted && termuxVersion!=null && gateway.maySync(r,project.id),modifier=Modifier.fillMaxWidth()){Text("Получить изменения")} }
+            item {com.animacode.animadev.projects.ActionButton(onClick={confirmSync=true},enabled=permitted && termuxVersion!=null && gateway.maySync(r,project.id),modifier=Modifier.fillMaxWidth()){Text("Получить изменения")} }
             item {Text(when {blocked->"Новое действие заблокировано текущим заданием.";!ready->"Операции доступны после подключения помощника.";snap==null->"Обновите локальное состояние.";!snap.optBoolean("branch_allowed")->"Ветка не разрешена профилем. Переключение не выполняется.";!snap.optBoolean("remote_ok")->"Origin не соответствует профилю проекта.";snap.optBoolean("dirty")->"Получение изменений заблокировано: есть локальные правки.";snap.optInt("ahead")>0->"Есть локальные коммиты. Объединение запрещено.";snap.optInt("behind")==0->"Проверка GitHub не изменяет исходники.";else->"Обновление — только fast-forward после подтверждения."},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-            if(snap?.optBoolean("dirty")==true)item {TextButton(onClick={changedFiles=true}){Text("Посмотреть изменённые файлы")}}
+            if(snap?.optBoolean("dirty")==true)item {com.animacode.animadev.projects.ActionButton(onClick={changedFiles=true}){Text("Посмотреть изменённые файлы")}}
         } else {
             val prepared=belongs && snap!=null && gateway.mayTest(r,project.id)
             val canRun=available && prepared
@@ -282,13 +282,19 @@ import com.animacode.animadev.repos.*
                                     style=MaterialTheme.typography.bodySmall)
                             }
                             if(test.optString("state") != "SUCCEEDED") {
-                                val reason=test.optString("message").ifBlank { "Тесты не завершились успешно." }
+                                val reason=TestResultPresentation.message(test.optString("action"),
+                                    test.optString("error_code"),
+                                    test.optString("message").ifBlank { "Тесты не завершились успешно." })
                                 Text(reason,style=MaterialTheme.typography.bodyMedium,
                                     color=MaterialTheme.colorScheme.error)
                                 test.optString("error_code").takeIf { it.isNotBlank() }?.let { code ->
                                     Text("Код: $code",style=MaterialTheme.typography.bodySmall,
                                         color=MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
+                            }
+                            TestSummary.details(test.optJSONObject("tests")).takeIf { it.isNotBlank() }?.let {
+                                Text(it,style=MaterialTheme.typography.bodySmall,
+                                    color=MaterialTheme.colorScheme.error)
                             }
                             OutlinedButton(onClick={onJournal(test.optString("job_id"))},
                                 modifier=Modifier.fillMaxWidth()) {Text("Открыть журнал")}
@@ -304,6 +310,6 @@ import com.animacode.animadev.repos.*
             JobMonitor(context,r,permitted,onJournal)
         }
     }
-    if(confirmSync)AlertDialog(onDismissRequest={confirmSync=false},title={Text("Получить изменения?")},text={Text("${project.name}: ветка, origin и чистота проверятся повторно. Только fast-forward, без отправки на GitHub.")},confirmButton={TextButton(onClick={confirmSync=false;gateway.start("SYNC",project.id,project.path)}){Text("Получить")}},dismissButton={TextButton(onClick={confirmSync=false}){Text("Отложить")}})
-    if(changedFiles)AlertDialog(onDismissRequest={changedFiles=false},title={Text("Изменённые файлы")},text={Column {Text(snap?.optJSONArray("changed_files")?.let {a->(0 until a.length()).joinToString("\n"){a.optString(it)}} ?: "Список недоступен");Text("Просмотр содержимого diff пока не подключён.",style=MaterialTheme.typography.bodySmall)}},confirmButton={TextButton(onClick={changedFiles=false}){Text("Закрыть")}})
+    if(confirmSync)AlertDialog(onDismissRequest={confirmSync=false},title={Text("Получить изменения?")},text={Text("${project.name}: ветка, origin и чистота проверятся повторно. Только fast-forward, без отправки на GitHub.")},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmSync=false;gateway.start("SYNC",project.id,project.path)}){Text("Получить")}},dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmSync=false}){Text("Отложить")}})
+    if(changedFiles)AlertDialog(onDismissRequest={changedFiles=false},title={Text("Изменённые файлы")},text={Column {Text(snap?.optJSONArray("changed_files")?.let {a->(0 until a.length()).joinToString("\n"){a.optString(it)}} ?: "Список недоступен");Text("Просмотр содержимого diff пока не подключён.",style=MaterialTheme.typography.bodySmall)}},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={changedFiles=false}){Text("Закрыть")}})
 }

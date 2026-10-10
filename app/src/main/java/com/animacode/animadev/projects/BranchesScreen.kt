@@ -87,7 +87,7 @@ import org.json.JSONObject
                 Text(if(b.active)"Текущая рабочая ветка" else "Нажмите для выбора ветки",style=MaterialTheme.typography.labelSmall,color=if(b.active)AnimaPulse.green else MaterialTheme.colorScheme.primary)
             }}}
             if(rows.isEmpty())item {Text(if(search.isNotBlank())"В загруженных страницах совпадений нет" else "Ветки пока не получены")}
-            if(metadata.optBoolean("branches_more"))item {FilledTonalButton(onClick={feedback.tap(feedbackView);gateway.read("BRANCHES",project.path,metadata.optLong("branches_next"))},enabled=permitted && !pending,modifier=Modifier.fillMaxWidth()){Text("Загрузить следующие ветки")};Text("Страницы ограничены временем и размером ответа. Изменения refs во время чтения требуют обновить список.",style=MaterialTheme.typography.bodySmall)}
+            if(metadata.optBoolean("branches_more"))item {com.animacode.animadev.projects.ActionButton(onClick={feedback.tap(feedbackView);gateway.read("BRANCHES",project.path,metadata.optLong("branches_next"))},enabled=permitted && !pending,modifier=Modifier.fillMaxWidth()){Text("Загрузить следующие ветки")};Text("Страницы ограничены временем и размером ответа. Изменения refs во время чтения требуют обновить список.",style=MaterialTheme.typography.bodySmall)}
         } else item {Text("Обновите список. Результаты другого проекта здесь не показываются.",style=MaterialTheme.typography.bodyMedium)}
     }
     selectedBranch?.let {row->
@@ -115,7 +115,7 @@ import org.json.JSONObject
                     selectedBranch=null
                 },enabled=eligible) {Text("Переключить ветку")}
             },
-            dismissButton={TextButton(onClick={selectedBranch=null}){Text("Закрыть")}}
+            dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={selectedBranch=null}){Text("Закрыть")}}
         )
     }
 }

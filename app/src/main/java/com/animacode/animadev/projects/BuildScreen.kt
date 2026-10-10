@@ -116,7 +116,7 @@ import com.animacode.animadev.termux.TermuxGateway
         if(!permitted)item {Button(onClick={grant.launch(TermuxGateway.PERMISSION)}){Text("Разрешить Termux")}}
         if(!record.optBoolean("ready"))item {Card {Column(Modifier.padding(16.dp)) {
             Text("Локальный помощник необходимо обновить")
-            Button(onClick={gateway.install()},enabled=permitted && termuxVersion!=null && !blocked && !record.optBoolean("pending")){Text("Обновить помощник")}
+            ActionButton(onClick={gateway.install()},enabled=permitted && termuxVersion!=null && !blocked && !record.optBoolean("pending")){Text("Обновить помощник")}
         }}}
         item {OutlinedCard(shape=RoundedCornerShape(22.dp),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
             Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),verticalArrangement=Arrangement.spacedBy(14.dp)) {
@@ -171,7 +171,7 @@ import com.animacode.animadev.termux.TermuxGateway
                     if(storedCredentials!=null && !showPasswordFields) {
                         Text("Пароль готов к использованию",style=MaterialTheme.typography.bodyMedium,
                             color=MaterialTheme.colorScheme.primary)
-                        TextButton(onClick={tap();showPasswordFields=true},
+                        com.animacode.animadev.projects.ActionButton(onClick={tap();showPasswordFields=true},
                             enabled=!releaseOrDebugBusy) {Text("Использовать другой пароль")}
                     }
                     AnimatedVisibility(storedCredentials==null || showPasswordFields) {
@@ -185,7 +185,7 @@ import com.animacode.animadev.termux.TermuxGateway
                                 visualTransformation=PasswordVisualTransformation(),singleLine=true,
                                 enabled=!releaseOrDebugBusy,modifier=Modifier.fillMaxWidth())
                             if(storedCredentials==null) {
-                                TextButton(onClick={
+                                com.animacode.animadev.projects.ActionButton(onClick={
                                     tap()
                                     val ok=vault.save(project.id,signing.documentUri(project.id),signing.alias(project.id),
                                         releasePassword,releaseKeyPassword)
@@ -200,7 +200,7 @@ import com.animacode.animadev.termux.TermuxGateway
                                     Text("Сохранить пароль защищённо")
                                 }
                             } else {
-                                TextButton(onClick={tap();showPasswordFields=false;releasePassword="";releaseKeyPassword=""}) {
+                                com.animacode.animadev.projects.ActionButton(onClick={tap();showPasswordFields=false;releasePassword="";releaseKeyPassword=""}) {
                                     Text("Отмена")
                                 }
                             }
@@ -227,7 +227,7 @@ import com.animacode.animadev.termux.TermuxGateway
                         else -> "Введите пароль JKS или сохраните его на телефоне."
                     },style=MaterialTheme.typography.bodySmall,
                         color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick={tap();showSecurityDetails=!showSecurityDetails}) {
+                    com.animacode.animadev.projects.ActionButton(onClick={tap();showSecurityDetails=!showSecurityDetails}) {
                         Text(if(showSecurityDetails)"Скрыть настройки безопасности" else "Безопасность и управление паролем")
                     }
                     AnimatedVisibility(showSecurityDetails) {
@@ -303,14 +303,14 @@ import com.animacode.animadev.termux.TermuxGateway
                 Text("SHA-256: "+a.optString("sha256"),style=MaterialTheme.typography.bodySmall)
                 Text("Размер: "+a.optLong("size")+" байт · Git "+a.optString("commit").take(12),style=MaterialTheme.typography.bodySmall)
             }}}
-            TextButton(onClick={onJournal(job.optString("job_id"))}){Text("Журнал задания")}
+            com.animacode.animadev.projects.ActionButton(onClick={onJournal(job.optString("job_id"))}){Text("Журнал задания")}
         }
     }
     if(confirmReleaseStop)AlertDialog(
         onDismissRequest={confirmReleaseStop=false},
         title={Text("Остановить Release AAB?")},
         text={Text("Termux получит Ctrl+C. Готового AAB может не быть; исходники и Git не изменятся. Другая сборка останется заблокированной до подтверждения завершения.")},
-        confirmButton={TextButton(onClick={confirmReleaseStop=false;ReleaseCancel.request(context)}){Text("Остановить")}},
-        dismissButton={TextButton(onClick={confirmReleaseStop=false}){Text("Продолжить")}}
+        confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmReleaseStop=false;ReleaseCancel.request(context)}){Text("Остановить")}},
+        dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmReleaseStop=false}){Text("Продолжить")}}
     )
 }

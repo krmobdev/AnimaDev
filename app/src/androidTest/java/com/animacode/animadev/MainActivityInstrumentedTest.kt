@@ -12,7 +12,9 @@ import org.junit.runner.RunWith
 class MainActivityInstrumentedTest {
     @Test fun appLaunchesAndResumesOnDevice() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
-        assertTrue(context.packageName in setOf("com.animacode.animadev","com.animacode.animadev.devicefixture"))
+        // Fresh per-job IDs protect the owner's installed application and secrets.
+        assertTrue(context.packageName.matches(Regex(
+            "com\\\\.animacode\\\\.animadev(?:\\\\.devicefixture)?(?:\\\\.animadevtests\\\\.j[a-f0-9]{32})?")))
         ActivityScenario.launch(MainActivity::class.java).use {scenario ->
             scenario.onActivity {activity ->
                 assertFalse(activity.isFinishing)

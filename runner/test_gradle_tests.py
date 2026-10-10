@@ -22,7 +22,16 @@ def wrapper(root, xml=OK, exit_code=0, prefix=''):
 class Reports(unittest.TestCase):
     def stats(self, xml):return gt.summary({}, {'file':('stamp',xml.encode())})
     def test_actual_counts(self):
-        self.assertEqual(self.stats(XML),dict(total=3,passed=1,failed=1,skipped=1,duration_ms=125,report_files=1))
+        self.assertEqual(self.stats(XML),dict(total=3,passed=1,failed=1,skipped=1,duration_ms=125,report_files=1,failure_details=[dict(class_name='Fixture',test_name='fail',message='assertion')]))
+    def test_device_failure_message_is_not_unit_message(self):
+        self.assertIn('инструментальные',gt.result_message('TEST_DEVICE','TESTS_FAILED'))
+        self.assertIn('unit',gt.result_message('TEST','TESTS_FAILED'))
+    def test_failure_details_are_redacted_and_bounded(self):
+        xml='<testsuite name="Fixture" tests="1" failures="1" time="0"><testcase name="launch"><failure message="password=sample"/></testcase></testsuite>'
+        details=gt.summary({}, {'file':('fresh',xml.encode())},redact=runner.redact)['failure_details']
+        self.assertEqual(details[0]['test_name'],'launch')
+        self.assertNotIn('sample',details[0]['message'])
+        self.assertIn('[REDACTED]',details[0]['message'])
     def test_zero_tests_is_actual_zero(self):
         self.assertEqual(self.stats('<testsuite tests="0" time="0"/>')['total'],0)
     def test_stale_xml_not_success(self):

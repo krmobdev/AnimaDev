@@ -31,7 +31,7 @@ import com.animacode.animadev.termux.TermuxGateway
             Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {Icon(AppIcons.Terminal,null,tint=MaterialTheme.colorScheme.onPrimaryContainer);Spacer(Modifier.width(12.dp));Text(if(version==null)"Termux не найден" else if(!permitted)"Требуется доступ" else "Termux установлен",style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)}
             Text("${version ?: "Версия недоступна"} · RUN_COMMAND ${if(permitted)"разрешён" else "запрещён"}",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)
             if(!permitted && version!=null)Button(onClick={grant.launch(TermuxGateway.PERMISSION)}){Text("Разрешить доступ")}
-            else FilledTonalButton(onClick={gateway.read("ENV")},enabled=permitted && version!=null && !data.optBoolean("pending")){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Проверить окружение")}
+            else com.animacode.animadev.projects.ActionButton(onClick={gateway.read("ENV")},enabled=permitted && version!=null && !data.optBoolean("pending")){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Проверить окружение")}
         }} }
         if(data.optBoolean("pending"))item {LinearProgressIndicator(Modifier.fillMaxWidth())}
         if(data.optString("message").isNotEmpty())item {Text(data.optString("message"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}

@@ -104,7 +104,7 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
     if(selector.isNotEmpty())AlertDialog(onDismissRequest={selector=""},title={Text(if(selector=="theme")"Тема" else "Предупреждение без прогресса")},text={Column {
         if(selector=="theme")listOf("system" to "Как в системе","light" to "Светлая","dark" to "Тёмная").forEach {(id,label)->SingleChoiceRow(label,theme==id){onTheme(id);selector=""}}
         else MonitorPolicy.thresholds.forEach {value->SingleChoiceRow("$value минут",minutes==value){minutes=value;prefs.edit().putInt("warning_minutes",value).apply();selector=""}}
-    }},confirmButton={TextButton(onClick={selector=""}){Text("Отмена")}})
+    }},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={selector=""}){Text("Отмена")}})
 }
 @Composable fun FileSettings(context:Context) {
     val scope=rememberCoroutineScope();val destination=remember {ExportDestination(context)}

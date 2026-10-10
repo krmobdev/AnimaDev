@@ -106,17 +106,17 @@ import org.json.JSONObject
                 }
             }
             if(newProjects.isEmpty() && !info.optBoolean("pending"))item {Text("Новых проектов в последнем поиске нет.",style=MaterialTheme.typography.bodyMedium)}
-            item { SectionLabel("По точному пути");OutlinedTextField(explicitPath,{explicitPath=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Локальный путь")},placeholder={Text("~/projects/MyApp")});FilledTonalButton(onClick={gateway.read("PATH",explicitPath)},enabled=permitted && explicitPath.isNotBlank() && !info.optBoolean("pending"),modifier=Modifier.padding(top=8.dp)){Text("Проверить путь")} }
+            item { SectionLabel("По точному пути");OutlinedTextField(explicitPath,{explicitPath=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Локальный путь")},placeholder={Text("~/projects/MyApp")});com.animacode.animadev.projects.ActionButton(onClick={gateway.read("PATH",explicitPath)},enabled=permitted && explicitPath.isNotBlank() && !info.optBoolean("pending"),modifier=Modifier.padding(top=8.dp)){Text("Проверить путь")} }
             item { Text("Поиск в HOME до 6 уровней. Скрытые и служебные каталоги исключены; ссылки не обходятся.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
             val issues=catalog.optJSONArray("issues")
             if(issues!=null && issues.length()>0)item {
-                TextButton(onClick={showIssues=!showIssues}){Text(if(showIssues)"Скрыть ограничения" else "Пропуски и ограничения (${issues.length()})")}
+                com.animacode.animadev.projects.ActionButton(onClick={showIssues=!showIssues}){Text(if(showIssues)"Скрыть ограничения" else "Пропуски и ограничения (${issues.length()})")}
                 if(showIssues)Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {for(i in 0 until issues.length()) {val item=issues.getJSONObject(i);Text(item.optString("path").removePrefix(ProjectPolicy.HOME)+"\n"+item.optString("reason"),style=MaterialTheme.typography.bodySmall)} }
             }
             item {Spacer(Modifier.height(12.dp))}
         }
     }
-    remove?.let { p->AlertDialog(onDismissRequest={remove=null},title={Text("Убрать проект?")},text={Text("${p.name} исчезнет из списка приложения. Файлы и история останутся в Termux.")},confirmButton={TextButton(onClick={store.remove(p.id);remove=null}){Text("Убрать")}},dismissButton={TextButton(onClick={remove=null}){Text("Отмена")}}) }
+    remove?.let { p->AlertDialog(onDismissRequest={remove=null},title={Text("Убрать проект?")},text={Text("${p.name} исчезнет из списка приложения. Файлы и история останутся в Termux.")},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={store.remove(p.id);remove=null}){Text("Убрать")}},dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={remove=null}){Text("Отмена")}}) }
 }
 @Composable fun ProjectWorkspace(context:Context,project:LocalProject,onTool:(String)->Unit) {
     var worktreesExpanded by rememberSaveable(project.id) { mutableStateOf(false) }
@@ -169,7 +169,7 @@ import org.json.JSONObject
             }
         }
         item {
-            FilledTonalButton(onClick={open("branches")},modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {
+            com.animacode.animadev.projects.ActionButton(onClick={open("branches")},modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {
                 Icon(AppIcons.Git,null);Spacer(Modifier.width(10.dp))
                 Text("Ветки и переключение")
             }

@@ -16,7 +16,7 @@ import time
 
 VERSION = '0.4.0'
 MONITOR_SHA = 'f95d91e7170ab96df4ad9731e48e3f8bae77a23055424ed834d4a0299c55e5e5'
-GRADLE_SHA = 'ca3e49a5d250d353052d0fffcc60b701f90bb7989f2bedbbd7c7d5736053bb01'
+GRADLE_SHA = '60523c1cd6d4973213487d5feae33c94a6fd86c4f1b29a76035e5481bdcee453'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
 STATE_ROOT = HOME / '.local/share/animadev'
@@ -528,7 +528,7 @@ class Engine:
                     if j['action']=='TEST_DEVICE' else module['execute_debug'](guard,log,
                     lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid))
                 code = result.get('error_code','')
-                result['message'] = MESSAGES.get(code,module['MESSAGES'].get(code,'Debug APK готов.' if j['action']=='BUILD_DEBUG' else 'Инструментальные тесты завершены.' if j['action']=='TEST_DEVICE' else 'Unit-тесты завершены.'))
+                result['message'] = MESSAGES.get(code,module['result_message'](j['action'],code) or ('Debug APK готов.' if j['action']=='BUILD_DEBUG' else 'Инструментальные тесты завершены.' if j['action']=='TEST_DEVICE' else 'Unit-тесты завершены.'))
                 with self.store.transaction() as c: latest=self.store.get(c,jid)
                 if latest.get('cancel_requested') and result['state'] != 'SUCCEEDED':
                     result.update(state='INTERRUPTED',error_code='CANCELLED',

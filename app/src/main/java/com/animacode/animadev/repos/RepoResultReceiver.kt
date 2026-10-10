@@ -23,8 +23,8 @@ class RepoResultReceiver : BroadcastReceiver() {
             if (record.optString("mode") in setOf("LOG","HISTORY")) {
                 val successful = result.getInt("exitCode") == 0 && result.getInt("err") == -1 && j.optBoolean("ok")
                 if(successful) JournalCache(context).use { cache ->
-                    if(record.optString("mode") == "HISTORY") cache.history(j.getJSONObject("page"))
-                    else cache.receive(j.getJSONObject("page"),record.getString("page_job"),record.getString("page_view"),record.getLong("page_offset"))
+                    if(record.optString("mode") == "HISTORY") cache.history(j.getJSONObject("page"),record.optString("project_id",RepoGateway.PROJECT))
+                    else cache.receive(j.getJSONObject("page"),record.getString("page_job"),record.getString("page_view"),record.getLong("page_offset"),record.optString("project_id",RepoGateway.PROJECT))
                 }
                 record.put("pending",false).put("journal_message",if(successful) "Журнал получен" else "Журнал пока недоступен. Повторите чтение; команды не запускаются.")
                     .put("journal_more",j.optJSONObject("page")?.optBoolean("more") ?: false)
@@ -75,6 +75,9 @@ class RepoResultReceiver : BroadcastReceiver() {
                         tests.getLong("failed"), tests.getLong("skipped"), tests.getLong("duration_ms")))
                     if (job.getString("state") == "SUCCEEDED") check(tests != null && tests.getLong("failed") == 0L)
                     record.put(if(job.getString("action")=="TEST_DEVICE")"device_test_job" else "test_job", job)
+                }
+                JournalCache(context).use { cache ->
+                    cache.rememberJob(job,record.optString("project_id",RepoGateway.PROJECT))
                 }
                 if(record.optBoolean("manual_query")) record.put("query_result","Состояние задания проверено: ${MonitorPolicy.label(job.getString("state"),false,false)}")
                 record.put("state", job.getString("state")).put("job", job)

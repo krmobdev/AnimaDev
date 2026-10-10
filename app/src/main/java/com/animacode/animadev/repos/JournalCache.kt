@@ -12,7 +12,7 @@ class JournalCache(context: Context) : SQLiteOpenHelper(context, "journal_cache.
         db.execSQL("CREATE TABLE history(job TEXT PRIMARY KEY,data TEXT)")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
-    @Synchronized fun receive(page: JSONObject, job: String, view: String, offset: Long) {
+    @Synchronized fun receive(page: JSONObject, job: String, view: String, offset: Long, expectedProject:String=RepoGateway.PROJECT) {
         require(page.getString("job_id") == job && page.getLong("offset") == offset)
         val next = page.getLong("next_offset"); val text = page.getString("text")
         require(next >= offset && text.length <= 12_000 && view in setOf("ALL","IMPORTANT"))
@@ -22,18 +22,28 @@ class JournalCache(context: Context) : SQLiteOpenHelper(context, "journal_cache.
             require(cursor(job,view) == offset)
             db.execSQL("INSERT OR REPLACE INTO pages VALUES(?,?,?,?,?,?,?)", arrayOf<Any>(job,view,offset,next,RepoResultReceiver.redact(text),if(page.optBoolean("truncated"))1 else 0,if(page.optBoolean("legacy"))1 else 0))
             page.optJSONObject("metadata")?.let { metadata ->
-                require(metadata.getString("job_id")==job && metadata.getString("project_id")==RepoGateway.PROJECT)
+                require(metadata.getString("job_id")==job && metadata.getString("project_id")==expectedProject)
                 db.execSQL("INSERT OR REPLACE INTO history VALUES(?,?)",arrayOf(job,metadata.toString()))
             }
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
     }
-    fun history(page: JSONObject) {
+    @Synchronized fun rememberJob(job:JSONObject,expectedProject:String=RepoGateway.PROJECT) {
+        require(job.getString("job_id").matches(Regex("[a-f0-9]{32}")) &&
+            job.getString("project_id")==expectedProject)
+        val id=job.getString("job_id")
+        val previous=readableDatabase.rawQuery("SELECT data FROM history WHERE job=?",arrayOf(id)).use {
+            if(it.moveToFirst())JSONObject(it.getString(0)) else JSONObject()
+        }
+        job.keys().forEach { key -> previous.put(key,job.get(key)) }
+        writableDatabase.execSQL("INSERT OR REPLACE INTO history VALUES(?,?)",arrayOf(id,previous.toString()))
+    }
+    @Synchronized fun history(page: JSONObject,expectedProject:String=RepoGateway.PROJECT) {
         val items = page.getJSONArray("items")
         require(items.length() <= 20)
         for(i in 0 until items.length()) {
             val j=items.getJSONObject(i)
-            require(j.getString("job_id").matches(Regex("[a-f0-9]{32}")) && j.getString("project_id")==RepoGateway.PROJECT)
+            require(j.getString("job_id").matches(Regex("[a-f0-9]{32}")) && j.getString("project_id")==expectedProject)
             val previous=readableDatabase.rawQuery("SELECT data FROM history WHERE job=?",arrayOf(j.getString("job_id"))).use { if(it.moveToFirst())JSONObject(it.getString(0)) else JSONObject() }
             j.keys().forEach { key -> previous.put(key,j.get(key)) }
             writableDatabase.execSQL("INSERT OR REPLACE INTO history VALUES(?,?)",arrayOf(j.getString("job_id"),previous.toString()))
@@ -56,11 +66,20 @@ class JournalCache(context: Context) : SQLiteOpenHelper(context, "journal_cache.
                 append("Итог: ${MonitorPolicy.label(j.optString("state"),false,false)} · Exit code: ${j.optString("exit_code")}\n")
                 if(end>0 && start>0) append("Длительность: ${((end-start)*1000).toLong()} мс\n")
                 if(j.has("tests") && !j.isNull("tests"))append(TestSummary.format(j.getJSONObject("tests")))
-                append(j.optString("message"));append("\n\n")
+                append(TestResultPresentation.message(j.optString("action"),j.optString("error_code"),j.optString("message")));append("\n\n")
             }
         }
     }
-    fun text(job: String, view: String): String = header(job) + readableDatabase.rawQuery("SELECT text FROM pages WHERE job=? AND view=? ORDER BY offset",arrayOf(job,view)).use { c -> buildString { while(c.moveToNext()) append(c.getString(0)) } }
+    fun text(job: String, view: String): String = header(job) + fallback(job,view) + readableDatabase.rawQuery("SELECT text FROM pages WHERE job=? AND view=? ORDER BY offset",arrayOf(job,view)).use { c -> buildString { while(c.moveToNext()) append(c.getString(0)) } }
+    private fun fallback(job:String,view:String):String {
+        if(cursor(job,view)>0L)return ""
+        return readableDatabase.rawQuery("SELECT data FROM history WHERE job=?",arrayOf(job)).use { c ->
+            if(!c.moveToFirst())"" else JSONObject(c.getString(0)).let { j ->
+                listOf(j.optString("stdout"),j.optString("stderr")).filter { it.isNotBlank() }
+                    .joinToString("\n") { RepoResultReceiver.redact(it).takeLast(4096) }
+            }
+        }
+    }
     fun notice(job: String, view: String): String = readableDatabase.rawQuery("SELECT MAX(truncated),MAX(legacy) FROM pages WHERE job=? AND view=?",arrayOf(job,view)).use {
         if(!it.moveToFirst()) "" else listOfNotNull(if(it.getInt(0)==1) "Журнал усечён по лимиту 5 MiB. Показаны все доступные сохранённые данные." else null,if(it.getInt(1)==1) "Старый runner сохранил только ограниченный фрагмент вывода." else null).joinToString("\n")
     }

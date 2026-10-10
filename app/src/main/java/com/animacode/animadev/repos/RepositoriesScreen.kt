@@ -120,11 +120,11 @@ fun RepositoriesScreen(context: Context, permitted: Boolean, termuxVersion: Stri
     }
     if (confirmInstall) AlertDialog(onDismissRequest = { confirmInstall = false }, title = { Text("Настроить локальный помощник?") },
         text = { Text("AnimaDev сохранит встроенный проверенный runner в ~/.local/share/animadev. Настройки Termux и файлы QuizApp не меняются.") },
-        confirmButton = { TextButton(onClick = { confirmInstall = false; gateway.install() }) { Text("Настроить") } },
-        dismissButton = { TextButton(onClick = { confirmInstall = false }) { Text("Отмена") } })
+        confirmButton = { com.animacode.animadev.projects.ActionButton(compact=true,onClick = { confirmInstall = false; gateway.install() }) { Text("Настроить") } },
+        dismissButton = { com.animacode.animadev.projects.ActionButton(compact=true,onClick = { confirmInstall = false }) { Text("Отмена") } })
     if (confirmSync) AlertDialog(onDismissRequest = { confirmSync = false }, title = { Text("Получить изменения AnimaQuiz?") },
         text = { Text("Только test/decomposition-v1 и fast-forward. Runner повторно проверит ветку, origin и локальные изменения. При любом расхождении остановится.") },
-        confirmButton = { TextButton(onClick = { confirmSync = false; gateway.start("SYNC", RepoGateway.PROJECT, com.animacode.animadev.projects.ProjectPolicy.QUIZ) }) { Text("Синхронизировать") } },
-        dismissButton = { TextButton(onClick = { confirmSync = false }) { Text("Отмена") } })
+        confirmButton = { com.animacode.animadev.projects.ActionButton(compact=true,onClick = { confirmSync = false; gateway.start("SYNC", RepoGateway.PROJECT, com.animacode.animadev.projects.ProjectPolicy.QUIZ) }) { Text("Синхронизировать") } },
+        dismissButton = { com.animacode.animadev.projects.ActionButton(compact=true,onClick = { confirmSync = false }) { Text("Отмена") } })
 }
 private fun Sequence<String>.takeLastLines(count: Int) = toList().takeLast(count).joinToString("\n")

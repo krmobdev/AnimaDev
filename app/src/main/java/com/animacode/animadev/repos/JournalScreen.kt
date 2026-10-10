@@ -122,12 +122,20 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
         onDispose { store.prefs.unregisterOnSharedPreferenceChangeListener(listener); cache.close() }
     }
     LaunchedEffect(requestedJob) { if(requestedJob.isNotEmpty())jobId=requestedJob }
-    LaunchedEffect(jobId,view,record.optLong("journal_generation")) {
+    LaunchedEffect(jobId,view,record.optLong("journal_generation"),record.optBoolean("ready"),record.optString("journal_message")) {
         prefs.edit().putString("journal_job",jobId).putString("journal_view",view).apply()
         withContext(Dispatchers.IO) {
+            val saved=listOfNotNull(record.optJSONObject("job"),record.optJSONObject("test_job"),
+                record.optJSONObject("device_test_job"),record.optJSONObject("build_job"))
+                .find { it.optString("job_id")==jobId }
+            if(saved!=null)cache.rememberJob(saved,saved.optString("project_id",RepoGateway.PROJECT))
             val history=cache.jobs(); var content=cache.text(jobId,view); var n=cache.notice(jobId,view)
+            if(cache.cursor(jobId,view)==0L)n=listOf(n,
+                if(!record.optBoolean("ready"))"Полный журнал ещё не загружен. Обновите помощник кнопкой ниже; сохранённый результат показан."
+                else record.optString("journal_message").takeIf { it.isNotBlank() && it!="Журнал получен" }
+                    ?: "Читаем полный журнал из Termux…").filter { it.isNotBlank() }.joinToString("\n")
             if(cache.cursor(jobId,view)==0L && record.optString("runner_version") != RepoGateway.VERSION) {
-                val legacy=listOfNotNull(record.optJSONObject("job"),record.optJSONObject("test_job")).find { it.optString("job_id")==jobId }
+                val legacy=listOfNotNull(record.optJSONObject("job"),record.optJSONObject("test_job"),record.optJSONObject("device_test_job"),record.optJSONObject("build_job")).find { it.optString("job_id")==jobId }
                 if(legacy!=null) {
                     n="Старый runner сохранил только ограниченный фрагмент. Полного вывода этого задания не существует."
                     content="AnimaQuiz · ${legacy.optString("action")}\nJob ID: $jobId\n${legacy.optString("state")} · exit=${legacy.optString("exit_code")}\nJUnit: ${legacy.optJSONObject("tests")?.let {TestSummary.format(it)} ?: "—"}\n"+
@@ -219,6 +227,12 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
             }
             if(showSearch)OutlinedTextField(search,{search=it},label={Text("Поиск по доступному журналу")},singleLine=true,modifier=Modifier.fillMaxWidth())
             if(notice.isNotEmpty())Text(notice,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
+            if(!record.optBoolean("ready"))com.animacode.animadev.projects.ActionButton(
+                onClick={gateway.install()},
+                enabled=com.animacode.animadev.termux.TermuxGateway(context).permitted() &&
+                    !record.optBoolean("pending") && !store.blocked()) {
+                Text("Обновить помощник")
+            }
         }
         if(loadAll || historyLoading || exporting)LinearProgressIndicator(Modifier.fillMaxWidth()) else HorizontalDivider()
         Box(Modifier.weight(1f)) {

@@ -50,11 +50,12 @@ def reports(root):
         result[path.name] = ((stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns, hashlib.sha256(data).hexdigest()), data)
     return result
 
-def summary(before, after):
+def summary(before, after, redact=lambda text:text):
     fresh = [data for name,(stamp,data) in after.items() if name not in before or before[name][0] != stamp]
     if not fresh: raise ReportError('REPORTS_MISSING')
     total = failed = skipped = 0
     duration = 0.0
+    failure_details = []
     for data in fresh:
         if b'<!DOCTYPE' in data.upper() or b'<!ENTITY' in data.upper(): raise ReportError('REPORTS_INVALID')
         try:
@@ -72,14 +73,31 @@ def summary(before, after):
                 case_fail = sum(case.find('failure') is not None or case.find('error') is not None for case in cases)
                 case_skip = sum(case.find('skipped') is not None for case in cases)
                 if n != len(cases) or case_fail != f+e or case_skip != sk or case_fail+case_skip > n or min(n,f,e,sk,d)<0 or not math.isfinite(d): raise ValueError()
+                for case in cases:
+                    failure = case.find('failure')
+                    if failure is None: failure = case.find('error')
+                    if failure is not None and len(failure_details)<10:
+                        safe=SafeLines(redact).feed(failure.get('message') or failure.text or 'Причина не указана')
+                        failure_details.append(dict(
+                            class_name=redact(case.get('classname') or suite.get('name') or '')[:160],
+                            test_name=redact(case.get('name') or '')[:160],
+                            message=safe[:400]))
                 rt += n; rf += f; re_count += e; rs += sk; duration += d
             if document.tag == 'testsuites':
                 for key,value in (('tests',rt),('failures',rf),('errors',re_count),('skipped',rs)):
                     if key in document.attrib and int(document.attrib[key]) != value: raise ValueError()
             total += rt; failed += rf+re_count; skipped += rs
         except (ET.ParseError, KeyError, ValueError, OverflowError): raise ReportError('REPORTS_INVALID')
-    return {'total':total,'passed':total-failed-skipped,'failed':failed,'skipped':skipped,
+    result={'total':total,'passed':total-failed-skipped,'failed':failed,'skipped':skipped,
             'duration_ms':round(duration*1000),'report_files':len(fresh)}
+    if failure_details:result['failure_details']=failure_details
+    return result
+
+def result_message(action,code):
+    if code in ('TESTS_FAILED','TEST_FAILED') and action=='TEST_DEVICE':
+        return 'Есть проваленные инструментальные тесты. Откройте журнал: там имена тестов и причины.'
+    return MESSAGES.get(code)
+
 
 def diagnostic(text, redact):
     text = redact(text)
@@ -191,7 +209,7 @@ def execute(guard, log, on_process, identity, redact, timeout=TIMEOUT, jid=''):
     code,unknown=process(guard.root,env,log,on_process,identity,redact,timeout,getattr(guard,'observe',lambda:None))
     if unknown:return dict(state='UNKNOWN',error_code='TEST_TIMEOUT_UNKNOWN',exit_code=None,snapshot=snapshot,tests=None,unresolved=True)
     result=dict(state='FAILED',error_code='GRADLE_FAILED',exit_code=code,snapshot=snapshot,tests=None)
-    try:result['tests']=summary(before,reports(guard.root))
+    try:result['tests']=summary(before,reports(guard.root),redact=redact)
     except ReportError as e:
         if code==0:result['error_code']=e.code
     after=guard.snapshot();guard.require(after,clean=bool(guard.project.get('dynamic')))
@@ -443,7 +461,7 @@ def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT,a
     if unknown:
         return dict(state='UNKNOWN',error_code='TEST_TIMEOUT_UNKNOWN',exit_code=None,snapshot=snapshot,tests=None,unresolved=True)
     result=dict(state='FAILED',error_code='GRADLE_FAILED',exit_code=code,snapshot=snapshot,tests=None)
-    try:result['tests']=summary(before,device_reports(guard.root,jid))
+    try:result['tests']=summary(before,device_reports(guard.root,jid),redact=redact)
     except ReportError as e:
         if code==0:result['error_code']=e.code
     # The target must remain exactly the same throughout installation and test run.
