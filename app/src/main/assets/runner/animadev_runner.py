@@ -383,6 +383,12 @@ class Engine:
             if not reconcile:
                 active = [json.loads(x[0]) for x in c.execute('SELECT data FROM jobs WHERE project=?', (project,))]
                 if any(x['state'] not in TERMINAL for x in active): raise Denied('JOB_BUSY')
+                # All build/test jobs share the same Termux Gradle resource pool,
+                # even when different projects have independent checkout paths.
+                if action in ('TEST', 'BUILD_DEBUG'):
+                    jobs = [json.loads(x[0]) for x in c.execute('SELECT data FROM jobs')]
+                    if any(x['state'] not in TERMINAL and x.get('action') in ('TEST', 'BUILD_DEBUG') for x in jobs):
+                        raise Denied('JOB_BUSY')
             if c.execute('SELECT COUNT(*) FROM jobs').fetchone()[0] >= 100:
                 raise Denied('HISTORY_FULL')
             j = {'job_id': jid, 'project_id': project, 'action': action, 'fingerprint': fp,
@@ -436,6 +442,7 @@ class Engine:
             self.store.update(jid, state='FAILED', error_code='PATH_DENIED', ended_at=time.time())
             return
         fd = os.open(lock_path, os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW, 0o600)
+        global_fd = None
         guard = None
         signals = self.monitor['Signals'](self.store,jid,self.registry[j['project_id']]['root'])
         def log(channel, content):
@@ -451,6 +458,12 @@ class Engine:
         log('event','Рабочий каталог: '+self.registry[j['project_id']]['root'])
         self.store.update(jid,last_progress_at=time.time(),stage='Проверка проекта')
         try:
+            if j['action'] in ('TEST', 'BUILD_DEBUG'):
+                global_path = self.store.root / '.build-global.lock'
+                if global_path.is_symlink(): raise Denied('PATH_DENIED')
+                global_fd = os.open(global_path, os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW, 0o600)
+                try: fcntl.flock(global_fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
+                except BlockingIOError: raise Denied('JOB_BUSY')
             try: fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
             except BlockingIOError: raise Denied('JOB_BUSY')
             guard = GitGuard(self.registry[j['project_id']], log, self.git_executable,
@@ -496,7 +509,9 @@ class Engine:
                 final=self.store.update(jid,computing=False)
                 log('event','Итог: '+final['state']+' · exit='+str(final.get('exit_code'))+' · '+final.get('message',''))
                 self.journal.flush(jid)
-            finally: os.close(fd)
+            finally:
+                os.close(fd)
+                if global_fd is not None: os.close(global_fd)
 
 def wire_job(job):
     result=dict(job)
