@@ -16,6 +16,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import com.animacode.animadev.repos.*
 import com.animacode.animadev.termux.TermuxGateway
@@ -49,22 +53,30 @@ import org.json.JSONObject
     val foundGroups=ProjectGrouping.groups(found.map {ProjectIdentity(it.id,it.path,it.repositoryPath,it.worktree)})
     val newProjects=foundGroups.mapNotNull {g->found.find {it.id==g.first().id}}.filter {candidate->primaryProjects.none {p->(p.repositoryPath.ifEmpty {p.path})==(candidate.repositoryPath.ifEmpty {candidate.path})}}
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=100.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=20.dp,bottom=110.dp),verticalArrangement=Arrangement.spacedBy(17.dp)) {
             item { Text("Репозитории: ${primaryProjects.size} · worktree: ${projects.count {it.worktree}}",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(bottom=8.dp)) }
             if(projects.isEmpty())item { Text("Добавьте существующий Git-репозиторий. Его файлы останутся на месте.",style=MaterialTheme.typography.bodyLarge) }
             items(primaryProjects,key={it.id}) { p ->
-                val snapshot=if(p.supported && record.optString("project_id","animaquiz")==p.id)record.optJSONObject("snapshot") else null
+                val snapshot=if(p.supported && record.optString("project_id","animaquiz")==p.id)
+                    record.optJSONObject("snapshot")?.takeIf {it.optString("branch")==p.branch &&
+                        it.optString("local_commit")==p.commit} else null
                 var menu by remember { mutableStateOf(false) }
-                val branch=snapshot?.optString("branch")?.ifEmpty { p.branch } ?: p.branch
+                val branch=p.branch.ifBlank {snapshot?.optString("branch").orEmpty()}
                 val dirty=snapshot?.optBoolean("dirty") ?: p.dirty
                 val active=p.supported && record.optString("project_id","animaquiz")==p.id && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
-                Card(onClick={onOpen(p)},colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
+                Card(onClick={onOpen(p)},shape=RoundedCornerShape(24.dp),
+                    colors=CardDefaults.cardColors(containerColor=AnimaPulse.panel),
+                    border=BorderStroke(1.dp,AnimaPulse.border)) {
                     Row(Modifier.fillMaxWidth().padding(start=16.dp,top=12.dp,bottom=12.dp,end=4.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-                        Surface(shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.secondaryContainer) { Icon(AppIcons.Folder,null,tint=MaterialTheme.colorScheme.onSecondaryContainer,modifier=Modifier.padding(10.dp)) }
+                        Surface(shape=RoundedCornerShape(15.dp),color=AnimaPulse.dark) { Icon(AppIcons.Folder,null,tint=AnimaPulse.green,modifier=Modifier.padding(10.dp)) }
                         Column(Modifier.weight(1f).padding(horizontal=12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-                            Text(p.name,style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
-                            Text(branch.ifEmpty { "Ветка не проверена" },style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(if(active)"${record.optString("action")} · ${MonitorPolicy.label(record.optString("state"),false,false)}" else if(p.error.isNotEmpty())"Нужна проверка" else if(p.worktree)"Worktree · только просмотр" else when(dirty){true->"Локальные изменения";false->"Чисто";else->"Не проверено"},style=MaterialTheme.typography.labelMedium,color=if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(p.name,style=MaterialTheme.typography.titleLarge,color=Color.White,
+                                fontWeight=FontWeight.ExtraBold,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text("● "+branch.ifEmpty { "Ветка не проверена" },
+                                style=MaterialTheme.typography.titleSmall,
+                                fontWeight=FontWeight.Bold,maxLines=1,
+                                overflow=TextOverflow.Ellipsis,color=AnimaPulse.green)
+                            Text(if(active)"${record.optString("action")} · ${MonitorPolicy.label(record.optString("state"),false,false)}" else if(p.error.isNotEmpty())"Нужна проверка" else if(p.worktree)"Worktree · только просмотр" else when(dirty){true->"Локальные изменения";false->"Чисто";else->"Не проверено"},style=MaterialTheme.typography.labelMedium,color=if(active)AnimaPulse.green else AnimaPulse.muted
                         }
                         Box { IconButton(onClick={haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick);menu=true}) {Icon(AppIcons.More,"Меню ${p.name}")}
                             DropdownMenu(menu,{menu=false}) {DropdownMenuItem(text={Text("Убрать из приложения")},onClick={menu=false;remove=p})}
