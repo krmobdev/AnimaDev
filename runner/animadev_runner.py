@@ -23,7 +23,7 @@ STATE_ROOT = HOME / '.local/share/animadev'
 FIXED_GIT = str(HOME.parent / 'usr/bin/git')
 FIXED_SSH = str(HOME.parent / 'usr/bin/ssh')
 REGISTRY = {'animaquiz': {'name': 'AnimaQuiz', 'root': str(HOME / 'quizapp'),
-    'origin': 'git@github.com:krmobdev/quizapp.git', 'branch': 'test/decomposition-v1'}}
+    'origin': 'git@github.com:krmobdev/quizapp.git', 'branch': 'test/decomposition-v1', 'allow_main': True}}
 ACTIONS = {'STATUS', 'CHECK', 'SYNC', 'TEST', 'BUILD_DEBUG'}
 # Dynamic profiles are validated against catalog-derived path and GitHub rules.
 DYNAMIC_REMOTE = re.compile(r'^github[.]com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)$')
@@ -295,7 +295,7 @@ class GitGuard:
             self.remote_url = raw if remote_ok else None
         changes = self.call(['status', '--porcelain=v1', '-z', '--untracked-files=all'])[1]
         names = [redact(x)[:200] for x in changes.split('\0') if x][:20]
-        allowed = branch == self.project['branch'] and (self.project.get('dynamic') or branch not in ('main','master'))
+        allowed = (branch == self.project['branch'] and (self.project.get('dynamic') or branch not in ('main','master'))) or (self.project.get('allow_main') and branch=='main')
         return {'name': self.project['name'], 'branch': branch, 'local_commit': sha,
             'dirty': bool(changes), 'changed_files': names, 'remote_ok': remote_ok,
             'branch_allowed': allowed, 'remote_commit': '', 'ahead': 0, 'behind': 0,
@@ -315,8 +315,11 @@ class GitGuard:
     def fetch(self, jid):
         ref = 'refs/animadev/' + jid
         # URL and refspec are fixed registry data, no configured helper or arbitrary remote.
+        branch=self.snapshot()['branch'] if self.project.get('allow_main') else self.project['branch']
+        if self.project.get('allow_main') and branch not in ('main','test/decomposition-v1'):
+            raise Denied('BRANCH_DENIED')
         code, _, diagnostic = self.call(['fetch', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head',
-            (self.remote_url if self.project.get('dynamic') else self.project['origin']), 'refs/heads/'+self.project['branch']+':'+ref], timeout=180, allow_failure=True)
+            (self.remote_url if self.project.get('dynamic') else self.project['origin']), 'refs/heads/'+branch+':'+ref], timeout=180, allow_failure=True)
         if code: raise Denied(classify_fetch_error(diagnostic), code)
         return self.text(['rev-parse', '--verify', ref+'^{commit}'])
     def execute(self, action, jid):
