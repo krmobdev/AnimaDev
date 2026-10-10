@@ -64,9 +64,9 @@ class ReleaseGateway(private val context:Context) {
 
     suspend fun launch(project:LocalProject,storePassword:String,keyPassword:String):String {
         val repo=RepoStore(context).read()
-        if(store.busy())return "Предыдущее Release-задание ещё не подтверждено."
+        if(store.busy())return "Release AAB уже выполняется или его результат неизвестен."
         if(!project.supported || !RepoGateway(context).mayBuild(repo,project.id)
-           || repo.optBoolean("pending") || context.checkSelfPermission(TermuxGateway.PERMISSION)!=android.content.pm.PackageManager.PERMISSION_GRANTED
+           || repo.optBoolean("pending") || RepoStore(context).blocked() || context.checkSelfPermission(TermuxGateway.PERMISSION)!=android.content.pm.PackageManager.PERMISSION_GRANTED
            || TermuxGateway(context).installedVersion()==null) {
             return "Сначала проверьте GitHub SHA и готовность Termux. Повторный запуск при активном задании запрещён."
         }
@@ -118,7 +118,13 @@ class ReleaseGateway(private val context:Context) {
             val server=try {LocalServerSocket(socketName)}
                 catch(_:Exception) {return "Android запретил защищённый локальный канал. Секреты не отправлены."}
             try {
-                if(!store.begin(project.id,request,sha))return "Не удалось сохранить идентификатор задания."
+                // Atomically reserve the only app-wide build slot before dispatch.
+                val reserved=synchronized(BuildConcurrencyPolicy.launchMonitor) {
+                    val current=RepoStore(context)
+                    if(current.blocked() || current.read().optBoolean("pending"))false
+                    else store.begin(project.id,request,sha)
+                }
+                if(!reserved)return "Уже выполняется другая операция Termux. Дождитесь подтверждения её результата."
                 val callbackIntent=Intent(context,ReleaseResultReceiver::class.java).apply {
                     action=ReleaseWire.CALLBACK
                     this.data=Uri.parse("animadev://release/$request")
