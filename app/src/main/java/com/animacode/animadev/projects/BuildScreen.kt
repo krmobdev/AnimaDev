@@ -83,7 +83,7 @@ import com.animacode.animadev.termux.TermuxGateway
                     }
                 },enabled=canRelease && releasePassword.isNotEmpty(),
                   modifier=Modifier.fillMaxWidth()) {Text("Собрать подписанный Release AAB")}
-                Text("Ключ и пароли передаются локально в Termux через stdin; в аргументах и настройках не сохраняются. Подпись использует анонимные файлы оперативной памяти.",
+                Text("Ключ и пароли передаются только по локальному Unix-сокету с проверкой UID приложений. В Intent, аргументах и настройках секретов нет. Для подписи используются анонимные файлы оперативной памяти.",
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 if(!canDebug)Text("Нужна предварительная проверка GitHub SHA и чистого проекта.",
                     style=MaterialTheme.typography.bodySmall)
