@@ -1,5 +1,17 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-11 00:07 GMT+03:00 · 0.4.0-beta.10-dev.34 (48)
+- RU: Продолжен скин Emerald Glass: экраны Tests (Unit / On device), History с фильтрами, Branches с активной веткой и Termux с реальными версиями инструментов.
+- EN: Continued Emerald Glass across Unit/Device tests, filtered History, active Branches and the real Termux tool inventory.
+- RU: Добавлены карточки подписи и состояния Release AAB без изменений защищённого обмена JKS/паролями; оформление Git, SHA и журналов основано на реальных данных.
+- EN: Styled Release AAB signing and status while keeping the existing protected keystore/password transfer and real Git/job data.
+- RU: Обновлены главное меню Settings и About, сохранив все прежние настройки и рабочую ссылку GitHub.
+- EN: Styled Settings and About without changing preferences, and preserved the working GitHub link.
+- RU: В Emerald Projects добавлено рабочее меню перехода к настройкам, истории изменений и документации; старый Pulse доступен по-прежнему.
+- EN: Added a functioning Emerald Projects menu for Settings, Change log, About and Documentation; Pulse remains available.
+- RU: UI-тесты компилируются, реальный запуск на Android и визуальная приёмка владельцем всё ещё необходимы.
+- EN: Device UI tests require a real Android run and owner visual acceptance.
+
 ## 2026-10-10 23:50 GMT+03:00 · 0.4.0-beta.10-dev.33 (47)
 - RU: Начат отдельный скин Emerald Glass по утверждённым макетам: чёрно-графитовая палитра, зелёные акценты, стеклянные карточки и векторная графика Compose.
 - EN: Started the opt-in Emerald Glass skin from approved references: dark graphite, emerald highlights, frosted cards and Compose-drawn vector graphics.
