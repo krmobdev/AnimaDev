@@ -1,5 +1,17 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-11 01:25 GMT+03:00 · 0.4.0-beta.10-dev.36 (50)
+- RU: Emerald Glass: нижняя навигация автоматически адаптируется к экрану менее 360 dp и увеличенному шрифту; статусы могут переноситься на две строки.
+- EN: Emerald Glass bottom navigation adapts to screens below 360 dp and large font settings; status badges support wrapping.
+- RU: Четырёхпозиционные вкладки (история и журналы) прокручиваются на узких экранах, выбор плавно анимируется без тяжёлых эффектов.
+- EN: Four-item tabs scroll on narrow screens; selection uses lightweight color animation.
+- RU: Рабочий экран проекта адаптирует ветку, SHA, кнопки и сетку инструментов при крупном шрифте. Добавлено экономное кэшированное зелёное свечение карточек.
+- EN: Project dashboard adapts branch/SHA controls and tool tiles for large fonts; adds cached ambient card glow.
+- RU: Добавлены UI-тесты навигации и вкладок с крупным шрифтом; запускаются только в отдельном пакете devicefixture, не затрагивая установленный AnimaDev.
+- EN: Added large-font UI tests using an isolated devicefixture package, separate from the installed AnimaDev.
+- RU: Визуальная приёмка по референсам и фактическая оценка 60 fps ещё необходимы.
+- EN: Reference matching and on-device frame pacing validation are still required.
+
 ## 2026-10-11 00:19 GMT+03:00 · 0.4.0-beta.10-dev.35 (49)
 - RU: Emerald Glass: переработаны монитор задания, живой журнал и журнал Release AAB с реальными статусами, этапами, временем, фильтрами и экспортом. Секреты не сохраняются в журнале.
 - EN: Emerald Glass adds a redesigned live job monitor, streaming journal and sanitized Release AAB timeline with real statuses, stages, elapsed time, filters and export.
