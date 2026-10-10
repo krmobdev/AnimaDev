@@ -120,7 +120,21 @@ class MainActivity:ComponentActivity() {
                 }}
             ) { padding -> Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when {
-                    route=="settings"->AppearanceSettings(context,theme,dynamic,{theme=it;settings.edit().putString("theme",it).apply()},{dynamic=it;settings.edit().putBoolean("dynamic",it).apply()},settingsSection,{settingsSection=it})
+                    route=="settings"->AppearanceSettings(
+                        context,theme,dynamic,
+                        {theme=it;settings.edit().putString("theme",it).apply()},
+                        {dynamic=it;settings.edit().putBoolean("dynamic",it).apply()},
+                        settingsSection,{settingsSection=it},
+                        onOpenBuild={projectId->
+                            val project=projects.all().firstOrNull {it.id==projectId && it.supported}
+                            if(project!=null) {
+                                projects.select(project.id)
+                                selected=project.id
+                                top="projects"
+                                settingsSection=""
+                                route="build"
+                            }
+                        })
                     top=="termux"->TermuxOverview(context,permitted,version) { permitted=termux.permitted() }
                     route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
                     route=="branches"->BranchesScreen(context,current,permitted)
