@@ -31,6 +31,11 @@ object RepoPolicy {
         "UNKNOWN" -> "Результат неизвестен"
         else -> "Не запускались"
     }
+    // Query never retries START. The SHA is from a previously installed
+    // local runner, not a user-entered value.
+    fun canRecoverJob(pending:Boolean,jobId:String,jobRunnerSha:String,installedSha:String):Boolean =
+        !pending && jobId.matches(Regex("[a-f0-9]{32}")) &&
+            (jobRunnerSha.ifBlank {installedSha}).matches(Regex("[a-f0-9]{64}"))
     fun runnerForQuery(mode: String, current: String, job: String, installed: String, legacy: String): String =
         if (mode == "START") current else job.ifEmpty { installed.ifEmpty { legacy } }
     val activeStates = setOf("REQUESTED", "QUEUED", "RUNNING", "UNKNOWN")
