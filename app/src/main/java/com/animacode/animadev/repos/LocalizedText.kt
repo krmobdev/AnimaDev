@@ -30,7 +30,7 @@ import com.animacode.animadev.projects.*
     style:TextStyle=LocalTextStyle.current
 ) {
     MaterialText(
-        text=AppTranslation.translate(text,AppLanguage.english(LocalAppLanguage.current,LocalConfiguration.current.locales[0].language)),
+        text=NeonStrings.display(text,AppLanguage.english(LocalAppLanguage.current,LocalConfiguration.current.locales[0].language),LocalNeonSkin.current),
         modifier=modifier,color=color,fontSize=fontSize,fontStyle=fontStyle,
         fontWeight=fontWeight,fontFamily=fontFamily,letterSpacing=letterSpacing,
         textDecoration=textDecoration,textAlign=textAlign,lineHeight=lineHeight,
