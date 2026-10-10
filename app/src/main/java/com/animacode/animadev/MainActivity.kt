@@ -92,7 +92,12 @@ class MainActivity:ComponentActivity() {
                 while(true) {
                     store.expire();CatalogGateway(context).expire()
                     val r=store.read()
-                    if(!r.optBoolean("pending") && r.optBoolean("ready") && r.optString("job_id").isNotEmpty() && (restore || (store.blocked() && System.currentTimeMillis()-r.optLong("last_confirmed")>=5000))) { gateway.query();restore=false }
+                    if(RepoPolicy.canRecoverJob(r.optBoolean("pending"),r.optString("job_id"),
+                        r.optString("job_runner_sha"),r.optString("installed_sha")) &&
+                        (restore || (store.blocked() &&
+                            System.currentTimeMillis()-r.optLong("last_confirmed")>=5000))) {
+                        gateway.query();restore=false
+                    }
                     delay(2000)
                 }
             }
