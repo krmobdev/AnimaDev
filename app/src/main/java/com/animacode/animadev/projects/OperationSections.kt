@@ -140,14 +140,16 @@ object OperationResultPolicy {
             ActionButton(onClick={
                 if(apk) {
                     val direct=destination.artifactUri(artifact.optString("path"))
+                        ?: ArtifactGateway.rememberedUri(context,artifact)
                     if(direct!=null)scope.launch {ArtifactGateway.install(context,artifact,direct)}
                     else picker.launch(arrayOf("application/vnd.android.package-archive","application/octet-stream"))
                 } else ArtifactGateway.openFolder(context,artifact)
             }) {
                 Text(if(apk)"Установить APK" else "Открыть папку")
             }
-            if(apk && destination.artifactUri(artifact.optString("path"))==null)
-                Text("Выберите этот APK в системном проводнике. Перед установкой проверим его SHA-256.",
+            if(apk && destination.artifactUri(artifact.optString("path"))==null &&
+                ArtifactGateway.rememberedUri(context,artifact)==null)
+                Text("При первом нажатии выберите этот APK в системном проводнике. Затем откроется установщик Android.",
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             ActionButton(onClick={details=!details}) {Text(if(details)"Скрыть сведения о файле" else "Сведения о файле")}
             if(details) {
