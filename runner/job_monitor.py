@@ -119,13 +119,44 @@ class Journal:
         keys=('job_id','project_id','action','state','created_at','started_at','ended_at','exit_code')
         return dict(items=[{k:j.get(k) for k in keys} for j in jobs[offset:offset+20]],next_offset=offset+20,more=len(jobs)>offset+20)
 
+def available_memory_mib(path='/proc/meminfo'):
+    """Linux/Android MemAvailable, not invented from free/swap estimates."""
+    try:
+        with open(path, 'r', encoding='ascii') as file:
+            for line in file:
+                if line.startswith('MemAvailable:'):
+                    parts=line.split()
+                    return round(int(parts[1])/1024) if len(parts)>2 and parts[2]=='kB' else None
+    except (OSError,ValueError,UnicodeError): pass
+    return None
+
+def process_rss_mib(pid):
+    if not pid: return None
+    try:
+        with open('/proc/%d/status'%pid,'r',encoding='ascii') as file:
+            for line in file:
+                if line.startswith('VmRSS:'):
+                    parts=line.split()
+                    return round(int(parts[1])/1024,1) if len(parts)>2 and parts[2]=='kB' else None
+    except (OSError,ValueError,UnicodeError): pass
+    return None
+
+def cpu_usage_percent(previous_ticks, current_ticks, seconds, hz=None):
+    """Percent of one logical CPU; values above 100% mean multithreaded work."""
+    if previous_ticks is None or current_ticks is None or seconds<=0 or current_ticks<previous_ticks:return None
+    try: hz=hz or os.sysconf('SC_CLK_TCK')
+    except (OSError,ValueError):return None
+    if hz<=0:return None
+    return round(max(0.0,(current_ticks-previous_ticks)*100.0/(seconds*hz)),1)
+
 class Signals:
     def __init__(self, store, jid, root):
         self.store,self.jid,self.root=store,jid,pathlib.Path(root)
-        self.last_check=0; self.cpu=None; self.report_stamp=None
+        self.last_check=0; self.cpu=None; self.cpu_sample_at=None; self.report_stamp=None
     def tick(self, force=False):
         now=time.time()
         if not force and now-self.last_check<2: return
+        sample_seconds=now-self.cpu_sample_at if self.cpu_sample_at is not None else 0
         self.last_check=now
         with self.store.transaction() as c: j=self.store.get(c,self.jid)
         pid=j.get('child_pid'); alive=None; ticks=None
@@ -144,7 +175,9 @@ class Signals:
                         except (OSError,ValueError,IndexError): pass
             except (OSError,ValueError,IndexError): pass
         computed=ticks is not None and self.cpu is not None and ticks>self.cpu
+        cpu_percent=cpu_usage_percent(self.cpu,ticks,sample_seconds)
         self.cpu=ticks
+        self.cpu_sample_at=now
         stamp=None
         if j['action']=='TEST':
             directory=self.root/'app/build/test-results/testDebugUnitTest'
@@ -155,7 +188,10 @@ class Signals:
             except OSError: pass
         changed=stamp is not None and self.report_stamp is not None and stamp!=self.report_stamp
         self.report_stamp=stamp
-        updates=dict(observed_at=now,process_alive=alive,cpu_available=ticks is not None,computing=computed)
+        updates=dict(observed_at=now,process_alive=alive,cpu_available=ticks is not None,
+                     computing=computed,cpu_percent=cpu_percent,
+                     memory_available_mib=available_memory_mib(),
+                     process_rss_mib=process_rss_mib(pid) if alive else None)
         if computed or changed: updates.update(last_progress_at=now,progress_signal='CPU' if computed else 'REPORTS')
         self.store.update(self.jid,**updates)
     def output(self, text):
