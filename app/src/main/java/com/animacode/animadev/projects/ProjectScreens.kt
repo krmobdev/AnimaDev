@@ -146,8 +146,6 @@ import org.json.JSONObject
         verticalArrangement=Arrangement.spacedBy(22.dp)) {
         item {
             Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                Text("PROJECT CONTROL",style=MaterialTheme.typography.labelLarge,
-                    color=AnimaPulse.green)
                 Text(project.name,style=MaterialTheme.typography.headlineLarge,
                     fontWeight=androidx.compose.ui.text.font.FontWeight.ExtraBold)
                 if(catalog.optBoolean("pending"))
