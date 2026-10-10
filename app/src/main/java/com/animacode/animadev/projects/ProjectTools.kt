@@ -106,6 +106,7 @@ import com.animacode.animadev.repos.*
         } else {
             val prepared=belongs && snap!=null && gateway.mayTest(r,project.id)
             val canRun=available && prepared
+            val canRunDevice=available && !adbPending
             val needStatus=r.optString("project_id","animaquiz")!=project.id || snap==null
             item {
                 OutlinedCard(shape=androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
@@ -172,9 +173,8 @@ import com.animacode.animadev.repos.*
                         Text(adbState,style=MaterialTheme.typography.bodyMedium,
                             color=if(deviceReady)MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Сопряжение ADB не подключает устройство. "+
-                            "На основном экране «Беспроводная отладка» Pixel указан "+
-                            "отдельный IP:порт для подключения.",
+                        Text("Для Wi-Fi укажи IP:порт с основного экрана беспроводной отладки Pixel. "+
+                            "Это не порт из окна сопряжения.",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
                         OutlinedTextField(value=adbEndpoint,onValueChange={adbEndpoint=it.take(45)},
@@ -208,33 +208,41 @@ import com.animacode.animadev.repos.*
                             Spacer(Modifier.width(8.dp))
                             Text(if(adbPending)"Проверяем ADB…" else "Проверить устройства · adb devices")
                         }
-                        // ADB readiness expires after 90 seconds; that is only a UI hint.
-                        // The Termux runner independently checks adb devices -l immediately
-                        // before Gradle. Never permanently disable instrumentation based
-                        // on a stale SharedPreferences snapshot.
+                        // The device runner checks the branch, origin, clean worktree,
+                        // GitHub SHA and ADB immediately before running Gradle. It does
+                        // not need the separate Unit-tests STATUS screen or cached ADB age.
                         Button(onClick={gateway.start("TEST_DEVICE",project.id,project.path)},
-                            enabled=canRun && !adbPending,
+                            enabled=canRunDevice,
                             modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
                             Icon(AppIcons.Tests,null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Запустить тесты на устройстве")
+                            Text("Запустить инструментальные тесты")
                         }
-                        if(!deviceReady)Text("ADB пока не подтвердил устройство или проверка устарела. "+
-                            "Кнопка запуска доступна: Termux перепроверит adb devices -l "+
-                            "перед Gradle и сообщит ADB_NOT_READY, если Pixel не подключён. "+
-                            "Для Wi-Fi укажите IP:порт с основного экрана беспроводной отладки "+
-                            "(не порт сопряжения); VPN может мешать локальному соединению.",
+                        Text(if(deviceReady)
+                            "ADB подтвердил Pixel. Перед запуском Gradle устройство будет проверено ещё раз."
+                            else "Pixel ещё не подтверждён. Подключи его через ADB. "+
+                                "Запуск доступен: Termux проверит подключение и покажет "+
+                                "точную ошибку вместо молчаливой блокировки.",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("GitHub, ветка и чистота проекта проверяются автоматически "+
+                            "при запуске. Переходить в Unit-тесты не нужно.",
+                            style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        if(!canRunDevice && !adbPending && !activeOrUnknown) {
+                            Text(when {
+                                !permitted -> "Нет разрешения на запуск команд в Termux."
+                                termuxVersion==null -> "Termux не найден."
+                                !ready -> "Обнови помощник Termux кнопкой выше."
+                                else -> "Сейчас выполняется другое задание. Дождись завершения."
+                            },style=MaterialTheme.typography.bodySmall,
+                                color=MaterialTheme.colorScheme.error)
+                        }
                         if(activeOrUnknown && r.optString("job_id").isNotBlank()) {
                             OutlinedButton(onClick={gateway.query(true)},enabled=canRecover,
                                 modifier=Modifier.fillMaxWidth()) {
                                 Text("Уточнить статус предыдущего задания")
                             }
-                        } else if(!prepared && ready) {
-                            Text("Подготовьте Git-снимок в разделе Unit-тесты. "+
-                                "ADB можно подключать независимо от готовности Gradle.",
-                                style=MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
