@@ -301,6 +301,53 @@ def adb_devices(run=subprocess.run, adb='/data/data/com.termux/files/usr/bin/adb
     except (OSError,subprocess.TimeoutExpired):
         return []
 
+def valid_wifi_endpoint(endpoint):
+    """Only explicit RFC1918 IPv4:port; no guessing, pairing or port scans."""
+    if type(endpoint) is not str or len(endpoint)>22:
+        return False
+    match=re.fullmatch(r'([0-9]{1,3}(?:[.][0-9]{1,3}){3}):([0-9]{4,5})',endpoint)
+    if not match:return False
+    parts=[int(piece) for piece in match.group(1).split('.')]
+    port=int(match.group(2))
+    return 1024<=port<=65535 and all(n<=255 for n in parts) and (
+        parts[0]==10 or parts[0]==172 and 16<=parts[1]<=31 or
+        parts[:2]==[192,168])
+
+
+def connect_known_adb_endpoint(endpoint, run=subprocess.run,
+                               adb='/data/data/com.termux/files/usr/bin/adb'):
+    """Reconnect a confirmed prior Wi-Fi endpoint; never reset any other device."""
+    if not valid_wifi_endpoint(endpoint):return False
+    try:
+        result=run([adb,'connect',endpoint],stdin=subprocess.DEVNULL,
+                   stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+                   timeout=12,check=False)
+        # Successful subprocess return alone does not establish authorization.
+        # Caller must recheck adb devices -l.
+        return result.returncode==0
+    except (OSError,subprocess.TimeoutExpired):
+        return False
+
+
+def reconnect_offline_adb(run=subprocess.run, adb='/data/data/com.termux/files/usr/bin/adb'):
+    """Reconnect one stale LAN transport, without disconnecting anyone else."""
+    try:
+        result=run([adb,'devices','-l'],stdin=subprocess.DEVNULL,
+                   stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+                   timeout=10,check=False)
+        if result.returncode or len(result.stdout)>16000:return False
+        entries=[]
+        for line in result.stdout.decode('utf-8','replace').splitlines()[1:]:
+            fields=line.split()
+            if len(fields)>=2 and not fields[0].startswith('emulator-'):
+                if not re.fullmatch(r'[A-Za-z0-9._:-]{4,128}',fields[0]):
+                    return False
+                entries.append((fields[0],fields[1]))
+        if len(entries)!=1 or entries[0][1]!='offline':return False
+        return connect_known_adb_endpoint(entries[0][0],run=run,adb=adb)
+    except (OSError,ValueError,subprocess.TimeoutExpired):
+        return False
+
 def device_reports(root):
     folder=pathlib.Path(root)/DEVICE_RESULTS
     if folder.is_symlink() or folder.resolve()!=folder.absolute():raise ReportError('REPORTS_INVALID')
@@ -318,7 +365,7 @@ def device_reports(root):
         result[str(p.relative_to(folder))]=((st.st_ino,st.st_mtime_ns,st.st_ctime_ns,hashlib.sha256(data).hexdigest()),data)
     return result
 
-def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT):
+def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT,adb_endpoint=''):
     snapshot=guard.snapshot()
     guard.require(snapshot,clean=True)
     if guard.project.get('dynamic'):
@@ -332,6 +379,12 @@ def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT):
         if snapshot['local_commit']!=remote or snapshot['ahead'] or snapshot['behind']:
             return dict(state='FAILED',error_code='BUILD_OUTDATED',exit_code=None,snapshot=snapshot,tests=None)
     devices=adb_devices()
+    if not devices and adb_endpoint and connect_known_adb_endpoint(adb_endpoint):
+        devices=adb_devices()
+        log('event','ADB: проверено повторное подключение по сохранённому адресу')
+    if not devices and reconnect_offline_adb():
+        devices=adb_devices()
+        log('event','ADB: попытка восстановления единственного offline Wi-Fi устройства')
     if len(devices)!=1:
         log('event','ADB: ожидается одно подключённое авторизованное устройство; сейчас '+str(len(devices)))
         return dict(state='FAILED',error_code='ADB_NOT_READY',exit_code=None,snapshot=snapshot,tests=None)

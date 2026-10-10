@@ -33,7 +33,13 @@ class MainActivity:ComponentActivity() {
     private var requestedJournal by mutableStateOf("")
     private var requestedRelease by mutableStateOf(false)
     private val termux by lazy { TermuxGateway(this) }
-    override fun onResume() { super.onResume();permitted=termux.permitted();version=termux.installedVersion() }
+    override fun onResume() {
+        super.onResume()
+        permitted=termux.permitted()
+        version=termux.installedVersion()
+        // Restore a previously authorized Pixel, never during a running Gradle job.
+        if(permitted && version!=null) AdbDeviceGateway(this).autoRestore()
+    }
     override fun onNewIntent(intent:Intent) { super.onNewIntent(intent);setIntent(intent);requestedJournal=intent.getStringExtra("journal_job") ?: "";requestedRelease=intent.getBooleanExtra("open_release",false) }
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState);enableEdgeToEdge();requestedJournal=NavigationState.notificationTarget(intent.getStringExtra("journal_job") ?: "",savedInstanceState!=null)

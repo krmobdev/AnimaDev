@@ -9,9 +9,25 @@ import com.animacode.animadev.termux.TermuxGateway
 import org.json.JSONObject
 import java.util.UUID
 
-/** Read-only ADB discovery inside Termux; never starts an activity on the device. */
+/** Scoped ADB discovery/recovery inside Termux; never resets the shared ADB server. */
 class AdbDeviceGateway(private val context:Context) {
     val prefs=context.getSharedPreferences("adb_status_v1",Context.MODE_PRIVATE)
+    /** Remember only ADB endpoints confirmed as authorized, never pairing endpoints. */
+    fun rememberedEndpoint():String=prefs.getString("preferred_endpoint","").orEmpty()
+        .takeIf(::validLanEndpoint).orEmpty()
+    /** On foreground return, recover only when no Gradle/Release job is active.
+     *  Never interrupt a running build or force-close a device connection.
+     */
+    fun autoRestore() {
+        expire()
+        if(com.animacode.animadev.repos.RepoStore(context).blocked() ||
+            ReleaseStore(context).busy())return
+        val now=System.currentTimeMillis()
+        if(prefs.getBoolean("pending",false) ||
+            now-prefs.getLong("auto_checked_at",0) in 0..59_999)return
+        prefs.edit().putLong("auto_checked_at",now).apply()
+        refresh(rememberedEndpoint())
+    }
     fun recentDevice():Boolean {
         return prefs.getInt("count",0)==1 && !prefs.getBoolean("pending",false) &&
             System.currentTimeMillis()-prefs.getLong("verified_at",0) in 0..90_000
@@ -159,8 +175,13 @@ class AdbDeviceReceiver:BroadcastReceiver() {
             } ?: "TRANSPORT_ERROR"
             if(count==1)check(serial.matches(Regex("[A-Za-z0-9._:-]{4,128}")))
         } catch(_:Exception) {count=0;serial="";offline=0;unauthorized=0;connection="TRANSPORT_ERROR"}
-        gateway.prefs.edit().putBoolean("pending",false).remove("request")
+        val editor=gateway.prefs.edit().putBoolean("pending",false).remove("request")
             .putInt("count",count).putLong("verified_at",System.currentTimeMillis())
+        // ADB lists the actual transport port, not the six-digit pairing port.
+        // Preserve it even after an app restart, but never overwrite with offline.
+        if(count==1 && AdbDeviceGateway.validLanEndpoint(serial))
+            editor.putString("preferred_endpoint",serial)
+        editor
             .putString("message",when(count) {
                 1->"Устройство готово: $serial"
                 0->when(connection) {

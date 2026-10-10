@@ -145,6 +145,30 @@ class Fixture(unittest.TestCase):
         self.assertEqual(result['state'],'INTERRUPTED')
         self.assertEqual(result['error_code'],'CANCELLED')
 
+    def test_device_job_persists_validated_preferred_endpoint(self):
+        jid=uuid.uuid4().hex
+        j=self.engine.start(jid,'animaquiz','TEST_DEVICE',spawn=False,
+                            adb_endpoint='192.168.1.132:44163')
+        self.assertEqual(j['adb_endpoint'],'192.168.1.132:44163')
+        self.assertEqual(self.engine.start(jid,'animaquiz','TEST_DEVICE',spawn=False,
+                            adb_endpoint='192.168.1.132:44163')['job_id'],jid)
+        with self.assertRaises(Denied) as cm:
+            self.engine.start(jid,'animaquiz','TEST_DEVICE',spawn=False,
+                              adb_endpoint='192.168.1.132:45555')
+        self.assertEqual(cm.exception.code,'REPLAY_CONFLICT')
+
+    def test_no_arbitrary_endpoint_or_non_test_device_payload(self):
+        for endpoint in ('127.0.0.1:44163','8.8.8.8:44163','192.168.1.132:0',
+                         '192.168.1.132:70000','192.168.1.132:44163;exit'):
+            with self.subTest(endpoint=endpoint):
+                with self.assertRaises(Denied) as cm:
+                    self.engine.start(uuid.uuid4().hex,'animaquiz','TEST_DEVICE',
+                                      spawn=False,adb_endpoint=endpoint)
+                self.assertEqual(cm.exception.code,'RESULT_MALFORMED')
+        with self.assertRaises(Denied):
+            self.engine.start(uuid.uuid4().hex,'animaquiz','TEST',
+                              spawn=False,adb_endpoint='192.168.1.132:44163')
+
     def test_cancel_running_verified_job_sets_one_shot_flag(self):
         jid=uuid.uuid4().hex
         self.engine.start(jid,'animaquiz','TEST',spawn=False)

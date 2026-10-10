@@ -220,6 +220,46 @@ class GradleFixture(unittest.TestCase):
 
 
 
+class OfflineAdbRecovery(unittest.TestCase):
+    """Only one offline LAN address may be reconnected; never kill-server."""
+    def simulate(self, rows, connect_code=0):
+        commands=[]
+        def fake(argv, **kw):
+            commands.append(tuple(argv[1:]))
+            if argv[1]=='devices':
+                return subprocess.CompletedProcess(argv,0,
+                    ('List of devices attached\\n'+rows).replace('\\n','\n').encode(),b'')
+            if argv[1]=='connect':
+                return subprocess.CompletedProcess(argv,connect_code,b'connected to Pixel',b'')
+            raise AssertionError(argv)
+        result=gt.reconnect_offline_adb(run=fake)
+        return result,commands
+
+    def test_single_offline_wifi_reconnects_only_that_serial(self):
+        ready,commands=self.simulate('192.168.1.132:44163 offline\\n')
+        self.assertTrue(ready)
+        self.assertEqual(commands,[('devices','-l'),('connect','192.168.1.132:44163')])
+
+    def test_live_connection_is_reused_without_commands(self):
+        ready,commands=self.simulate('192.168.1.132:44163 device\\n')
+        self.assertFalse(ready)
+        self.assertEqual(commands,[('devices','-l')])
+
+    def test_never_reconnect_unauthorized_or_usb_or_multiple(self):
+        for rows in ('ADB1234 unauthorized\\n','ADB1234 offline\\n',
+                     '192.168.1.132:44163 offline\\nADB1234 device\\n',
+                     '127.0.0.1:5000 offline\\n', '192.168.1.132:0 offline\\n'):
+            with self.subTest(rows=rows):
+                ready,commands=self.simulate(rows)
+                self.assertFalse(ready)
+                self.assertEqual(commands,[('devices','-l')])
+
+    def test_failure_does_not_claim_success(self):
+        ready,commands=self.simulate('192.168.1.132:44163 offline\\n',connect_code=1)
+        self.assertFalse(ready)
+        self.assertEqual(len(commands),2)
+
+
 class InstrumentationFixture(unittest.TestCase):
     """Exercise the complete guarded Gradle device-test path with a fake wrapper."""
     setUp=base.Fixture.setUp
@@ -249,7 +289,8 @@ class InstrumentationFixture(unittest.TestCase):
 
     def exercise(self, devices):
         guard=runner.GitGuard(self.project,git_executable=self.engine.git_executable)
-        with patch.object(gt,'adb_devices',return_value=devices):
+        with patch.object(gt,'adb_devices',return_value=devices), \
+             patch.object(gt,'reconnect_offline_adb',return_value=False):
             return gt.execute_device(guard,lambda *a:None,lambda *a:None,
                                      runner.identity,runner.redact,jid=uuid.uuid4().hex)
 
@@ -263,6 +304,19 @@ class InstrumentationFixture(unittest.TestCase):
         self.assertEqual((self.repo/'app/build/device-args.txt').read_text().splitlines(),
                          list(gt.DEVICE_COMMAND[1:]))
         self.assertEqual(base.git(self.repo,'rev-parse','HEAD'),self.before)
+
+    def test_saved_endpoint_recovers_missing_transport_before_gradle(self):
+        self.prepare()
+        guard=runner.GitGuard(self.project,git_executable=self.engine.git_executable)
+        device='192.168.1.132:44163'
+        with patch.object(gt,'adb_devices',side_effect=[[],[device],[device]]), \
+             patch.object(gt,'connect_known_adb_endpoint',return_value=True) as connect, \
+             patch.object(gt,'reconnect_offline_adb',return_value=False) as fallback:
+            result=gt.execute_device(guard,lambda *a:None,lambda *a:None,
+                runner.identity,runner.redact,jid=uuid.uuid4().hex,adb_endpoint=device)
+        self.assertEqual(result['state'],'SUCCEEDED',result)
+        connect.assert_called_once_with(device)
+        fallback.assert_not_called()
 
     def test_missing_device_blocks_gradle_before_launch(self):
         self.prepare()

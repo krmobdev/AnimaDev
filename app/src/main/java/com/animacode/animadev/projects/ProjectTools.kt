@@ -22,7 +22,7 @@ import com.animacode.animadev.repos.*
     val gateway=remember {RepoGateway(context)};val r=rememberRepoRecord(context);val store=remember {RepoStore(context)}
     val adb=remember {AdbDeviceGateway(context)}
     var adbVersion by remember {mutableIntStateOf(0)}
-    var adbEndpoint by rememberSaveable(project.id) { mutableStateOf("") }
+    var adbEndpoint by rememberSaveable(project.id) { mutableStateOf(adb.rememberedEndpoint()) }
     var deviceActionMessage by rememberSaveable(project.id) { mutableStateOf("") }
     LaunchedEffect(adb) {
         while(true) {

@@ -191,6 +191,10 @@ class RepoGateway(private val context: Context) {
             .put("job_id", target.ifEmpty { r.getString("job_id") }).put("action", targetAction.ifEmpty { r.getString("action") })
             .put("project_id", r.optString("project_id",PROJECT))
         if (mode=="START" && r.has("profile")) payload.put("profile",r.getJSONObject("profile"))
+        if (mode=="START" && r.optString("action")=="TEST_DEVICE") {
+            val endpoint=com.animacode.animadev.projects.AdbDeviceGateway(context).rememberedEndpoint()
+            if(endpoint.isNotEmpty()) payload.put("adb_endpoint",endpoint)
+        }
         if (mode in setOf("LOG","HISTORY")) payload.put("offset",offset).put("view",view)
         val script = """
             import pathlib,hashlib,json,sys
