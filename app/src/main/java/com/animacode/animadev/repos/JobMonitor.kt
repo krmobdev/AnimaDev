@@ -18,6 +18,7 @@ import java.util.Locale
 
 @Composable
 fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJournal: (String)->Unit) {
+    val locale=androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val settings=remember { context.getSharedPreferences("monitor_settings",Context.MODE_PRIVATE) }
     val store=remember { RepoStore(context) }; val gateway=remember { RepoGateway(context) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -50,7 +51,7 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
             },style=MaterialTheme.typography.titleMedium)
             Text(MonitorPolicy.label(state,quiet,warning))
             if(details)Text("Job ID: $jid",style=MaterialTheme.typography.bodySmall)
-            if(details)Text("Начало: ${if(start>0)SimpleDateFormat("dd.MM HH:mm:ss",Locale.getDefault()).format(Date(start)) else "не подтверждено"}")
+            if(details)Text("Начало: ${if(start>0)SimpleDateFormat("dd.MM HH:mm:ss",locale).format(Date(start)) else "не подтверждено"}")
             Text("Прошло: ${maxOf(0,elapsed)/60_000} мин ${maxOf(0,elapsed)/1000%60} с")
             if(job?.optBoolean("cancel_requested")==true)
                 Text("Отмена запрошена · ожидаем остановку Gradle",color=MaterialTheme.colorScheme.error,
@@ -62,13 +63,13 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
                 Text("Процесс: "+when(alive) {true->"работает";false->"не обнаружен";else->"статус неизвестен"},
                     style=MaterialTheme.typography.bodySmall)
                 val cpu=job?.optDouble("cpu_percent",Double.NaN) ?: Double.NaN
-                Text("CPU процесса Gradle: "+if(cpu.isFinite() && cpu>=0)"%.1f%%".format(java.util.Locale.getDefault(),cpu) else "нет доступа к счётчикам",
+                Text("CPU процесса Gradle: "+if(cpu.isFinite() && cpu>=0)"%.1f%%".format(locale,cpu) else "нет доступа к счётчикам",
                     style=MaterialTheme.typography.bodySmall)
                 val ram=job?.optInt("memory_available_mib",-1) ?: -1
                 Text("Свободно доступной RAM устройства: "+if(ram>=0)"$ram МиБ" else "показатель недоступен",
                     style=MaterialTheme.typography.bodySmall)
                 val rss=job?.optDouble("process_rss_mib",Double.NaN) ?: Double.NaN
-                Text("RAM процесса (RSS): "+if(rss.isFinite() && rss>=0)"%.1f МиБ".format(java.util.Locale.getDefault(),rss) else "показатель недоступен",
+                Text("RAM процесса (RSS): "+if(rss.isFinite() && rss>=0)"%.1f МиБ".format(locale,rss) else "показатель недоступен",
                     style=MaterialTheme.typography.bodySmall)
                 Text("CPU — процент одного логического ядра; многопоточный Gradle может превышать 100%. Показатели из Termux, не из прогноза.",
                     style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
