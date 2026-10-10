@@ -11,6 +11,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object SigningPolicy {
     // Legacy Termux paths remain readable for migration, but the UI uses Android's document picker.
@@ -74,6 +78,10 @@ class SigningStore(private val context: Context) {
     var fileName by remember(currentId) {mutableStateOf(store.fileLabel(currentId))}
     var hasAccess by remember(currentId) {mutableStateOf(store.hasDocument(currentId))}
     var message by remember(currentId) {mutableStateOf("")}
+    var storePassword by remember(currentId) {mutableStateOf("")}
+    var keyPassword by remember(currentId) {mutableStateOf("")}
+    var checking by remember(currentId) {mutableStateOf(false)}
+    val scope=rememberCoroutineScope()
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri->
         if(uri!=null) {
             val name=runCatching {
@@ -93,7 +101,7 @@ class SigningStore(private val context: Context) {
                 else->{
                     fileName=name
                     hasAccess=store.hasDocument(currentId)
-                    message="Файл выбран. Укажите alias ключа и нажмите «Сохранить alias»."
+                    message="Файл выбран. Укажите alias и при необходимости проверьте пароль и закрытый ключ."
                 }
             }
         }
@@ -124,14 +132,52 @@ class SigningStore(private val context: Context) {
             enabled=currentId.isNotBlank(),
             modifier=Modifier.fillMaxWidth()
         ) {Text(if(fileName.isEmpty())"Выбрать файл ключа" else "Заменить файл ключа")}
-        OutlinedTextField(alias,{alias=it},label={Text("Псевдоним ключа (alias)")},
+        OutlinedTextField(alias,{alias=it;message=""},label={Text("Псевдоним ключа (alias)")},
             singleLine=true,modifier=Modifier.fillMaxWidth())
         Button(
             onClick={message=if(store.saveAlias(currentId,alias))"Alias сохранён" else "Не удалось сохранить alias"},
             enabled=currentId.isNotBlank() && hasAccess && alias.isNotBlank()
         ) {Text("Сохранить alias")}
+        Text("Проверка ключа",style=MaterialTheme.typography.titleSmall)
+        Text("Пароли нужны только на время проверки, не сохраняются и не отправляются в Termux.",
+            style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedTextField(storePassword,{storePassword=it},label={Text("Пароль хранилища")},
+            visualTransformation=PasswordVisualTransformation(),singleLine=true,
+            modifier=Modifier.fillMaxWidth(),enabled=!checking)
+        OutlinedTextField(keyPassword,{keyPassword=it},label={Text("Пароль ключа (если отличается)")},
+            visualTransformation=PasswordVisualTransformation(),singleLine=true,
+            modifier=Modifier.fillMaxWidth(),enabled=!checking)
+        Button(onClick={
+            val id=currentId
+            val uri=store.documentUri(id)
+            val name=fileName
+            val selectedAlias=alias.trim()
+            val password=storePassword.toCharArray()
+            val key=if(keyPassword.isEmpty())password.copyOf() else keyPassword.toCharArray()
+            storePassword=""
+            keyPassword=""
+            checking=true
+            message="Проверяю файл и закрытый ключ…"
+            scope.launch {
+                val outcome=withContext(Dispatchers.IO) {
+                    try {
+                        context.contentResolver.openInputStream(Uri.parse(uri))?.use {
+                            SigningVerification.check(it,name,selectedAlias,password,key)
+                        } ?: SigningVerification.Outcome.INVALID_SELECTION
+                    } catch (_: Exception) {
+                        SigningVerification.Outcome.UNSUPPORTED_OR_BAD_STORE_PASSWORD
+                    } finally {
+                        password.fill('\\u0000')
+                        key.fill('\\u0000')
+                    }
+                }
+                checking=false
+                if(currentId==id)message=SigningVerification.message(outcome)
+            }
+        },enabled=hasAccess && alias.isNotBlank() && storePassword.isNotEmpty() && !checking,
+            modifier=Modifier.fillMaxWidth()) {Text(if(checking)"Проверяю…" else "Проверить файл, alias и пароль")}
         if(message.isNotEmpty())Text(message)
-        Text("Файл выбирается через системный проводник Android, без ручного ввода пути. Сам ключ не передаётся в Termux. Пароли здесь пока не принимаются: защищённый канал Android Keystore → Termux не готов, поэтому Release AAB заблокирован. Debug APK доступен без ключа.",
+        Text("Файл выбирается через системный проводник Android. Проверка выполняется локально, без копирования ключа. Release AAB пока заблокирован до проверки безопасного подписания в Termux. Debug APK доступен без ключа.",
             style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
