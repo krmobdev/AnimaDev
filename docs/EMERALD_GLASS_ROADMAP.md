@@ -12,20 +12,20 @@ repository, job, Git, signing and storage state remain unchanged. No invented da
 - [x] Project dashboard: branch + copy SHA, Git / Tests / Build / History actions
 - [x] Dashboard Build Now routes to existing guarded Build screen
 - [x] Build screen foundation: read-only real configuration, guarded Debug build action
-- [ ] Build and unit-test validation
+- [x] Build and unit-test validation · dev.33: 196/196 unit, UI tests compiled, Debug APK built
 - [ ] Pixel visual acceptance and accessibility verification
 
 ## Sprint 2 — planned
-- [ ] Build Release AAB full skin without changing signing/secret transport
-- [ ] Test UI: Unit / On-device and journal, preserving correct back navigation
-- [ ] History: action filters and real job statuses
-- [ ] Branches: active branch, actual SHA and safe verified checkout
+- [x] Release AAB: redesigned keystore/password/status sections; secure signing unchanged
+- [x] Test UI: Unit / On-device tabs and guarded actions; preserved existing journal navigation
+- [x] History: action filters and real job statuses
+- [x] Branches: active branch, actual SHA and existing safe verified checkout
 - [ ] Job monitor / journal: unified Emerald Glass layout
 
 ## Sprint 3 — planned
-- [ ] Termux environment / tools / SDK overview, real versions from probes
-- [ ] Settings and Appearance redesigned, preserving every current preference
-- [ ] About, changelog, bilingual bundled documentation
+- [x] Termux environment / tools / SDK overview, real versions from probes
+- [x] Settings index redesigned, preserving existing search and preferences; nested sections need polish
+- [x] About branded hero, changelog and bilingual bundled documentation
 - [ ] Polish: 60-fps-friendly animations, insets, small-screen layouts, long labels
 - [ ] RU / EN accessibility; screenshots / instrumentation tests; regression tests
 
