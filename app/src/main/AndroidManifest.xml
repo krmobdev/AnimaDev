@@ -14,6 +14,7 @@
         <receiver android:name=".projects.CatalogReceiver" android:exported="false" />
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.reports" android:exported="false" android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/report_paths" /></provider>
         <receiver android:name=".repos.RepoResultReceiver" android:exported="false" />
+        <receiver android:name=".repos.RepoCancelReceiver" android:exported="false" />
         <receiver android:name=".projects.ReleaseResultReceiver" android:exported="false" />
         <receiver android:name=".projects.ReleaseEnrollmentReceiver" android:exported="false" />
         <receiver android:name=".projects.BranchSwitchReceiver" android:exported="false" />
