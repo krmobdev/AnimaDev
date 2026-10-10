@@ -109,6 +109,10 @@ class RepoGateway(private val context: Context) {
             r.remove("build_job")
         }
         r.put("project_id",projectId)
+        if(action=="BUILD_DEBUG") {
+            val folder=com.animacode.animadev.projects.ExportDestination(context).artifactDirectory() ?:return
+            r.put("output_dir",folder)
+        } else r.remove("output_dir")
         if (projectId == PROJECT) r.remove("profile")
         else r.put("profile",JSONObject().put("id",project.id).put("name",project.name)
             .put("root",project.path).put("remote",project.remote).put("branch",project.branch))
@@ -210,6 +214,8 @@ class RepoGateway(private val context: Context) {
             .put("job_id", target.ifEmpty { r.getString("job_id") }).put("action", targetAction.ifEmpty { r.getString("action") })
             .put("project_id", r.optString("project_id",PROJECT))
         if (mode=="START" && r.has("profile")) payload.put("profile",r.getJSONObject("profile"))
+        if (mode=="START" && r.optString("action")=="BUILD_DEBUG")
+            payload.put("output_dir",r.optString("output_dir","/storage/emulated/0/Download"))
         if (mode=="START" && r.optString("action")=="TEST_DEVICE") {
             val endpoint=com.animacode.animadev.projects.AdbDeviceGateway(context).rememberedEndpoint()
             if(endpoint.isNotEmpty()) payload.put("adb_endpoint",endpoint)
