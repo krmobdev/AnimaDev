@@ -70,7 +70,7 @@ class SigningStore(private val context: Context) {
     }
 }
 
-@Composable fun SigningSettings(context:Context) {
+@Composable fun SigningSettings(context:Context,onOpenBuild:(String)->Unit={}) {
     val store=remember {SigningStore(context)}
     val supported=remember {ProjectStore(context).all().filter {it.supported}}
     var currentId by remember {mutableStateOf(supported.firstOrNull()?.id ?: "")}
@@ -177,7 +177,17 @@ class SigningStore(private val context: Context) {
         },enabled=hasAccess && alias.isNotBlank() && storePassword.isNotEmpty() && !checking,
             modifier=Modifier.fillMaxWidth()) {Text(if(checking)"Проверяю…" else "Проверить файл, alias и пароль")}
         if(message.isNotEmpty())Text(message)
-        Text("Файл выбирается через системный проводник Android. Проверка выполняется локально, без копирования ключа. Release AAB пока заблокирован до проверки безопасного подписания в Termux. Debug APK доступен без ключа.",
+        HorizontalDivider()
+        Text("Следующий шаг — сборка Release AAB",style=MaterialTheme.typography.titleMedium)
+        Text("Здесь выбирается ключ и проверяется пароль хранилища. Сама сборка находится в разделе проекта «Сборка». Настроенные JKS и alias будут использованы автоматически.",
+            style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Button(onClick={onOpenBuild(currentId)},
+            enabled=currentId.isNotBlank() && hasAccess && store.alias(currentId).isNotBlank(),
+            modifier=Modifier.fillMaxWidth()) {Text("Перейти к сборке Release AAB")}
+        if(!hasAccess || store.alias(currentId).isBlank())
+            Text("Чтобы перейти к сборке, выберите JKS и сохраните alias.",
+                style=MaterialTheme.typography.bodySmall)
+        Text("Пароль закрытого ключа JKS проверяется при подписании в Termux. Секреты для сборки передаются по локальному каналу с проверкой UID. Проводник и настройки не хранят пароль.",
             style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
