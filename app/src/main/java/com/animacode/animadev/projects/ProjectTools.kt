@@ -157,11 +157,31 @@ import com.animacode.animadev.repos.*
                                 style=MaterialTheme.typography.bodyMedium)
                             Text("Файлы: "+when {gitSnap==null->"Не проверены";dirty->"Есть изменения";else->"Чисто"},
                                 style=MaterialTheme.typography.bodyMedium)
+                            if(dirty) {
+                                val files=gitSnap?.optJSONArray("changed_files")
+                                Text("Изменено файлов (в ответе): "+(files?.length() ?: 0),
+                                    style=MaterialTheme.typography.bodySmall)
+                                com.animacode.animadev.projects.ActionButton(onClick={changedFiles=true}) {
+                                    Text("Показать изменённые файлы")
+                                }
+                            }
                             Text(if(checked)"Коммитов на GitHub: +"+behind+" · локально: +"+ahead
                                 else "Для сравнения коммитов нужна проверка GitHub.",
                                 style=MaterialTheme.typography.bodyMedium)
                             if(stale)Text("Каталог и ответ Termux расходятся по SHA. Повторите проверку.",
                                 color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+                            Text(when {
+                                working->"Следующий шаг: дождаться завершения операции."
+                                jobState in setOf("FAILED","TIMED_OUT","INTERRUPTED","UNKNOWN") && gitJob ->
+                                    "Следующий шаг: посмотреть код ошибки и журнал ниже."
+                                gitSnap==null || !checked->"Следующий шаг: проверить обновления."
+                                dirty->"Перед обновлением сохраните локальные изменения самостоятельно."
+                                ahead>0->"Есть локальные коммиты: автоматическое объединение запрещено."
+                                behind>0 && canReceive->"Следующий шаг: получить изменения по кнопке ниже."
+                                behind>0->"Получение пока заблокировано; причины указаны ниже."
+                                else->"Получать нечего. Для нового APK откройте раздел «Сборка»."
+                            },style=MaterialTheme.typography.bodySmall,
+                                color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     com.animacode.animadev.projects.ActionButton(
