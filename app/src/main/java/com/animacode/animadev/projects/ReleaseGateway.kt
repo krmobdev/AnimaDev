@@ -17,7 +17,7 @@ import org.json.JSONObject
 import java.util.UUID
 
 /** Only IDs, progress and artifact checksums survive process death. Never credentials. */
-class ReleaseStore(context:Context) {
+class ReleaseStore(private val context:Context) {
     companion object {
         val generation=mutableIntStateOf(0)
         private const val PREFS="release_jobs_v1"
@@ -39,7 +39,10 @@ class ReleaseStore(context:Context) {
     fun busy():Boolean=read().optString("state") in active
     fun write(record:JSONObject):Boolean {
         val ok=prefs.edit().putString("job",record.toString()).commit()
-        if(ok)generation.intValue++
+        if(ok) {
+            generation.intValue++
+            ReleaseNotifications.publish(context,record)
+        }
         return ok
     }
     fun begin(project:String,id:String,sha:String):Boolean {
