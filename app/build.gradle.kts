@@ -15,12 +15,13 @@ android {
     namespace = "com.animacode.animadev"
     compileSdk = 37
     defaultConfig {
-        applicationId = "com.animacode.animadev"
+        applicationId = if (providers.gradleProperty("animadevDeviceFixture").orNull == "true")
+            "com.animacode.animadev.devicefixture" else "com.animacode.animadev"
         minSdk = 33
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 40
-        versionName = "0.4.0-beta.8-dev.26"
+        versionCode = 41
+        versionName = "0.4.0-beta.8-dev.27"
     }
     sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
     buildFeatures { compose = true }

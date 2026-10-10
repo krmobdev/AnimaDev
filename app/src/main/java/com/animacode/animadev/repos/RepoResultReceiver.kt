@@ -32,6 +32,7 @@ class RepoResultReceiver : BroadcastReceiver() {
                     .put("journal_generation",record.optLong("journal_generation")+1)
                 record.remove("transport_id")
                 store.write(record)
+                RepoGateway(context).drainCancel()
                 return
             }
             record.put("pending", false).put("callback_exit", result.getInt("exitCode"))
@@ -96,6 +97,7 @@ class RepoResultReceiver : BroadcastReceiver() {
             }
             store.write(record)
             JobNotifications.publish(context,record)
+            RepoGateway(context).drainCancel()
         } catch (_: Exception) {
             if(record.optString("mode") in setOf("LOG","HISTORY")) {
                 store.edit { it.put("pending",false).put("journal_message","Ответ журнала не подтверждён; сохранённые данные доступны.").remove("transport_id") }; return

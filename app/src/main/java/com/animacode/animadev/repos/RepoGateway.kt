@@ -160,13 +160,32 @@ class RepoGateway(private val context: Context) {
     }
     fun cancel() {
         val r=store.read()
-        if(!r.optBoolean("ready") || r.optBoolean("pending") ||
+        if(!r.optBoolean("ready") ||
             r.optString("action") !in setOf("TEST","TEST_DEVICE","BUILD_DEBUG") ||
             r.optString("state") !in setOf("REQUESTED","QUEUED","RUNNING") ||
             r.optString("job_id").isBlank()) return
+        if(r.optBoolean("pending")) {
+            // Polling is transport activity, not a reason to flicker the control.
+            // Persist the confirmed intent bound to this job; never cancel a new job.
+            if(r.optString("mode")!="CANCEL")
+                store.edit { it.put("cancel_after_job",r.optString("job_id")) }
+            return
+        }
+        store.edit { it.remove("cancel_after_job") }
         dispatch("CANCEL")
     }
+    fun drainCancel() {
+        val r=store.read()
+        if(r.optBoolean("pending"))return
+        val target=r.optString("cancel_after_job")
+        if(target.isEmpty())return
+        if(target!=r.optString("job_id") || r.optString("state") !in setOf("REQUESTED","QUEUED","RUNNING")) {
+            store.edit {it.remove("cancel_after_job")};return
+        }
+        cancel()
+    }
     fun query(manual: Boolean = false) {
+        drainCancel()
         val r = store.read()
         // A past job must be queryable even after the embedded runner was
         // upgraded. Otherwise UNKNOWN permanently blocks helper installation.

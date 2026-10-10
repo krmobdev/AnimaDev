@@ -12,12 +12,12 @@ import org.junit.runner.RunWith
 class MainActivityInstrumentedTest {
     @Test fun appLaunchesAndResumesOnDevice() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("com.animacode.animadev",context.packageName)
+        assertTrue(context.packageName in setOf("com.animacode.animadev","com.animacode.animadev.devicefixture"))
         ActivityScenario.launch(MainActivity::class.java).use {scenario ->
             scenario.onActivity {activity ->
                 assertFalse(activity.isFinishing)
                 assertFalse(activity.isDestroyed)
-                assertEquals("com.animacode.animadev",activity.packageName)
+                assertEquals(context.packageName,activity.packageName)
             }
         }
     }

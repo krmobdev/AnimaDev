@@ -80,11 +80,9 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
                 if(record.optString("action") in setOf("TEST","TEST_DEVICE","BUILD_DEBUG") &&
                     state in setOf("REQUESTED","QUEUED","RUNNING") &&
                     job?.optBoolean("cancel_requested")!=true) {
-                    OutlinedButton(onClick={confirmCancel=true},
-                        enabled=permitted && !record.optBoolean("pending"),modifier=Modifier.fillMaxWidth(),
-                        colors=ButtonDefaults.outlinedButtonColors(contentColor=MaterialTheme.colorScheme.error)) {
-                        Text("Остановить · Ctrl+C")
-                    }
+                    StopJobButton(permitted=permitted,
+                        pending=record.optBoolean("pending"),mode=record.optString("mode"),
+                        queued=record.optString("cancel_after_job")==jid) {confirmCancel=true}
                 }
                 OutlinedButton(onClick={openJournal(jid)},modifier=Modifier.fillMaxWidth()) { Text("Открыть журнал") }
                 if(manual) OutlinedButton(onClick={gateway.query(true)},enabled=permitted && !record.optBoolean("pending")) {
@@ -137,5 +135,15 @@ fun MonitorSettings(context: Context,embedded:Boolean=false,showNotifications:Bo
             else context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,context.packageName))
         }))
         Text("Отказ не блокирует задания. Уведомления не гарантируют сохранение процесса Termux.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(horizontal=16.dp,vertical=8.dp))
+    }
+}
+
+/** Polling must not change the layout or enabled state of the stop control. */
+@Composable fun StopJobButton(permitted:Boolean,pending:Boolean,mode:String,queued:Boolean,onClick:()->Unit) {
+    val stopping=queued || (pending && mode=="CANCEL")
+    OutlinedButton(onClick=onClick,enabled=permitted && !stopping,
+        modifier=Modifier.fillMaxWidth(),
+        colors=ButtonDefaults.outlinedButtonColors(contentColor=MaterialTheme.colorScheme.error)) {
+        Text(if(stopping)"Отправляем остановку…" else "Остановить · Ctrl+C")
     }
 }

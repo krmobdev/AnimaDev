@@ -57,7 +57,7 @@ private fun HighlightedLogChunk(chunk:String) {
         buildAnnotatedString {
             append(chunk)
             JournalStylePolicy.styles(chunk).forEach { line ->
-                val color=when(line.tone) { LogTone.SUCCESS->success;LogTone.ERROR->scheme.error;LogTone.WARNING->warning;else->scheme.onSurface }
+                val color=when(line.tone) { LogTone.SUCCESS->success;LogTone.ERROR->if(light)Color(0xFFB3261E) else Color(0xFFFF8A80);LogTone.WARNING->warning;else->scheme.onSurface }
                 if(line.tone!=LogTone.NORMAL)addStyle(SpanStyle(color=color,fontWeight=FontWeight.SemiBold),line.start,line.end)
                 if(line.timestampEnd>line.start)addStyle(SpanStyle(color=if(light)Color(0xFF161616) else Color(0xFFF5F5F5),fontWeight=FontWeight.Bold),line.start,line.timestampEnd)
             }
