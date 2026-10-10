@@ -1,4 +1,4 @@
-# AnimaDev · 0.4.0-beta.9-dev.31
+# AnimaDev · 0.4.0-beta.10-dev.33
 
 Android 13+ companion for **local Git, tests and Android builds in Termux**. Written in Kotlin and Jetpack Compose (Material You / Pulse). No mandatory VPS, AnimaBridge or GitHub API token is needed to use the installed app.
 
@@ -29,6 +29,14 @@ Android 13+ companion for **local Git, tests and Android builds in Termux**. Wri
 4. In Git tools verify branch, origin and GitHub SHA before TEST/BUILD. / Сверьте GitHub SHA и чистоту дерева.
 5. Inspect Job ID and Journal during execution. **QUERY** does not start another job. / Проверяйте статус прежнего задания по ID.
 6. For Debug tap Build and open APK through the **native Android installer**. AAB is for publishing, not direct device installation.
+## Два скина / Two skins
+
+- **Pulse / Material:** existing UI preserved. Stored settings, project data and results stay intact.
+- **Emerald Glass (opt-in):** graphite/emerald theme inspired by owner-approved mockups.
+  Initial sprint: Projects, project dashboard, root navigation and Debug Build foundation.
+- Switch using **Settings → Appearance → Emerald Glass**. Turning it off restores
+  your previous Pulse/Material style without resetting projects or jobs.
+- [Emerald Glass implementation checklist](docs/EMERALD_GLASS_ROADMAP.md).
 
 ## Documentation / Документация
 
