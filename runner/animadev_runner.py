@@ -16,7 +16,7 @@ import time
 
 VERSION = '0.4.0'
 MONITOR_SHA = 'f95d91e7170ab96df4ad9731e48e3f8bae77a23055424ed834d4a0299c55e5e5'
-GRADLE_SHA = '9a4b486ca5b0ee879e671b6fa8b35d645167122f4180c013e35382aa7556b6af'
+GRADLE_SHA = '2adbd1cbe06b87b0639437f7529b7ec89866406215c2c4b53704c98a25f212ab'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
 STATE_ROOT = HOME / '.local/share/animadev'
