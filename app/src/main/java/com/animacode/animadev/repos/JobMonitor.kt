@@ -76,7 +76,7 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
             if(job!=null && !job.isNull("exit_code"))Text("Exit code: ${job.optInt("exit_code")}")
             Text(record.optString("message"),style=MaterialTheme.typography.bodySmall)
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                if(record.optString("action") in setOf("TEST","BUILD_DEBUG") &&
+                if(record.optString("action") in setOf("TEST","TEST_DEVICE","BUILD_DEBUG") &&
                     state in setOf("REQUESTED","QUEUED","RUNNING") &&
                     job?.optBoolean("cancel_requested")!=true) {
                     OutlinedButton(onClick={confirmCancel=true},
