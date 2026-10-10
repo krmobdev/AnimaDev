@@ -40,6 +40,7 @@ object JobNotifications {
         val operation=when(action) {
             "BUILD_DEBUG"->"Debug APK"
             "TEST"->"Unit-тесты"
+            "TEST_DEVICE"->"Тесты на устройстве"
             "CHECK"->"GitHub SHA"
             "SYNC"->"Синхронизация"
             else->"Git"
@@ -87,7 +88,7 @@ object JobNotifications {
         builder.addAction(android.R.drawable.ic_menu_view,"Открыть",tap)
         if(running && state in setOf("REQUESTED","QUEUED","RUNNING") &&
             job?.optBoolean("cancel_requested")!=true &&
-            action in setOf("TEST","BUILD_DEBUG")) {
+            action in setOf("TEST","TEST_DEVICE","BUILD_DEBUG")) {
             val cancel=PendingIntent.getBroadcast(context,jid.hashCode(),
                 Intent(context,RepoCancelReceiver::class.java).apply {
                     this.action="com.animacode.animadev.REPO_CANCEL"
@@ -107,7 +108,7 @@ class RepoCancelReceiver:BroadcastReceiver() {
             !jid.matches(Regex("[a-f0-9]{32}")))return
         val record=RepoStore(context).read()
         if(record.optString("job_id")==jid &&
-            record.optString("action") in setOf("BUILD_DEBUG","TEST") &&
+            record.optString("action") in setOf("BUILD_DEBUG","TEST","TEST_DEVICE") &&
             record.optString("state") in setOf("REQUESTED","QUEUED","RUNNING") &&
             !record.optBoolean("pending")) RepoGateway(context).cancel()
     }
