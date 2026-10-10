@@ -1,6 +1,10 @@
 package com.animacode.animadev.projects
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -17,23 +22,39 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /** Emerald-only presentation building blocks. No repository or runner effects. */
+/**
+ * Tabs remain readable at 320dp and with accessibility font scaling.
+ * Long filter sets scroll instead of forcing four cramped equal-width chips.
+ */
 @Composable fun NeonTabs(labels:List<String>,selected:Int,onSelect:(Int)->Unit,
                         modifier:Modifier=Modifier) {
-    Surface(modifier=modifier,shape=RoundedCornerShape(21.dp),
-        color=NeonGlass.surface,border=BorderStroke(1.dp,NeonGlass.outline)) {
-        Row(Modifier.padding(5.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-            labels.forEachIndexed {index,label->
-                val active=index==selected
-                Surface(onClick={onSelect(index)},modifier=Modifier.weight(1f).heightIn(min=49.dp),
-                    shape=RoundedCornerShape(17.dp),
-                    color=if(active)Color(0xFF194330) else Color.Transparent,
-                    border=if(active)BorderStroke(1.dp,NeonGlass.green.copy(alpha=.36f)) else null) {
-                    Box(contentAlignment=Alignment.Center,
-                        modifier=Modifier.padding(horizontal=6.dp,vertical=8.dp)) {
-                        Text(label,style=MaterialTheme.typography.labelLarge,
-                            color=if(active)NeonGlass.softGreen else NeonGlass.muted,
-                            fontWeight=if(active)FontWeight.Bold else FontWeight.Normal,
-                            maxLines=2)
+    val scaled=LocalDensity.current.fontScale>=1.25f
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val scrollable=labels.size>3 && (maxWidth<470.dp || scaled)
+        val scrollState=rememberScrollState()
+        Surface(shape=RoundedCornerShape(21.dp),
+            color=NeonGlass.surface,border=BorderStroke(1.dp,NeonGlass.outline)) {
+            Row(Modifier.fillMaxWidth()
+                .then(if(scrollable)Modifier.horizontalScroll(scrollState) else Modifier)
+                .padding(5.dp),horizontalArrangement=Arrangement.spacedBy(5.dp)) {
+                labels.forEachIndexed {index,label->
+                    val active=index==selected
+                    val color by animateColorAsState(
+                        targetValue=if(active)Color(0xFF194330) else Color.Transparent,
+                        animationSpec=tween(160),label="Emerald tab background")
+                    val tabModifier=if(scrollable)Modifier.width(112.dp) else Modifier.weight(1f)
+                    Surface(onClick={onSelect(index)},
+                        modifier=tabModifier.heightIn(min=52.dp),
+                        shape=RoundedCornerShape(17.dp),color=color,
+                        border=if(active)BorderStroke(1.dp,
+                            NeonGlass.green.copy(alpha=.36f)) else null) {
+                        Box(contentAlignment=Alignment.Center,
+                            modifier=Modifier.padding(horizontal=9.dp,vertical=9.dp)) {
+                            Text(label,style=MaterialTheme.typography.labelLarge,
+                                color=if(active)NeonGlass.softGreen else NeonGlass.muted,
+                                fontWeight=if(active)FontWeight.Bold else FontWeight.Normal,
+                                maxLines=3,overflow=TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
