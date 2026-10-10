@@ -208,16 +208,22 @@ import com.animacode.animadev.repos.*
                             Spacer(Modifier.width(8.dp))
                             Text(if(adbPending)"Проверяем ADB…" else "Проверить устройства · adb devices")
                         }
+                        // ADB readiness expires after 90 seconds; that is only a UI hint.
+                        // The Termux runner independently checks adb devices -l immediately
+                        // before Gradle. Never permanently disable instrumentation based
+                        // on a stale SharedPreferences snapshot.
                         Button(onClick={gateway.start("TEST_DEVICE",project.id,project.path)},
-                            enabled=canRun && deviceReady,
+                            enabled=canRun && !adbPending,
                             modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
                             Icon(AppIcons.Tests,null)
                             Spacer(Modifier.width(8.dp))
                             Text("Запустить тесты на устройстве")
                         }
-                        if(!deviceReady)Text("Если подключение не удаётся: проверьте, что порт взят "+
-                            "не из окна сопряжения, оба устройства в одной Wi-Fi сети, "+
-                            "VPN не мешает доступу. При USB-подключении разрешите отладку на Pixel.",
+                        if(!deviceReady)Text("ADB пока не подтвердил устройство или проверка устарела. "+
+                            "Кнопка запуска доступна: Termux перепроверит adb devices -l "+
+                            "перед Gradle и сообщит ADB_NOT_READY, если Pixel не подключён. "+
+                            "Для Wi-Fi укажите IP:порт с основного экрана беспроводной отладки "+
+                            "(не порт сопряжения); VPN может мешать локальному соединению.",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
                         if(activeOrUnknown && r.optString("job_id").isNotBlank()) {
