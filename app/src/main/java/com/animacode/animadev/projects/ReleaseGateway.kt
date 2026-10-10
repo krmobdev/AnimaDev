@@ -126,6 +126,8 @@ class ReleaseGateway(private val context:Context) {
                 store.failedWithoutTransfer(request,"Termux не вернул одноразовый ключ шифрования. JKS не передавался.")
                 return "Не удалось согласовать защищённый обмен с Termux. Секреты не отправлены."
             }
+            if(store.read().optString("state")!="REQUESTED")
+                return "Подготовка Release отменена до передачи секретов."
             val sealed=ReleaseHybridTransport.seal(request,publicKey,payload)
             if(sealed==null) {
                 store.failedWithoutTransfer(request,"Не удалось зашифровать JKS для Termux. Ничего не отправлено.")
@@ -208,8 +210,13 @@ class ReleaseResultReceiver:BroadcastReceiver() {
                 val code=payload.optString("error_code","RESULT_UNCONFIRMED")
                 if(!code.matches(Regex("[A-Z_]{3,50}")))error("Malformed code")
                 // No secrets, stderr or raw command output are stored or displayed.
-                record.put("state",if(code.endsWith("_UNKNOWN") || code=="RESULT_UNCONFIRMED")"UNKNOWN" else "FAILED")
+                record.put("state",when {
+                    code=="CANCELLED"->"CANCELLED"
+                    code.endsWith("_UNKNOWN") || code=="RESULT_UNCONFIRMED"->"UNKNOWN"
+                    else->"FAILED"
+                })
                     .put("message",when(code) {
+                        "CANCELLED"->"Сборка остановлена через Ctrl+C. Подписанный AAB не опубликован."
                         "ENVELOPE_MISSING"->"Termux не получил зашифрованное содержимое. Проверьте RUN_COMMAND_STDIN."
                         "TRANSPORT_DECRYPT_FAILED"->"Termux получил данные, но отклонил шифрование. Проверьте связь и повторите с новым одноразовым ключом."
                         "TRANSPORT_UNAVAILABLE"->"Не удалось запустить локальный модуль расшифровки в Termux."
