@@ -37,9 +37,23 @@ class SigningVerificationTest {
         assertEquals(SigningVerification.Outcome.ALIAS_NOT_FOUND,
             SigningVerification.check(ByteArrayInputStream(bytes),"my_key_store.jks","key0",
                 "fixture-store-pass".toCharArray(),"fixture-key-pass".toCharArray()))
-        assertEquals(SigningVerification.Outcome.UNSUPPORTED_OR_BAD_STORE_PASSWORD,
+        assertEquals(SigningVerification.Outcome.WRONG_STORE_PASSWORD_OR_DAMAGED,
             SigningVerification.check(ByteArrayInputStream(bytes),"my_key_store.jks","fixture",
                 "wrong-fixture-store".toCharArray(),"fixture-key-pass".toCharArray()))
+    }
+
+    @Test fun jksMetadataWorksWithoutJksProvider() {
+        val bytes=fixture("JKS","fixture-store-pass","fixture-key-pass")
+        assertEquals(SigningVerification.Outcome.JKS_STORE_AND_ALIAS_VERIFIED,
+            JksInspector.inspect(bytes,"fixture","fixture-store-pass".toCharArray()))
+        assertEquals(SigningVerification.Outcome.WRONG_STORE_PASSWORD_OR_DAMAGED,
+            JksInspector.inspect(bytes,"fixture","wrong-fixture".toCharArray()))
+        assertEquals(SigningVerification.Outcome.ALIAS_NOT_FOUND,
+            JksInspector.inspect(bytes,"missing","fixture-store-pass".toCharArray()))
+        val damaged=bytes.copyOf()
+        damaged[40]=(damaged[40].toInt() xor 1).toByte()
+        assertEquals(SigningVerification.Outcome.WRONG_STORE_PASSWORD_OR_DAMAGED,
+            JksInspector.inspect(damaged,"fixture","fixture-store-pass".toCharArray()))
     }
     @Test fun validPkcs12PrivateKeyInKeystoreExtension() {
         val bytes=fixture("PKCS12","fixture-only-pass","fixture-only-pass")
@@ -47,10 +61,21 @@ class SigningVerificationTest {
             SigningVerification.check(ByteArrayInputStream(bytes),"my_key_store.keystore","fixture",
                 "fixture-only-pass".toCharArray(),"fixture-only-pass".toCharArray()))
     }
+
+    @Test fun pkcs12ContentDetectedDespiteJksFileName() {
+        val bytes=fixture("PKCS12","fixture-only-pass","fixture-only-pass")
+        assertEquals(SigningVerification.Outcome.VERIFIED,
+            SigningVerification.check(ByteArrayInputStream(bytes),"named_jks_but_pkcs12.jks","fixture",
+                "fixture-only-pass".toCharArray(),"fixture-only-pass".toCharArray()))
+    }
     @Test fun rejectsInvalidSelectionAndOversizedInputs() {
         assertEquals(SigningVerification.Outcome.INVALID_SELECTION,
             SigningVerification.check(ByteArrayInputStream(byteArrayOf()),"not_a_key.txt","fixture",
                 "anything".toCharArray(),"anything".toCharArray()))
+
+        assertEquals(SigningVerification.Outcome.INVALID_FORMAT,
+            SigningVerification.check(ByteArrayInputStream(byteArrayOf(0,0,0,0)),
+                "my_key_store.jks","fixture","anything".toCharArray(),"anything".toCharArray()))
         assertEquals(SigningVerification.Outcome.TOO_LARGE,
             SigningVerification.check(ByteArrayInputStream(ByteArray(SigningVerification.MAX_KEYSTORE_BYTES+1)),
                 "my_key_store.jks","fixture","anything".toCharArray(),"anything".toCharArray()))
