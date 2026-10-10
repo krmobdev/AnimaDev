@@ -22,6 +22,7 @@ import com.animacode.animadev.repos.*
     val gateway=remember {RepoGateway(context)};val r=rememberRepoRecord(context);val store=remember {RepoStore(context)}
     val adb=remember {AdbDeviceGateway(context)}
     var adbVersion by remember {mutableIntStateOf(0)}
+    var adbEndpoint by rememberSaveable(project.id) { mutableStateOf("") }
     DisposableEffect(adb) {
         val listener=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,_->adbVersion++ }
         adb.prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -152,6 +153,22 @@ import com.animacode.animadev.repos.*
                         Text(adbState,style=MaterialTheme.typography.bodyMedium,
                             color=if(deviceReady)MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Сопряжение ADB не подключает устройство. "+
+                            "На основном экране «Беспроводная отладка» Pixel указан "+
+                            "отдельный IP:порт для подключения.",
+                            style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedTextField(value=adbEndpoint,onValueChange={adbEndpoint=it.take(45)},
+                            singleLine=true,label={Text("IP:порт подключения Pixel")},
+                            placeholder={Text("192.168.1.132:37123")},
+                            modifier=Modifier.fillMaxWidth(),
+                            enabled=!adbPending)
+                        Button(onClick={adb.connect(adbEndpoint)},
+                            enabled=permitted && termuxVersion!=null && !adbPending &&
+                                AdbDeviceGateway.validLanEndpoint(adbEndpoint),
+                            modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
+                            Text("Подключить Pixel через ADB")
+                        }
                         OutlinedButton(onClick={adb.refresh()},
                             enabled=permitted && termuxVersion!=null && !adbPending,
                             modifier=Modifier.fillMaxWidth()) {
@@ -166,8 +183,9 @@ import com.animacode.animadev.repos.*
                             Spacer(Modifier.width(8.dp))
                             Text("Запустить тесты на устройстве")
                         }
-                        if(!deviceReady)Text("После adb pair выполните adb connect IP:ПОРТ из основного экрана беспроводной отладки Pixel. "+
-                            "При USB-подключении разрешите отладку на устройстве.",
+                        if(!deviceReady)Text("Если подключение не удаётся: проверьте, что порт взят "+
+                            "не из окна сопряжения, оба устройства в одной Wi-Fi сети, "+
+                            "VPN не мешает доступу. При USB-подключении разрешите отладку на Pixel.",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
                         if(!prepared && ready)Text("Сначала нажмите «Подготовить тесты» в разделе Unit-тесты.",
