@@ -50,25 +50,35 @@ def reports(root):
     return result
 
 def summary(before, after):
-    fresh = [data for name, (stamp, data) in after.items() if name not in before or before[name][0] != stamp]
+    fresh = [data for name,(stamp,data) in after.items() if name not in before or before[name][0] != stamp]
     if not fresh: raise ReportError('REPORTS_MISSING')
     total = failed = skipped = 0
     duration = 0.0
     for data in fresh:
         if b'<!DOCTYPE' in data.upper() or b'<!ENTITY' in data.upper(): raise ReportError('REPORTS_INVALID')
         try:
-            suite = ET.fromstring(data)
-            if suite.tag != 'testsuite': raise ValueError()
-            cases = suite.findall('testcase')
-            n = int(suite.attrib['tests']); f = int(suite.attrib.get('failures', '0')); e = int(suite.attrib.get('errors', '0')); s = int(suite.attrib.get('skipped', '0'))
-            d = float(suite.attrib['time'])
-            cf = sum(case.find('failure') is not None or case.find('error') is not None for case in cases)
-            cs = sum(case.find('skipped') is not None for case in cases)
-            if n != len(cases) or cf != f + e or cs != s or cf + cs > n or min(n,f,e,s,d) < 0 or not math.isfinite(d): raise ValueError()
-            total += n; failed += cf; skipped += cs; duration += d
+            document = ET.fromstring(data)
+            if document.tag == 'testsuite': suites = [document]
+            elif document.tag == 'testsuites': suites = list(document)
+            else: raise ValueError()
+            if not suites or any(suite.tag != 'testsuite' for suite in suites): raise ValueError()
+            rt = rf = re_count = rs = 0
+            for suite in suites:
+                cases = suite.findall('testcase')
+                n = int(suite.attrib['tests']); f = int(suite.attrib.get('failures','0'))
+                e = int(suite.attrib.get('errors','0')); sk = int(suite.attrib.get('skipped','0'))
+                d = float(suite.attrib['time'])
+                case_fail = sum(case.find('failure') is not None or case.find('error') is not None for case in cases)
+                case_skip = sum(case.find('skipped') is not None for case in cases)
+                if n != len(cases) or case_fail != f+e or case_skip != sk or case_fail+case_skip > n or min(n,f,e,sk,d)<0 or not math.isfinite(d): raise ValueError()
+                rt += n; rf += f; re_count += e; rs += sk; duration += d
+            if document.tag == 'testsuites':
+                for key,value in (('tests',rt),('failures',rf),('errors',re_count),('skipped',rs)):
+                    if key in document.attrib and int(document.attrib[key]) != value: raise ValueError()
+            total += rt; failed += rf+re_count; skipped += rs
         except (ET.ParseError, KeyError, ValueError, OverflowError): raise ReportError('REPORTS_INVALID')
-    return {'total':total, 'passed':total-failed-skipped, 'failed':failed, 'skipped':skipped,
-            'duration_ms':round(duration*1000), 'report_files':len(fresh)}
+    return {'total':total,'passed':total-failed-skipped,'failed':failed,'skipped':skipped,
+            'duration_ms':round(duration*1000),'report_files':len(fresh)}
 
 def diagnostic(text, redact):
     text = redact(text)

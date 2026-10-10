@@ -74,6 +74,28 @@ class DeviceDiscovery(unittest.TestCase):
             b'List of devices attached\nADB1234 device\n',b'error')
         self.assertEqual(gt.adb_devices(run=lambda *a,**kw:p),[])
 
+    def test_android_gradle_wrapped_multi_suite_report(self):
+        xml = ('<testsuites tests="4" failures="0" errors="0" skipped="0" time="2.208">'
+               '<testsuite tests="1" failures="0" errors="0" skipped="0" time="0.793">'
+               '<testcase name="launch" time="0.793"/></testsuite>'
+               '<testsuite tests="3" failures="0" errors="0" skipped="0" time="1.415">'
+               '<testcase name="drag"/><testcase name="cancel"/><testcase name="reward"/>'
+               '</testsuite></testsuites>')
+        self.assertEqual(gt.summary({}, {'pixel.xml':('fresh',xml.encode())}),
+                         dict(total=4,passed=4,failed=0,skipped=0,duration_ms=2208,report_files=1))
+
+    def test_android_gradle_wrapper_inconsistent_counts_rejected(self):
+        xml = ('<testsuites tests="4" failures="0" errors="0" skipped="0">'
+               '<testsuite tests="1" failures="0" errors="0" skipped="0" time="0.1">'
+               '<testcase name="one"/></testsuite></testsuites>')
+        with self.assertRaises(gt.ReportError) as cm:
+            gt.summary({}, {'pixel.xml':('fresh',xml.encode())})
+        self.assertEqual(cm.exception.code,'REPORTS_INVALID')
+
+    def test_android_gradle_wrapper_rejects_unexpected_child(self):
+        with self.assertRaises(gt.ReportError):
+            gt.summary({}, {'pixel.xml':('fresh',b'<testsuites><testcase/></testsuites>')})
+
     def test_device_reports_require_fresh_xml(self):
         with tempfile.TemporaryDirectory() as tmp:
             base=pathlib.Path(tmp);folder=base/gt.DEVICE_RESULTS/'Pixel'
