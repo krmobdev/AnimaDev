@@ -13,6 +13,8 @@ import pathlib
 import re
 import subprocess
 import sys
+import socket
+import struct
 import time
 
 HOME=pathlib.Path("/data/data/com.termux/files/home")
@@ -213,14 +215,48 @@ def run(payload):
         store_password[:]=b"\0"*len(store_password)
         key_password[:]=b"\0"*len(key_password)
 
+def _receive_secure_payload():
+    # Only public connection coordinates enter Termux RUN_COMMAND_ARGUMENTS.
+    if len(sys.argv)!=4:
+        raise ReleaseFailure("CHANNEL_DENIED")
+    name, request_id, uid_text=sys.argv[1:]
+    if not re.fullmatch(r"animadev-release-[a-f0-9]{32}",name) or not RX_ID.fullmatch(request_id) or not uid_text.isdecimal():
+        raise ReleaseFailure("CHANNEL_DENIED")
+    try:
+        expected_uid=int(uid_text)
+        if expected_uid<10000 or expected_uid>999999:
+            raise ValueError()
+        with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as client:
+            client.settimeout(20)
+            client.connect("\0"+name)
+            pid,uid,gid=struct.unpack("3i",client.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))
+            if uid!=expected_uid:
+                raise ReleaseFailure("PEER_UID_DENIED")
+            client.sendall(request_id.encode("ascii"))
+            def exact(n):
+                result=bytearray()
+                while len(result)<n:
+                    chunk=client.recv(n-len(result))
+                    if not chunk:raise ReleaseFailure("CHANNEL_CLOSED")
+                    result.extend(chunk)
+                return bytes(result)
+            size=struct.unpack(">I",exact(4))[0]
+            if size<=0 or size>MAX_MESSAGE:raise ReleaseFailure("CHANNEL_DENIED")
+            raw=exact(size)
+            obj=json.loads(raw)
+            if type(obj) is not dict or obj.get("request_id")!=request_id:
+                raise ReleaseFailure("CHANNEL_DENIED")
+            return obj
+    except (OSError,TimeoutError,ValueError,UnicodeError,json.JSONDecodeError):
+        raise ReleaseFailure("CHANNEL_UNAVAILABLE")
+
 def main():
     os.umask(0o077)
     request_id=""
     try:
-        raw=sys.stdin.buffer.read(MAX_MESSAGE+1)
-        if len(raw)>MAX_MESSAGE:raise ReleaseFailure("RESULT_MALFORMED")
-        payload=json.loads(raw)
-        raw=b"" # drop reference to the wire data as soon as possible
+        if len(sys.argv)>=3 and RX_ID.fullmatch(sys.argv[2]):
+            request_id=sys.argv[2]
+        payload=_receive_secure_payload()
         request_id=payload.get("request_id","") if isinstance(payload,dict) else ""
         if not isinstance(request_id,str) or not RX_ID.fullmatch(request_id):
             raise ReleaseFailure("RESULT_MALFORMED")
