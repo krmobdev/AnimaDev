@@ -1,5 +1,6 @@
 """Release worker protocol/guard regressions; never uses a real JKS or password."""
 import contextlib
+import io
 import json
 import pathlib
 import sys
