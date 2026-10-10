@@ -20,6 +20,17 @@ import com.animacode.animadev.repos.*
         return
     }
     val gateway=remember {RepoGateway(context)};val r=rememberRepoRecord(context);val store=remember {RepoStore(context)}
+    val adb=remember {AdbDeviceGateway(context)}
+    var adbVersion by remember {mutableIntStateOf(0)}
+    DisposableEffect(adb) {
+        val listener=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,_->adbVersion++ }
+        adb.prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {adb.prefs.unregisterOnSharedPreferenceChangeListener(listener)}
+    }
+    adb.expire()
+    val adbState=adb.prefs.getString("message","Устройство ещё не проверено.").orEmpty()
+    val adbPending=adb.prefs.getBoolean("pending",false)
+    val deviceReady=adb.recentDevice()
     val belongs=r.optString("project_id","animaquiz")==project.id
     val snap=if(belongs)r.optJSONObject("snapshot")?.takeIf {
         it.optString("branch")==project.branch && it.optString("local_commit")==project.commit
@@ -55,20 +66,103 @@ import com.animacode.animadev.repos.*
             item {Text(when {blocked->"Новое действие заблокировано текущим заданием.";!ready->"Операции доступны после подключения помощника.";snap==null->"Обновите локальное состояние.";!snap.optBoolean("branch_allowed")->"Ветка не разрешена профилем. Переключение не выполняется.";!snap.optBoolean("remote_ok")->"Origin не соответствует профилю проекта.";snap.optBoolean("dirty")->"Получение изменений заблокировано: есть локальные правки.";snap.optInt("ahead")>0->"Есть локальные коммиты. Объединение запрещено.";snap.optInt("behind")==0->"Проверка GitHub не изменяет исходники.";else->"Обновление — только fast-forward после подтверждения."},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
             if(snap?.optBoolean("dirty")==true)item {TextButton(onClick={changedFiles=true}){Text("Посмотреть изменённые файлы")}}
         } else {
-            item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Text("Unit-тесты · Debug",style=MaterialTheme.typography.titleMedium)
-                Text("Подтверждённый Gradle-профиль",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick={gateway.start("TEST",project.id,project.path)},enabled=available && gateway.mayTest(r,project.id),modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Tests,null);Spacer(Modifier.width(8.dp));Text("Запустить тесты")}
-            }} }
-            if(!available || !gateway.mayTest(r,project.id))item {Text(if(blocked)"Повторный запуск заблокирован: задание выполняется или итог неизвестен." else "Для запуска нужны готовый помощник и проверенные ветка/origin.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-            val test=if(belongs)r.optJSONObject("test_job") else null
-            if(test!=null && test.optString("state") in RepoPolicy.terminalStates)item {SectionLabel("Последний результат");Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Text(MonitorPolicy.label(test.optString("state"),false,false),style=MaterialTheme.typography.titleMedium)
-                test.optJSONObject("tests")?.let {counts->Text("${counts.optLong("passed")} из ${counts.optLong("total")} успешно",style=MaterialTheme.typography.headlineSmall);Text("Ошибок ${counts.optLong("failed")} · пропущено ${counts.optLong("skipped")}",style=MaterialTheme.typography.bodyMedium)}
-                val started=test.optDouble("started_at");val ended=test.optDouble("ended_at")
-                if(ended>started && started>0)Text("${((ended-started)/60).toInt()} мин ${((ended-started)%60).toInt()} с · exit ${test.optString("exit_code")}",style=MaterialTheme.typography.bodySmall)
-                OutlinedButton(onClick={onJournal(test.optString("job_id"))},modifier=Modifier.fillMaxWidth()){Text("Открыть результат и журнал")}
-            }} }
+            val prepared=belongs && snap!=null && gateway.mayTest(r,project.id)
+            val canRun=available && prepared
+            val needStatus=r.optString("project_id","animaquiz")!=project.id || snap==null
+            item {
+                OutlinedCard(shape=androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                    modifier=Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp),
+                        verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Text("Unit-тесты",style=MaterialTheme.typography.titleLarge)
+                        Text("Gradle · :app:testDebugUnitTest",
+                            style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        if(!ready) {
+                            Text("Сначала обновите локальный помощник Termux (кнопка выше).",
+                                color=MaterialTheme.colorScheme.error)
+                        } else if(needStatus) {
+                            Text("Для этого проекта ещё нет свежей проверки ветки и origin.",
+                                style=MaterialTheme.typography.bodyMedium)
+                        } else if(!prepared) {
+                            Text(when {
+                                blocked->"Предыдущее задание ещё выполняется или его статус неизвестен."
+                                !snap.optBoolean("remote_ok")->"Origin не подтверждён для этого проекта."
+                                else->"Состояние проекта изменилось. Обновите локальный снимок."
+                            },style=MaterialTheme.typography.bodyMedium)
+                        }
+                        if(!prepared || needStatus) {
+                            OutlinedButton(onClick={gateway.start("STATUS",project.id,project.path)},
+                                enabled=available,modifier=Modifier.fillMaxWidth()) {
+                                Icon(AppIcons.Refresh,null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Подготовить тесты · проверить проект")
+                            }
+                        }
+                        Button(onClick={gateway.start("TEST",project.id,project.path)},
+                            enabled=canRun,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
+                            Icon(AppIcons.Tests,null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Запустить unit-тесты")
+                        }
+                    }
+                }
+            }
+            item {
+                OutlinedCard(shape=androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                    modifier=Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp),
+                        verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Text("Инструментальные тесты",style=MaterialTheme.typography.titleLarge)
+                        Text("Реальное устройство · ADB · :app:connectedDebugAndroidTest",
+                            style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(adbState,style=MaterialTheme.typography.bodyMedium,
+                            color=if(deviceReady)MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedButton(onClick={adb.refresh()},
+                            enabled=permitted && termuxVersion!=null && !adbPending,
+                            modifier=Modifier.fillMaxWidth()) {
+                            Icon(AppIcons.Refresh,null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(if(adbPending)"Проверяем ADB…" else "Проверить устройства · adb devices")
+                        }
+                        Button(onClick={gateway.start("TEST_DEVICE",project.id,project.path)},
+                            enabled=canRun && deviceReady,
+                            modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
+                            Icon(AppIcons.Tests,null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Запустить тесты на устройстве")
+                        }
+                        if(!deviceReady)Text("После adb pair выполните adb connect IP:ПОРТ из основного экрана беспроводной отладки Pixel. "+
+                            "При USB-подключении разрешите отладку на устройстве.",
+                            style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        if(!prepared && ready)Text("Сначала нажмите «Подготовить тесты» в разделе Unit-тесты.",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            listOf("test_job" to "Unit-тесты","device_test_job" to "Тесты на устройстве").forEach { (field,title) ->
+                val test=if(belongs)r.optJSONObject(field) else null
+                if(test!=null && test.optString("state") in RepoPolicy.terminalStates)item {
+                    OutlinedCard(modifier=Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(18.dp),
+                            verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Text(title+" · "+MonitorPolicy.label(test.optString("state"),false,false),
+                                style=MaterialTheme.typography.titleMedium)
+                            test.optJSONObject("tests")?.let {counts->
+                                Text("${counts.optLong("passed")} из ${counts.optLong("total")} успешно",
+                                    style=MaterialTheme.typography.titleLarge)
+                                Text("Ошибок ${counts.optLong("failed")} · пропущено ${counts.optLong("skipped")}",
+                                    style=MaterialTheme.typography.bodySmall)
+                            }
+                            OutlinedButton(onClick={onJournal(test.optString("job_id"))},
+                                modifier=Modifier.fillMaxWidth()) {Text("Открыть журнал")}
+                        }
+                    }
+                }
+            }
         }
         if(belongs && r.optString("job_id").isNotEmpty() && (blocked || (tool=="git" && r.optString("action")!="TEST")))item {JobMonitor(context,r,permitted,onJournal)}
     }
