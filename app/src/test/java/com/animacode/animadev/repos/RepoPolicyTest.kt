@@ -10,7 +10,7 @@ class RepoPolicyTest {
         assertFalse(RepoPolicy.mayBuild("feature/development",true,true,true,false,true,0,0,"abc","abc","another-project"))
     }
     @Test fun validFastForwardAllowed() { assertTrue(sync()) }
-    @Test fun mainBlocked() { assertFalse(sync(branch="main")) }
+    @Test fun mainAllowedAfterVerifiedFastForward() { assertTrue(sync(branch="main"));assertFalse(sync(branch="main",checked=false)) }
     @Test fun masterBlocked() { assertFalse(sync(branch="master")) }
     @Test fun otherBranchBlocked() { assertFalse(sync(branch="feature/other")) }
     @Test fun dirtyBlocked() { assertFalse(sync(dirty=true)) }
@@ -35,7 +35,7 @@ class RepoPolicyTest {
     @Test fun newStartAlwaysUsesCurrentRunner() { assertEquals("new", RepoPolicy.runnerForQuery("START","new","old","old","legacy")) }
     @Test fun failedNetworkCheckAllowsExplicitRetry() { assertFalse(RepoPolicy.blocked("id","FAILED")); assertFalse(sync(checked=false)) }
     @Test fun testsAllowedWithConfirmedProfile() { assertTrue(RepoPolicy.mayTest("test/decomposition-v1",true,true,false)) }
-    @Test fun testsMainBlocked() { assertFalse(RepoPolicy.mayTest("main",true,true,false)) }
+    @Test fun testsMainAllowedWithVerifiedOrigin() { assertTrue(RepoPolicy.mayTest("main",true,true,false));assertFalse(RepoPolicy.mayTest("main",false,true,false)) }
     @Test fun testsWrongRemoteBlocked() { assertFalse(RepoPolicy.mayTest("test/decomposition-v1",false,true,false)) }
     @Test fun testsMissingRunnerBlocked() { assertFalse(RepoPolicy.mayTest("test/decomposition-v1",true,false,false)) }
     @Test fun testsConflictBlocked() { assertFalse(RepoPolicy.mayTest("test/decomposition-v1",true,true,true)) }
