@@ -1,4 +1,4 @@
-# AnimaDev · 0.4.0-beta.10-dev.35
+# AnimaDev · 0.4.0-beta.10-dev.36
 
 Android 13+ companion for **local Git, tests and Android builds in Termux**. Written in Kotlin and Jetpack Compose (Material You / Pulse). No mandatory VPS, AnimaBridge or GitHub API token is needed to use the installed app.
 
@@ -33,7 +33,7 @@ Android 13+ companion for **local Git, tests and Android builds in Termux**. Wri
 
 - **Pulse / Material:** existing UI preserved. Stored settings, project data and results stay intact.
 - **Emerald Glass (opt-in):** graphite/emerald theme inspired by owner-approved mockups.
-  Implemented across Projects, project dashboard, root navigation, Build, Tests, History, Branches, Termux, Settings index and About. Live job monitoring, journal filtering/export and nested settings now use Emerald components. On-device visual acceptance and instrumentation execution remain pending.
+  Implemented across Projects, project dashboard, root navigation, Build, Tests, History, Branches, Termux, Settings index and About. Live job monitoring, journal filtering/export and nested settings now use Emerald components. Adaptive narrow-screen layouts, large-font navigation/tabs and lightweight color transitions have been added. On-device visual acceptance remains pending; UI test execution is planned for the isolated devicefixture package.
 - Switch using **Settings → Appearance → Emerald Glass**. Turning it off restores
   your previous Pulse/Material style without resetting projects or jobs.
 - [Emerald Glass implementation checklist](docs/EMERALD_GLASS_ROADMAP.md).
