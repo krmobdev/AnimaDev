@@ -488,19 +488,14 @@ class Engine:
             except BlockingIOError: raise Denied('JOB_BUSY')
             guard = GitGuard(self.registry[j['project_id']], log, self.git_executable,
                 lambda pid, token: self.store.update(jid, child_pid=pid, child_identity=token))
-            cancel_signaled=False
             def observe():
-                nonlocal cancel_signaled
                 signals.tick()
                 with self.store.transaction() as c:
                     current=self.store.get(c,jid)
-                if not current or current['state'] not in ('RUNNING','QUEUED'):
-                    return False
-                if current.get('cancel_requested') and not cancel_signaled:
-                    cancel_signaled=True
-                    self.store.update(jid,stage='Отмена: отправляем Gradle Ctrl+C')
-                    return True
-                return False
+                # Git's read-only checks may call observe before Gradle exists.
+                # Do NOT consume the flag there: only Gradle process() does.
+                return bool(current and current['state'] in ('RUNNING','QUEUED')
+                            and current.get('cancel_requested'))
             guard.observe = observe
             if j['action'] in ('TEST','BUILD_DEBUG'):
                 module_path = pathlib.Path(__file__).resolve().parent / 'gradle_tests.py'
