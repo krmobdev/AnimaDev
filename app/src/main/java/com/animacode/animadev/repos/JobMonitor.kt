@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import org.json.JSONObject
+import com.animacode.animadev.projects.ProjectStore
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -22,6 +23,8 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while(true) { delay(1000);now=System.currentTimeMillis() } }
     val jid=record.optString("job_id"); if(jid.isEmpty())return
+    val projectId=record.optString("project_id","animaquiz")
+    val projectName=ProjectStore(context).all().find {it.id==projectId}?.name ?: projectId
     val job=record.optJSONObject("job")
     val state=record.optString("state")
     val start=((job?.optDouble("started_at",job.optDouble("created_at",0.0)) ?: record.optDouble("sent_at",0.0)/1000)*1000).toLong()
@@ -38,7 +41,11 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
     val terminal=state in RepoPolicy.terminalStates
     Card {
         Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Text("Задание AnimaQuiz · ${if(record.optString("action")=="TEST")"TEST" else "Git / ${record.optString("action")}"}",style=MaterialTheme.typography.titleMedium)
+            Text("Задание · $projectName · "+when(record.optString("action")) {
+                "TEST"->"Unit-тесты"
+                "BUILD_DEBUG"->"Debug APK"
+                else->"Git / "+record.optString("action")
+            },style=MaterialTheme.typography.titleMedium)
             Text(MonitorPolicy.label(state,quiet,warning))
             if(details)Text("Job ID: $jid",style=MaterialTheme.typography.bodySmall)
             if(details)Text("Начало: ${if(start>0)SimpleDateFormat("dd.MM HH:mm:ss",Locale.getDefault()).format(Date(start)) else "не подтверждено"}")
