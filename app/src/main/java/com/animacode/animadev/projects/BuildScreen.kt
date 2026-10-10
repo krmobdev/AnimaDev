@@ -88,6 +88,8 @@ import com.animacode.animadev.termux.TermuxGateway
     var showPasswordFields by remember(project.id){mutableStateOf(false)}
     var showSecurityDetails by remember(project.id){mutableStateOf(false)}
     var confirmReleaseStop by remember(project.id){mutableStateOf(false)}
+    var confirmCacheClear by remember {mutableStateOf(false)}
+    var cacheNotice by remember {mutableStateOf("")}
     var showReleaseJournal by remember(project.id){mutableStateOf(false)}
     val releaseScope=rememberCoroutineScope()
     val canRelease=canDebug && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseOrDebugBusy
@@ -125,7 +127,12 @@ import com.animacode.animadev.termux.TermuxGateway
                     }
                 }
                 Button(onClick={tap();gateway.start("BUILD_DEBUG",project.id,project.path)},enabled=canDebug,
-                    modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Build,null);Spacer(Modifier.width(8.dp));Text("Собрать Debug APK")}
+                    modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Build,null);Spacer(Modifier.width(8.dp));Text("Собрать Debug APK · полная пересборка")}
+                Text("Gradle выполняется с --rerun-tasks: старые результаты задач не используются. Кэш зависимостей и файлы проектов не удаляются.",
+                    style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(onClick={confirmCacheClear=true},enabled=!releaseOrDebugBusy,
+                    modifier=Modifier.fillMaxWidth()) {Text("Очистить временный кэш AnimaDev")}
+                if(cacheNotice.isNotBlank())Text(cacheNotice,style=MaterialTheme.typography.bodySmall)
                 if(!canDebug) {
                     Text(blockReason,style=MaterialTheme.typography.bodySmall)
                     OutlinedButton(onClick={tap();gateway.start("CHECK",project.id,project.path)},
@@ -327,6 +334,16 @@ import com.animacode.animadev.termux.TermuxGateway
         }
 
     }
+    if(confirmCacheClear)AlertDialog(
+        onDismissRequest={confirmCacheClear=false},title={Text("Очистить временный кэш?")},
+        text={Text("Удалятся только временные APK-копии и подготовленные отчёты самого AnimaDev. Git, Gradle, установленные приложения, задания и история не затрагиваются.")},
+        confirmButton={TextButton(onClick={
+            val count=AppCache.clear(context)
+            cacheNotice="Удалено временных файлов: $count"
+            confirmCacheClear=false
+        }) {Text("Очистить")}},
+        dismissButton={TextButton(onClick={confirmCacheClear=false}) {Text("Отмена")}}
+    )
     if(showReleaseJournal && releaseState.optString("id").isNotBlank())
         ReleaseJournalDialog(context,releaseState.optString("id")) {showReleaseJournal=false}
     if(confirmReleaseStop)AlertDialog(
