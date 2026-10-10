@@ -57,11 +57,14 @@ class MainActivity:ComponentActivity() {
         var theme by remember { mutableStateOf(settings.getString("theme","system") ?: "system") }
         var dynamic by remember { mutableStateOf(settings.getBoolean("dynamic",true)) }
         var pulse by remember { mutableStateOf(settings.getBoolean("pulse",true)) }
+        var language by remember {mutableStateOf(settings.getString("language","system") ?: "system")}
+        val english=AppLanguage.english(language)
         val dark=AppThemePolicy.dark(theme,isSystemInDarkTheme())
         val colors=if(pulse)pulseColorScheme(dark)
         else if(dynamic) { if(dark)dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }
         else if(dark)darkColorScheme() else lightColorScheme()
         SideEffect { enableEdgeToEdge(SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT){dark},SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT){dark}) }
+        CompositionLocalProvider(LocalAppLanguage provides language) {
         MaterialTheme(colorScheme=colors,typography=Typography(
             labelLarge=Typography().labelLarge.copy(textAlign=TextAlign.Center))) {
             val projects=remember { ProjectStore(context) }
@@ -75,7 +78,9 @@ class MainActivity:ComponentActivity() {
             var selectedTestTab by rememberSaveable(selected) { mutableIntStateOf(0) }
             var selectedBuildTab by rememberSaveable(selected) { mutableIntStateOf(0) }
             var settingsSection by rememberSaveable { mutableStateOf("") }
-            var settingsParent by rememberSaveable { mutableStateOf("list") };var menu by remember { mutableStateOf(false) }
+            var settingsParent by rememberSaveable { mutableStateOf("list") }
+            var supportParent by rememberSaveable { mutableStateOf("list") }
+            var menu by remember { mutableStateOf(false) }
             var confirmExit by rememberSaveable { mutableStateOf(false) }
             var projectGeneration by remember { mutableIntStateOf(0) }
             val current=remember(selected,projectGeneration) { projects.all().find { it.id==selected } }
@@ -149,19 +154,28 @@ class MainActivity:ComponentActivity() {
                 if(resumed)destinationMissing=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){DestinationPolicy.needsRecovery(destination.selected(),destination.available())}
             }
             fun back() {
+                if(route in setOf("changelog","help","about","termux_setup")) {route=supportParent;return}
                 if(route=="settings" && settingsSection.isNotEmpty()){settingsSection="";return}
                 val n=NavigationState(top,route,selected,journalJob,settingsParent,journalParent).back()
                 if(n==null)confirmExit=true else {top=n.section;route=n.route;journalJob=n.job}
             }
             BackHandler { back() }
             val root=route=="list"
-            val title=when { route=="settings"->SettingsPolicy.toolbarTitle(settingsSection);top=="termux"->"Termux";route=="list"->"Проекты";route=="branches"->"Ветки";route=="git"->"Git";route=="tests"->"Тесты";route=="build"->"Сборка";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
+            val title=when {
+                route=="changelog"->if(english)"Change log" else "Список изменений"
+                route=="help"->if(english)"Documentation" else "Документация"
+                route=="about"->if(english)"About" else "О программе"
+                route=="termux_setup"->if(english)"Build setup" else "Подготовка сборки"
+                route=="settings"->SettingsPolicy.toolbarTitle(settingsSection);top=="termux"->"Termux";route=="list"->"Проекты";route=="branches"->"Ветки";route=="git"->"Git";route=="tests"->"Тесты";route=="build"->"Сборка";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
             Scaffold(
                 contentWindowInsets=WindowInsets.safeDrawing,
                 topBar={TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(!root)IconButton(onClick={clickFeedback();back()}){Icon(AppIcons.Back,"Вернуться")}},actions={
                     Box { IconButton(onClick={clickFeedback();menu=true}){Icon(AppIcons.More,"Меню приложения")}
                         DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
-                            DropdownMenuItem(text={Text("Настройки")},leadingIcon={Icon(AppIcons.Settings,null)},onClick={clickFeedback();menu=false;if(route!="settings"){settingsParent=route;settingsSection="";route="settings"}})
+                            DropdownMenuItem(text={Text(if(english)"Settings" else "Настройки")},leadingIcon={Icon(AppIcons.Settings,null)},onClick={clickFeedback();menu=false;if(route!="settings"){settingsParent=route;settingsSection="";route="settings"}})
+                            DropdownMenuItem(text={Text(if(english)"Change log" else "Список изменений")},onClick={clickFeedback();menu=false;supportParent=route;route="changelog"})
+                            DropdownMenuItem(text={Text(if(english)"About" else "О программе")},onClick={clickFeedback();menu=false;supportParent=route;route="about"})
+                            DropdownMenuItem(text={Text(if(english)"Documentation" else "Документация")},onClick={clickFeedback();menu=false;supportParent=route;route="help"})
                         }
                     }
                 })},
@@ -171,12 +185,14 @@ class MainActivity:ComponentActivity() {
                 }}
             ) { padding -> Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when {
+                    route in setOf("changelog","help","about","termux_setup")->SupportScreen(context,route)
                     route=="settings"->AppearanceSettings(
                         context,theme,dynamic,
                         {theme=it;settings.edit().putString("theme",it).apply()},
                         {dynamic=it;settings.edit().putBoolean("dynamic",it).apply()},
                         settingsSection,{settingsSection=it},
                         pulse=pulse,onPulse={value->pulse=value;settings.edit().putBoolean("pulse",value).apply()},
+                        language=language,onLanguage={value->language=value;settings.edit().putString("language",value).apply()},
                         onOpenBuild={projectId->
                             val project=projects.all().firstOrNull {it.id==projectId && it.supported}
                             if(project!=null) {
@@ -187,7 +203,9 @@ class MainActivity:ComponentActivity() {
                                 route="build"
                             }
                         })
-                    top=="termux"->TermuxOverview(context,permitted,version) { permitted=termux.permitted() }
+                    top=="termux"->TermuxOverview(context,permitted,version,
+                        onPermissionUpdated={permitted=termux.permitted()},
+                        onOpenSetup={supportParent="list";route="termux_setup"})
                     route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->clickFeedback();projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
                     route=="branches"->BranchesScreen(context,current,permitted)
                     route=="workspace"->ProjectWorkspace(context,current,
@@ -214,6 +232,7 @@ class MainActivity:ComponentActivity() {
             } }
             if(destinationMissing)AlertDialog(onDismissRequest={destinationMissing=false},title={Text("Папка сохранения недоступна")},text={Text(destinationError.ifEmpty {"Выберите папку повторно или вернитесь к обычным Загрузкам. История и файлы сохранятся."})},confirmButton={Button(onClick={folderPicker.launch(null)}){Text("Выбрать папку")}},dismissButton={OutlinedButton(onClick={destination.useDownloads();destinationMissing=false}){Text("Использовать Загрузки")}})
             if(confirmExit)AlertDialog(onDismissRequest={confirmExit=false},title={Text("Закрыть AnimaDev?")},text={Text(if(store.blocked())"Задание продолжится в Termux. Состояние и журнал восстановятся при следующем открытии." else "Проекты, результаты и журналы сохранятся.")},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmExit=false;finishAndRemoveTask()}){Text("Выйти")}},dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmExit=false}){Text("Отмена")}})
+        }
         }
     }
 }
