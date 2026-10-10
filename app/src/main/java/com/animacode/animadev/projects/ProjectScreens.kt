@@ -118,7 +118,8 @@ import org.json.JSONObject
     }
     remove?.let { p->AlertDialog(onDismissRequest={remove=null},title={Text("Убрать проект?")},text={Text("${p.name} исчезнет из списка приложения. Файлы и история останутся в Termux.")},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={store.remove(p.id);remove=null}){Text("Убрать")}},dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={remove=null}){Text("Отмена")}}) }
 }
-@Composable fun ProjectWorkspace(context:Context,project:LocalProject,onTool:(String)->Unit) {
+@Composable fun ProjectWorkspace(context:Context,project:LocalProject,onTool:(String)->Unit,
+    permitted:Boolean=false,onJournal:(String)->Unit={}) {
     var worktreesExpanded by rememberSaveable(project.id) { mutableStateOf(false) }
     val catalog=rememberCatalogRecord(context)
     val entries=catalog.getJSONObject("catalog").optJSONArray("projects")
@@ -138,6 +139,11 @@ import org.json.JSONObject
     val dirty=project.dirty ?: snap?.optBoolean("dirty")
     val isActiveJob=project.supported && record.optString("project_id","animaquiz")==project.id &&
         RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
+    val releaseGeneration=ReleaseStore.generation.intValue
+    val release=remember(releaseGeneration) {ReleaseStore(context).read()}
+    val isActiveRelease=release.optString("project")==project.id && ReleaseStore.active.contains(release.optString("state"))
+    var releaseJournal by remember {mutableStateOf(false)}
+    var releaseStopConfirm by remember {mutableStateOf(false)}
     val feedback=remember {UiFeedback(context)}
     val view=androidx.compose.ui.platform.LocalView.current
     fun open(id:String) {feedback.tap(view);onTool(id)}
@@ -155,16 +161,33 @@ import org.json.JSONObject
         }
         item {ActiveBranchHero(branch,sha,dirty)}
         if(isActiveJob)item {
-            Surface(onClick={open(if(record.optString("action")=="TEST")"tests" else "build")},
-                shape=androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-                color=MaterialTheme.colorScheme.surfaceContainer) {
-                Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Text("ЗАДАНИЕ В РАБОТЕ",color=MaterialTheme.colorScheme.primary,
-                        style=MaterialTheme.typography.labelLarge)
-                    Text(MonitorPolicy.label(record.optString("state"),false,false),
-                        color=androidx.compose.ui.graphics.Color.White)
+            val action=record.optString("action")
+            val destination=when(action) {
+                "TEST_DEVICE"->"tests_device"
+                "TEST"->"tests_unit"
+                "BUILD_DEBUG"->"build_debug"
+                else->"git"
+            }
+            Column(verticalArrangement=Arrangement.spacedBy(9.dp)) {
+                Text("ЗАДАНИЕ В РАБОТЕ",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary)
+                com.animacode.animadev.repos.JobMonitor(context,record,permitted,onJournal)
+                OutlinedButton(onClick={open(destination)},modifier=Modifier.fillMaxWidth()) {
+                    Text("Открыть инструмент задания")
+                }
+            }
+        }
+        if(isActiveRelease)item {
+            OutlinedCard {
+                Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Text("RELEASE AAB · В РАБОТЕ",style=MaterialTheme.typography.titleMedium)
+                    Text("Этап: "+release.optString("phase"))
+                    Text("Job ID: "+release.optString("id").take(12))
+                    Text(release.optString("message"),style=MaterialTheme.typography.bodySmall)
                     LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Text("Открыть монитор →",color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick={releaseJournal=true},modifier=Modifier.fillMaxWidth()) {Text("Журнал Release")}
+                    OutlinedButton(onClick={open("build_release")},modifier=Modifier.fillMaxWidth()) {Text("Открыть сборку Release")}
+                    if(!release.optBoolean("cancel_requested") && release.optString("phase")!="EXPORTING")
+                        OutlinedButton(onClick={releaseStopConfirm=true},modifier=Modifier.fillMaxWidth()) {Text("Остановить Release · Ctrl+C")}
                 }
             }
         }
@@ -214,5 +237,12 @@ import org.json.JSONObject
                 color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+    if(releaseJournal) ReleaseJournalDialog(context,release.optString("id")) {releaseJournal=false}
+    if(releaseStopConfirm)AlertDialog(onDismissRequest={releaseStopConfirm=false},
+        title={Text("Остановить Release?")},
+        text={Text("Отправить Ctrl+C в Termux для этого Release AAB? Другие сборки останутся заблокированы до подтверждения результата.")},
+        confirmButton={TextButton(onClick={releaseStopConfirm=false;ReleaseCancel.request(context)}) {Text("Остановить")}},
+        dismissButton={TextButton(onClick={releaseStopConfirm=false}) {Text("Отмена")}})
+
 }
 @Composable fun UnavailableTool(title:String,reason:String) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {Text(title,style=MaterialTheme.typography.titleMedium);Text(reason,style=MaterialTheme.typography.bodyMedium)} }
