@@ -17,6 +17,7 @@
         <receiver android:name=".repos.RepoCancelReceiver" android:exported="false" />
         <receiver android:name=".projects.ReleaseResultReceiver" android:exported="false" />
         <receiver android:name=".projects.ReleaseCancelReceiver" android:exported="false" />
+        <receiver android:name=".projects.ReleaseCancelActionReceiver" android:exported="false" />
         <receiver android:name=".projects.ReleaseEnrollmentReceiver" android:exported="false" />
         <receiver android:name=".projects.BranchSwitchReceiver" android:exported="false" />
         <receiver android:name=".termux.ProbeResultReceiver" android:exported="false" />
