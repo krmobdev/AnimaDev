@@ -15,7 +15,7 @@ object SettingsPolicy {
         SettingEntry("jobs","warning","Предупреждение об отсутствии прогресса","5, 10, 15, 20 или 30 минут; не останавливает задание"),
         SettingEntry("jobs","limit","Защитный предел TEST","90 минут; при неопределённом результате повтор заблокирован"),
         SettingEntry("notifications","permission","Разрешение уведомлений","Управляется Android; отказ не блокирует задания"),
-        SettingEntry("files","folder","Папка сохранения","Отчёты и сборки APK/AAB; по умолчанию Загрузки"),
+        SettingEntry("files","folder","Папка сохранения","Отчёты и артефакты сборок APK/AAB; по умолчанию Загрузки"),
         SettingEntry("files","default","Использовать Загрузки","Вернуться к системной папке, не удаляя файлы"),
         SettingEntry("about","version","Версия AnimaDev","Версия приложения и Android"),
         SettingEntry("about","diagnostics","Диагностика","Связь Termux и очищенные журналы заданий")
