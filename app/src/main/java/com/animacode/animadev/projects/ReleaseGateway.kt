@@ -45,9 +45,10 @@ class ReleaseStore(private val context:Context) {
         }
         return ok
     }
-    fun begin(project:String,id:String,sha:String):Boolean {
+    fun begin(project:String,id:String,sha:String,outputDir:String):Boolean {
         if(busy())return false
         return write(JSONObject().put("project",project).put("id",id).put("sha",sha)
+            .put("output_dir",outputDir)
             .put("state","REQUESTED").put("phase","ENROLLING").put("started_at",System.currentTimeMillis())
             .put("message","Termux собирает Release AAB. Задание может занять несколько минут; не запускайте его повторно."))
     }
@@ -118,11 +119,10 @@ class ReleaseGateway(private val context:Context) {
             val payload=JSONObject().put("request_id",request).put("project",profile)
                 .put("alias",alias).put("keystore",Base64.encodeToString(key,Base64.NO_WRAP))
                 .put("store_password",storePassword).put("key_password",keyPassword)
-                .put("output_dir",outputDir)
             val reserved=synchronized(BuildConcurrencyPolicy.launchMonitor) {
                 val current=RepoStore(context)
                 if(current.blocked() || current.read().optBoolean("pending"))false
-                else store.begin(project.id,request,sha)
+                else store.begin(project.id,request,sha,outputDir)
             }
             if(!reserved)return "Другая операция Termux ещё активна. Дождитесь подтверждения её результата."
 
@@ -211,8 +211,17 @@ class ReleaseResultReceiver:BroadcastReceiver() {
             if(ok) {
                 val artifact=payload.getJSONObject("artifact")
                 check(ReleaseWire.validArtifact(artifact,record.getString("sha")))
+                val destination=record.optString("output_dir","/storage/emulated/0/Download")
+                if(destination!="/storage/emulated/0/Download") {
+                    record.put("artifact",artifact).put("phase","EXPORTING")
+                        .put("message","AAB подписан. Проверяем SHA-256 и переносим в выбранную папку.")
+                    check(store.write(record))
+                    if(!ArtifactMoveGateway.start(context,record,artifact,destination))
+                        ArtifactMoveGateway.result(context,record,false,"")
+                    return
+                }
                 record.put("artifact",artifact).put("state","SUCCEEDED")
-                    .put("message","Release AAB подписан, проверен и сохранён в выбранную папку.")
+                    .put("message","Release AAB подписан, проверен и сохранён в Загрузки.")
             } else {
                 val code=payload.optString("error_code","RESULT_UNCONFIRMED")
                 if(!code.matches(Regex("[A-Z_]{3,50}")))error("Malformed code")
