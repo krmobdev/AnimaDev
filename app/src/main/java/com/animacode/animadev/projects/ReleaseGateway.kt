@@ -102,7 +102,7 @@ class ReleaseGateway(private val context:Context) {
             if(!store.begin(project.id,request,sha))return "Не удалось сохранить идентификатор задания."
             val callbackIntent=Intent(context,ReleaseResultReceiver::class.java).apply {
                 action=ReleaseWire.CALLBACK
-                data=Uri.parse("animadev://release/$request")
+                this.data=Uri.parse("animadev://release/$request")
             }
             val flags=PendingIntent.FLAG_ONE_SHOT or
                 if(Build.VERSION.SDK_INT>=31)PendingIntent.FLAG_MUTABLE else 0
