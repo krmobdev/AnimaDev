@@ -1,4 +1,4 @@
-"""One-shot release AAB worker. Input ONLY from Termux RUN_COMMAND_STDIN.
+"""One-shot Release AAB worker. Secrets arrive ONLY via peer-verified Unix socket.
 
 This source is concatenated after release_signer.py from the signed Android APK.
 No dynamic shell commands, keystore paths, secret environment variables, Git writes,
