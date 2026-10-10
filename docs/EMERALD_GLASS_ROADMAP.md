@@ -26,7 +26,9 @@ repository, job, Git, signing and storage state remain unchanged. No invented da
 - [x] Termux environment / tools / SDK overview, real versions from probes
 - [x] Settings index and nested sections use Emerald cards, preserving original preferences
 - [x] About branded hero, changelog and bilingual bundled documentation
-- [ ] Polish: 60-fps-friendly animations, insets, small-screen layouts, long labels
+- [x] Small-screen tabs, bottom navigation, project tile grid, SHA layout and long labels adapt to width/font scale
+- [x] Lightweight selection transitions and cached ambient glow (no heavy blur)
+- [ ] Validate 60 fps frame pacing, insets, TalkBack, screenshot reference matching on device
 - [ ] RU / EN accessibility and screenshots / device instrumentation verification (new RU caption and navigation regression tests added)
 
 ## Non-negotiable correctness
