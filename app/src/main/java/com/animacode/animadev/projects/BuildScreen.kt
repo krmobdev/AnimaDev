@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.launch
@@ -17,6 +19,9 @@ import com.animacode.animadev.termux.TermuxGateway
 
 @Composable fun BuildScreen(context:Context,project:LocalProject,permitted:Boolean,termuxVersion:String?,
                            onPermissionUpdated:()->Unit,onJournal:(String)->Unit) {
+    val feedback=remember {UiFeedback(context)}
+    val view=LocalView.current
+    fun tap(){feedback.tap(view)}
     val record=rememberRepoRecord(context)
     val gateway=remember {RepoGateway(context)}
     val belongs=record.optString("project_id","animaquiz")==project.id
@@ -69,14 +74,14 @@ import com.animacode.animadev.termux.TermuxGateway
     val canRelease=canDebug && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseOrDebugBusy
     val effectivePasswordPresent=releasePassword.isNotEmpty() || storedCredentials?.storePassword?.isNotEmpty()==true
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
         item {Text(project.name,style=MaterialTheme.typography.titleMedium)
             Text("Ветка: "+(snapshot?.optString("branch") ?: "не проверена")+" · "+(snapshot?.optString("local_commit")?.take(12) ?: "SHA неизвестен"),
                 style=MaterialTheme.typography.bodySmall)
         }
         if(busyOwner!=null)item {
             Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
-                Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                     Text("Сборочный слот занят",style=MaterialTheme.typography.titleMedium)
                     Text("Проект: "+busyOwner+" · "+(if(releaseBusy)"Release AAB" else if(record.optString("action")=="TEST")"Unit-тесты" else "Debug APK"))
                     Text("Состояние: "+(if(releaseBusy)releaseState.optString("state") else record.optString("state")))
@@ -94,15 +99,15 @@ import com.animacode.animadev.termux.TermuxGateway
             Text("Локальный помощник необходимо обновить")
             Button(onClick={gateway.install()},enabled=permitted && termuxVersion!=null && !blocked && !record.optBoolean("pending")){Text("Обновить помощник")}
         }}}
-        item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        item {Card(shape=MaterialTheme.shapes.extraLarge,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
+            Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),verticalArrangement=Arrangement.spacedBy(14.dp)) {
                 Text("Debug APK",style=MaterialTheme.typography.titleMedium)
                 Text("Офлайн Gradle; перед запуском повторно сверяем GitHub SHA",style=MaterialTheme.typography.bodySmall)
-                Button(onClick={gateway.start("BUILD_DEBUG",project.id,project.path)},enabled=canDebug,
+                Button(onClick={tap();gateway.start("BUILD_DEBUG",project.id,project.path)},enabled=canDebug,
                     modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Build,null);Spacer(Modifier.width(8.dp));Text("Собрать Debug APK")}
                 if(!canDebug) {
                     Text(blockReason,style=MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick={gateway.start("CHECK",project.id,project.path)},
+                    OutlinedButton(onClick={tap();gateway.start("CHECK",project.id,project.path)},
                         enabled=canCheck,modifier=Modifier.fillMaxWidth()) {
                         Text("Проверить GitHub SHA")
                     }
@@ -129,10 +134,11 @@ import com.animacode.animadev.termux.TermuxGateway
                     Text(if(storedCredentials!=null)"Пароли сохранены в Android Keystore для этого JKS и alias. Вводить заново не требуется."
                          else "Сохранённые секреты не подходят к выбранному JKS/alias или недоступны. Удалите их и сохраните заново.",
                         style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(onClick={vaultMessage=if(vault.forget(project.id))"Сохранённые пароли удалены с устройства." else "Не удалось удалить секреты.";vaultGeneration++},
+                    OutlinedButton(onClick={tap();vaultMessage=if(vault.forget(project.id))"Сохранённые пароли удалены с устройства." else "Не удалось удалить секреты.";vaultGeneration++},
                         enabled=!releaseOrDebugBusy,modifier=Modifier.fillMaxWidth()){Text("Удалить сохранённые пароли")}
                 } else {
                     OutlinedButton(onClick={
+                        tap()
                         val ok=vault.save(project.id,signing.documentUri(project.id),signing.alias(project.id),
                             releasePassword,releaseKeyPassword)
                         vaultMessage=if(ok)"Пароли зашифрованы Android Keystore и сохранены только на этом устройстве."
@@ -143,6 +149,7 @@ import com.animacode.animadev.termux.TermuxGateway
                 }
                 if(vaultMessage.isNotBlank())Text(vaultMessage,style=MaterialTheme.typography.bodySmall)
                 Button(onClick={
+                    tap()
                     val saved=storedCredentials
                     val storePass=releasePassword.ifEmpty {saved?.storePassword.orEmpty()}
                     val keyPass=if(releasePassword.isNotEmpty())releaseKeyPassword else
