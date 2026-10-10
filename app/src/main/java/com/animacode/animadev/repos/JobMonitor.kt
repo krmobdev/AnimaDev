@@ -12,6 +12,17 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 import com.animacode.animadev.projects.ProjectStore
+import com.animacode.animadev.projects.LocalNeonSkin
+import com.animacode.animadev.projects.NeonGlass
+import com.animacode.animadev.projects.NeonStatus
+import com.animacode.animadev.projects.NeonSection
+import com.animacode.animadev.projects.NeonKeyValue
+import com.animacode.animadev.projects.NeonPrimaryAction
+import com.animacode.animadev.projects.AppIcons
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -19,6 +30,7 @@ import java.util.Locale
 @Composable
 fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJournal: (String)->Unit) {
     val locale=androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val neon=LocalNeonSkin.current
     val settings=remember { context.getSharedPreferences("monitor_settings",Context.MODE_PRIVATE) }
     val store=remember { RepoStore(context) }; val gateway=remember { RepoGateway(context) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -41,8 +53,25 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
     var details by remember { mutableStateOf(false) }
     var confirmCancel by remember(jid) { mutableStateOf(false) }
     val terminal=state in RepoPolicy.terminalStates
-    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    Surface(shape=RoundedCornerShape(if(neon)24.dp else 12.dp),
+        color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainerLow,
+        border=if(neon)BorderStroke(1.dp,NeonGlass.outline) else null) {
+        Column(Modifier.fillMaxWidth().padding(if(neon)19.dp else 16.dp),
+            verticalArrangement=Arrangement.spacedBy(if(neon)12.dp else 8.dp)) {
+            if(neon) {
+                NeonSection("Job monitor",AppIcons.History,projectName)
+                NeonStatus(MonitorPolicy.label(state,quiet,warning),
+                    state=="SUCCEEDED" || state in setOf("RUNNING","QUEUED","REQUESTED") && !warning)
+                NeonKeyValue("Operation",when(record.optString("action")) {
+                    "TEST"->"Unit tests";"TEST_DEVICE"->"On-device tests"
+                    "BUILD_DEBUG"->"Debug APK";else->record.optString("action")
+                },AppIcons.Build)
+                NeonKeyValue("Elapsed",
+                    "${maxOf(0,elapsed)/60_000}m ${maxOf(0,elapsed)/1000%60}s",AppIcons.History)
+                if(job?.optString("stage").orEmpty().isNotBlank())
+                    NeonKeyValue("Current stage",job!!.optString("stage"))
+                HorizontalDivider(color=NeonGlass.outline)
+            }
             Text("Задание · $projectName · "+when(record.optString("action")) {
                 "TEST"->"Unit-тесты"
                 "TEST_DEVICE"->"Инструментальные тесты · ADB"
@@ -87,12 +116,18 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
                         pending=record.optBoolean("pending"),mode=record.optString("mode"),
                         queued=record.optString("cancel_after_job")==jid) {confirmCancel=true}
                 }
-                OutlinedButton(onClick={openJournal(jid)},modifier=Modifier.fillMaxWidth()) { Text("Открыть журнал") }
+                if(neon)NeonPrimaryAction("Open journal","Live output, filtering and export",
+                    AppIcons.History,modifier=Modifier.fillMaxWidth(),onClick={openJournal(jid)})
+                else OutlinedButton(onClick={openJournal(jid)},modifier=Modifier.fillMaxWidth()) { Text("Открыть журнал") }
                 if(manual) OutlinedButton(onClick={gateway.query(true)},enabled=permitted && !record.optBoolean("pending")) {
                     Text(if(record.optBoolean("pending") && record.optBoolean("manual_query"))"Проверяем…" else "Проверить состояние задания")
                 }
             }
-            OutlinedButton(onClick={details=!details},modifier=Modifier.fillMaxWidth()){Text(if(details)"Скрыть сведения" else "Сведения о задании")}
+            OutlinedButton(onClick={details=!details},modifier=Modifier.fillMaxWidth()){
+                Icon(AppIcons.Info,null,tint=if(neon)NeonGlass.green else MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text(if(details)"Скрыть сведения" else "Сведения о задании")
+            }
             if(record.optString("query_result").isNotEmpty())Text(record.optString("query_result"),style=MaterialTheme.typography.bodySmall)
         }
     }
