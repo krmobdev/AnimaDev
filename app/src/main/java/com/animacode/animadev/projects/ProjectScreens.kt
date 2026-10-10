@@ -54,7 +54,20 @@ import org.json.JSONObject
     val newProjects=foundGroups.mapNotNull {g->found.find {it.id==g.first().id}}.filter {candidate->primaryProjects.none {p->(p.repositoryPath.ifEmpty {p.path})==(candidate.repositoryPath.ifEmpty {candidate.path})}}
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=20.dp,bottom=110.dp),verticalArrangement=Arrangement.spacedBy(17.dp)) {
-            item { Text("Репозитории: ${primaryProjects.size} · worktree: ${projects.count {it.worktree}}",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(bottom=8.dp)) }
+            if(LocalNeonSkin.current)item {
+                Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("Projects",style=MaterialTheme.typography.displaySmall,
+                        fontWeight=FontWeight.ExtraBold,color=NeonGlass.white,modifier=Modifier.weight(1f))
+                    Surface(shape=RoundedCornerShape(16.dp),color=NeonGlass.raised,
+                        border=BorderStroke(1.dp,NeonGlass.outline)) {
+                        Icon(AppIcons.Folder,null,tint=NeonGlass.green,
+                            modifier=Modifier.padding(13.dp).size(28.dp))
+                    }
+                }
+                Text("Репозитории: ${primaryProjects.size} · worktree: ${projects.count {it.worktree}}",
+                    style=MaterialTheme.typography.bodySmall,color=NeonGlass.muted,
+                    modifier=Modifier.padding(top=14.dp))
+            } else item { Text("Репозитории: ${primaryProjects.size} · worktree: ${projects.count {it.worktree}}",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(bottom=8.dp)) }
             if(projects.isEmpty())item { Text("Добавьте существующий Git-репозиторий. Его файлы останутся на месте.",style=MaterialTheme.typography.bodyLarge) }
             items(primaryProjects,key={it.id}) { p ->
                 val snapshot=if(p.supported && record.optString("project_id","animaquiz")==p.id)
@@ -64,7 +77,15 @@ import org.json.JSONObject
                 val branch=p.branch.ifBlank {snapshot?.optString("branch").orEmpty()}
                 val dirty=snapshot?.optBoolean("dirty") ?: p.dirty
                 val active=p.supported && record.optString("project_id","animaquiz")==p.id && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
-                Card(onClick={onOpen(p)},shape=RoundedCornerShape(24.dp),
+                if(LocalNeonSkin.current) {
+                    Box {
+                        NeonProjectCard(p,branch,dirty,active,onClick={onOpen(p)},onMore={menu=true})
+                        DropdownMenu(menu,{menu=false}) {
+                            DropdownMenuItem(text={Text("Убрать из приложения")},
+                                onClick={menu=false;remove=p})
+                        }
+                    }
+                } else Card(onClick={onOpen(p)},shape=RoundedCornerShape(24.dp),
                     colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainer),
                     border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline)) {
                     Row(Modifier.fillMaxWidth().padding(start=16.dp,top=12.dp,bottom=12.dp,end=4.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
@@ -85,7 +106,13 @@ import org.json.JSONObject
                 }
             }
         }
-        ExtendedFloatingActionButton(onClick={add=true;if(permitted)gateway.read("CATALOG")},icon={Icon(AppIcons.Add,null)},text={Text("Добавить проект")},modifier=Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(16.dp))
+        if(LocalNeonSkin.current) NeonPrimaryAction(
+            title="Добавить проект",icon=AppIcons.Add,
+            modifier=Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+                .padding(start=20.dp,end=20.dp,bottom=10.dp).fillMaxWidth(),
+            onClick={add=true;if(permitted)gateway.read("CATALOG")}
+        )
+        else ExtendedFloatingActionButton(onClick={add=true;if(permitted)gateway.read("CATALOG")},icon={Icon(AppIcons.Add,null)},text={Text("Добавить проект")},modifier=Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(16.dp))
     }
     if(add)ModalBottomSheet(onDismissRequest={add=false}) {
         LazyColumn(Modifier.fillMaxWidth().imePadding().heightIn(max=640.dp),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
