@@ -23,6 +23,7 @@ MESSAGES = {
  'REPORTS_INVALID': 'Отчёт JUnit повреждён или превышает безопасный размер. Успех не подтверждён.',
  'TEST_TIMEOUT_UNKNOWN': 'Превышен лимит 90 минут. Gradle мог оставить дочерние процессы; результат неизвестен, повтор заблокирован.',
  'TEST_STATE_CHANGED': 'Ветка или коммит изменились во время тестов. Результат не подтверждён.',
+ 'ADB_NOT_READY': 'Не найдено ровно одно авторизованное физическое устройство в adb devices -l. Сопряжение без adb connect недостаточно.',
  'RUNNER_CHECKSUM_MISMATCH': 'Контрольная сумма модуля тестов не совпадает. Запуск отменён.',
 }
 
@@ -266,3 +267,90 @@ def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT
     return dict(state='SUCCEEDED',error_code='',exit_code=0,snapshot=after,
                 artifact={'kind':'DEBUG_APK','path':str(target),'size':s.st_size,
                           'sha256':digest.hexdigest(),'commit':remote,'branch':checked['branch']})
+
+
+# Device instrumentation stays in Termux: never invokes GitHub Actions or CI.
+DEVICE_COMMAND = ('./gradlew', ':app:connectedDebugAndroidTest', '--offline',
+                  '--no-daemon', '--rerun-tasks', '--console=plain')
+DEVICE_RESULTS = 'app/build/outputs/androidTest-results/connected'
+
+def adb_devices(run=subprocess.run, adb='/data/data/com.termux/files/usr/bin/adb'):
+    """Only one authorized hardware/USB/WiFi ADB device is accepted."""
+    try:
+        result=run([adb,'devices','-l'],stdin=subprocess.DEVNULL,
+                   stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+                   timeout=20,check=False)
+        if result.returncode != 0 or len(result.stdout)>16000:return []
+        found=[]
+        for line in result.stdout.decode('utf-8','replace').splitlines()[1:]:
+            fields=line.split()
+            if len(fields)>=2 and fields[1]=='device' and re.fullmatch(r'[A-Za-z0-9._:-]{4,128}',fields[0]):
+                # adb's virtual emulators are not real connected Android devices.
+                if not fields[0].startswith('emulator-'):found.append(fields[0])
+        return found[:4]
+    except (OSError,subprocess.TimeoutExpired):
+        return []
+
+def device_reports(root):
+    folder=pathlib.Path(root)/DEVICE_RESULTS
+    if folder.is_symlink() or folder.resolve()!=folder.absolute():raise ReportError('REPORTS_INVALID')
+    if not folder.is_dir():return {}
+    result={}; total_bytes=0
+    # Recursion is bounded by the number and size of XML results.
+    for p in folder.rglob('TEST-*.xml'):
+        if len(result)>=MAX_FILES or p.is_symlink() or not p.is_file() or p.resolve()!=p.absolute():
+            raise ReportError('REPORTS_INVALID')
+        data=p.read_bytes()
+        if len(data)>MAX_XML:raise ReportError('REPORTS_INVALID')
+        total_bytes+=len(data)
+        if total_bytes>8*1024*1024:raise ReportError('REPORTS_INVALID')
+        st=p.stat()
+        result[str(p.relative_to(folder))]=((st.st_ino,st.st_mtime_ns,st.st_ctime_ns,hashlib.sha256(data).hexdigest()),data)
+    return result
+
+def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT):
+    snapshot=guard.snapshot()
+    guard.require(snapshot,clean=True)
+    if guard.project.get('dynamic'):
+        if not jid: return dict(state='FAILED',error_code='TEST_STATE_CHANGED',exit_code=None,snapshot=snapshot,tests=None)
+        remote=guard.fetch(jid)
+        checked=guard.snapshot()
+        guard.require(checked,clean=True)
+        if snapshot['branch']!=checked['branch'] or snapshot['local_commit']!=checked['local_commit']:
+            return dict(state='FAILED',error_code='TEST_STATE_CHANGED',exit_code=None,snapshot=checked,tests=None)
+        snapshot=guard.compare(checked,remote)
+        if snapshot['local_commit']!=remote or snapshot['ahead'] or snapshot['behind']:
+            return dict(state='FAILED',error_code='BUILD_OUTDATED',exit_code=None,snapshot=snapshot,tests=None)
+    devices=adb_devices()
+    if len(devices)!=1:
+        log('event','ADB: ожидается одно подключённое авторизованное устройство; сейчас '+str(len(devices)))
+        return dict(state='FAILED',error_code='ADB_NOT_READY',exit_code=None,snapshot=snapshot,tests=None)
+    wrapper=guard.root/'gradlew'
+    if not wrapper.is_file() or wrapper.is_symlink():
+        return dict(state='FAILED',error_code='GRADLE_MISSING',exit_code=None,snapshot=snapshot,tests=None)
+    try:before=device_reports(guard.root)
+    except ReportError as e:
+        return dict(state='FAILED',error_code=e.code,exit_code=None,snapshot=snapshot,tests=None)
+    env=dict(guard.env)
+    for key in ('JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','GRADLE_OPTS','JAVA_OPTS'):
+        env.pop(key,None)
+    log('event','ADB: одно устройство, серийный номер '+devices[0][:24])
+    log('command','bash ./gradlew :app:connectedDebugAndroidTest --offline --no-daemon --rerun-tasks --console=plain')
+    code,unknown=process(guard.root,env,log,on_process,identity,redact,
+                         timeout,getattr(guard,'observe',lambda:None),DEVICE_COMMAND)
+    if unknown:
+        return dict(state='UNKNOWN',error_code='TEST_TIMEOUT_UNKNOWN',exit_code=None,snapshot=snapshot,tests=None,unresolved=True)
+    result=dict(state='FAILED',error_code='GRADLE_FAILED',exit_code=code,snapshot=snapshot,tests=None)
+    try:result['tests']=summary(before,device_reports(guard.root))
+    except ReportError as e:
+        if code==0:result['error_code']=e.code
+    after=guard.snapshot()
+    guard.require(after,clean=True)
+    result['snapshot']=after
+    if after['branch']!=snapshot['branch'] or after['local_commit']!=snapshot['local_commit']:
+        result['error_code']='TEST_STATE_CHANGED'
+    elif result['tests'] and result['tests']['failed']:
+        result['error_code']='TESTS_FAILED'
+    elif code==0 and result['tests'] is not None:
+        result.update(state='SUCCEEDED',error_code='')
+    return result
