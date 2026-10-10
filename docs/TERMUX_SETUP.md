@@ -1,0 +1,31 @@
+# Termux — подготовка локальной Android-сборки
+
+Инструкция для существующего Termux. Команды запускайте **внутри Termux вручную**, только после проверки вывода. AnimaDev не устанавливает пакеты молча.
+
+## 1. Базовые компоненты
+```sh
+pkg update
+pkg install git python openjdk-21 curl unzip
+termux-setup-storage
+```
+Проверьте: `java -version`, `python --version`, `git --version`. Откройте разрешение памяти, если Android его запросит.
+
+## 2. Android SDK
+Понадобятся Android SDK command-line tools, platform-tools, соответствующая версия Android Platform и build-tools. Храните SDK в известном каталоге, задайте `ANDROID_HOME` / `ANDROID_SDK_ROOT` согласно конфигурации вашего проекта. Для установки компонентов служит `sdkmanager` из уже установленного Android SDK; команды вроде `sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"` — только пример: **берите версии из** `build.gradle.kts` и вашего `gradle.properties`. На Termux стандартный desktop `aapt2` может быть несовместим с архитектурой Android: нужен рабочий Termux AAPT2 и соответствующий override, если он требуется вашему проекту.
+
+## 3. Gradle
+Используйте только проектный `./gradlew`. После загрузки необходимых зависимостей проверьте:
+```sh
+./gradlew --version
+./gradlew :app:assembleDebug --offline --no-daemon --rerun-tasks --console=plain
+```
+При первой сборке `--offline` может не сработать — сначала легально скачайте необходимые зависимости. Не удаляйте `~/.gradle` и Android SDK: это приведёт к длительным повторным загрузкам.
+
+## 4. Связь с AnimaDev
+- Разрешите `RUN_COMMAND` в Termux и доступ AnimaDev в Android.
+- В приложении нажмите «Проверить окружение», убедитесь в подходящих версиях JDK, SDK и инструментов.
+- Проверьте SSH/GitHub, ветку и SHA, прежде чем запускать тесты или сборки.
+- Для тестов на устройстве отдельно настройте ADB и авторизованное устройство.
+
+## 5. Безопасность
+Не копируйте закрытые JKS, пароли или SSH-ключи в общий Download. Не запускайте незнакомые скрипты из проектов. Инструкция ничего не устанавливает автоматически и не изменяет ваши Git-репозитории.
