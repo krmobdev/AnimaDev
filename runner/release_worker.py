@@ -163,7 +163,14 @@ def run(payload):
         if not STATE.is_dir() or STATE.is_symlink() or lock.is_symlink():
             raise ReleaseFailure("STATE_UNAVAILABLE")
         fd=os.open(lock,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+        global_fd=None
         try:
+            # Shared with animadev_runner.py: only ONE Gradle job on the phone.
+            global_lock=STATE/".build-global.lock"
+            if global_lock.is_symlink():raise ReleaseFailure("STATE_UNAVAILABLE")
+            global_fd=os.open(global_lock,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+            try:fcntl.flock(global_fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            except BlockingIOError:raise ReleaseFailure("JOB_BUSY")
             try: fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
             except BlockingIOError:raise ReleaseFailure("JOB_BUSY")
             sha=_git_clean(root,project,fetch=True)
@@ -210,6 +217,7 @@ def run(payload):
             return artifact
         finally:
             os.close(fd)
+            if global_fd is not None:os.close(global_fd)
     finally:
         key_bytes[:]=b"\0"*len(key_bytes)
         store_password[:]=b"\0"*len(store_password)
