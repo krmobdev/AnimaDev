@@ -45,6 +45,11 @@ class ReleaseStore(context:Context) {
             .put("state","REQUESTED").put("started_at",System.currentTimeMillis())
             .put("message","Termux собирает Release AAB. Задание может занять несколько минут; не запускайте его повторно."))
     }
+    fun failedWithoutTransfer(id:String,message:String) {
+        val old=read()
+        if(old.optString("id")==id && old.optString("state")=="REQUESTED")
+            write(old.put("state","FAILED").put("message",message))
+    }
     fun failed(id:String,message:String) {
         val old=read()
         if(old.optString("id")==id && old.optString("state")=="REQUESTED")
@@ -135,14 +140,15 @@ class ReleaseGateway(private val context:Context) {
                 try {
                     if(context.startService(command)==null) {
                         callback.cancel()
-                        store.failed(request,"Termux не подтвердил запуск. Статус неизвестен; повтор заблокирован.")
+                        store.failedWithoutTransfer(request,"Termux не подтвердил запуск, секреты не передавались.")
                         return "Termux не подтвердил запуск Release."
                     }
                 } catch (_:Exception) {
                     callback.cancel()
-                    store.failed(request,"Android отказал в запуске. Статус неизвестен; повтор заблокирован.")
+                    store.failedWithoutTransfer(request,"Android отказал в запуске, секреты не передавались.")
                     return "Не удалось отправить задание Termux."
                 }
+                var transferStarted=false
                 val accepted=withContext(Dispatchers.IO) {
                     val watchdog=CoroutineScope(Dispatchers.IO).launch {
                         delay(20_000)
@@ -161,6 +167,7 @@ class ReleaseGateway(private val context:Context) {
                             try {
                                 if(encoded.size>180_000) return@withContext false
                                 val output=DataOutputStream(client.outputStream)
+                                transferStarted=true
                                 output.writeInt(encoded.size)
                                 output.write(encoded)
                                 output.flush()
@@ -173,7 +180,10 @@ class ReleaseGateway(private val context:Context) {
                     }
                 }
                 if(!accepted) {
-                    store.failed(request,"Локальный канал не прошёл проверку UID/nonce или недоступен. Передача секрета отменена.")
+                    if(transferStarted)
+                        store.failed(request,"Состояние передачи не подтверждено. Повторный запуск заблокирован.")
+                    else
+                        store.failedWithoutTransfer(request,"Защищённый канал недоступен. Передача JKS не начиналась.")
                     return "Защищённое соединение с Termux не установлено. Секреты не переданы."
                 }
                 return "Termux принял задание. Подписанный AAB появится после проверки SHA и сертификата."
