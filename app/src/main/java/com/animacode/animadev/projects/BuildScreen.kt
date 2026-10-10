@@ -82,6 +82,7 @@ import com.animacode.animadev.termux.TermuxGateway
     var releaseMessage by remember(project.id){mutableStateOf("")}
     var showPasswordFields by remember(project.id){mutableStateOf(false)}
     var showSecurityDetails by remember(project.id){mutableStateOf(false)}
+    var confirmReleaseStop by remember(project.id){mutableStateOf(false)}
     val releaseScope=rememberCoroutineScope()
     val canRelease=canDebug && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseOrDebugBusy
     val effectivePasswordPresent=releasePassword.isNotEmpty() || storedCredentials?.storePassword?.isNotEmpty()==true
@@ -255,6 +256,7 @@ import com.animacode.animadev.termux.TermuxGateway
                     Text(when(state) {
                         "SUCCEEDED"->"Готово к отправке"
                         "FAILED"->"Не удалось собрать"
+                        "CANCELLED"->"Остановлено пользователем"
                         "UNKNOWN"->"Результат требует проверки"
                         "REQUESTED"->"Выполняется в Termux"
                         else->state
@@ -267,6 +269,14 @@ import com.animacode.animadev.termux.TermuxGateway
                             " мин "+(maxOf(0L,now-started)/1000%60)+" с")
                         Text("Другие сборки заблокированы до подтверждения результата.",
                             style=MaterialTheme.typography.bodySmall)
+                        if(releaseState.optBoolean("cancel_requested"))
+                            Text("Отправлен Ctrl+C · ожидаем подтверждение остановки",color=MaterialTheme.colorScheme.error,
+                                style=MaterialTheme.typography.bodySmall)
+                        else OutlinedButton(onClick={confirmReleaseStop=true},
+                            modifier=Modifier.fillMaxWidth(),
+                            colors=ButtonDefaults.outlinedButtonColors(contentColor=MaterialTheme.colorScheme.error)) {
+                            Text("Остановить Release · Ctrl+C")
+                        }
                     }
                     Text(releaseState.optString("message"),style=MaterialTheme.typography.bodyMedium)
                     if(releaseMessage.isNotBlank())Text(releaseMessage,
@@ -296,4 +306,11 @@ import com.animacode.animadev.termux.TermuxGateway
             TextButton(onClick={onJournal(job.optString("job_id"))}){Text("Журнал задания")}
         }
     }
+    if(confirmReleaseStop)AlertDialog(
+        onDismissRequest={confirmReleaseStop=false},
+        title={Text("Остановить Release AAB?")},
+        text={Text("Termux получит Ctrl+C. Готового AAB может не быть; исходники и Git не изменятся. Другая сборка останется заблокированной до подтверждения завершения.")},
+        confirmButton={TextButton(onClick={confirmReleaseStop=false;ReleaseCancel.request(context)}){Text("Остановить")}},
+        dismissButton={TextButton(onClick={confirmReleaseStop=false}){Text("Продолжить")}}
+    )
 }
