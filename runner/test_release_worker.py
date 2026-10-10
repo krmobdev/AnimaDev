@@ -34,9 +34,9 @@ class ReleaseProtocolTests(unittest.TestCase):
                  "store_password":"synthetic-only","key_password":"","unexpected":"value"})
         self.assertEqual(caught.exception.code,"RESULT_MALFORMED")
 
-    def test_secure_channel_rejects_arguments_missing_app_uid(self):
+    def test_secure_channel_rejects_bad_transport_checksum(self):
         scope=self.worker
-        with mock.patch.object(sys,"argv",["-c","animadev-release-"+"a"*32,"b"*32]):
+        with mock.patch.object(sys,"argv",["-c","a"*32,"bad_checksum"]):
             with self.assertRaises(scope["ReleaseFailure"]) as e:
                 scope["_receive_secure_payload"]()
         self.assertEqual(e.exception.code,"CHANNEL_DENIED")
