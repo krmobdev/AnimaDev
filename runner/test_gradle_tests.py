@@ -197,6 +197,65 @@ class GradleFixture(unittest.TestCase):
         self.assertEqual(j['error_code'],'RUNNER_CHECKSUM_MISMATCH');self.assertFalse((self.repo/'app/build/args.txt').exists())
 
 
+
+class InstrumentationFixture(unittest.TestCase):
+    """Exercise the complete guarded Gradle device-test path with a fake wrapper."""
+    setUp=base.Fixture.setUp
+    tearDown=base.Fixture.tearDown
+
+    def prepare(self, xml=OK):
+        lines=[
+            '#!/bin/sh',
+            'mkdir -p app/build/outputs/androidTest-results/connected/Pixel',
+            'mkdir -p app/build',
+            'printf "%s\\n" "$@" > app/build/device-args.txt',
+            'printf "%s\\n" "$ANDROID_SERIAL" > app/build/device-serial.txt',
+        ]
+        if xml is not None:
+            lines.extend([
+                "cat > app/build/outputs/androidTest-results/connected/Pixel/TEST-fixture.xml <<'XML'",
+                xml,
+                'XML',
+            ])
+        lines.append('exit 0')
+        (self.repo/'gradlew').write_text('\\n'.join(lines)+'\\n')
+        (self.repo/'.gitignore').write_text('app/build/\\n')
+        base.git(self.repo,'add','gradlew','.gitignore')
+        base.git(self.repo,'commit','-m','instrumentation fixture')
+        base.git(self.repo,'push','origin',base.BRANCH)
+        self.before=base.git(self.repo,'rev-parse','HEAD')
+
+    def exercise(self, devices):
+        guard=runner.GitGuard(self.project,git_executable=self.engine.git_executable)
+        with patch.object(gt,'adb_devices',return_value=devices):
+            return gt.execute_device(guard,lambda *a:None,lambda *a:None,
+                                     runner.identity,runner.redact,jid=uuid.uuid4().hex)
+
+    def test_connected_device_executes_fixed_instrumentation_command(self):
+        self.prepare()
+        result=self.exercise(['192.168.1.132:39721'])
+        self.assertEqual(result['state'],'SUCCEEDED',result)
+        self.assertEqual(result['tests']['passed'],1)
+        self.assertEqual((self.repo/'app/build/device-serial.txt').read_text().strip(),
+                         '192.168.1.132:39721')
+        self.assertEqual((self.repo/'app/build/device-args.txt').read_text().splitlines(),
+                         list(gt.DEVICE_COMMAND[1:]))
+        self.assertEqual(base.git(self.repo,'rev-parse','HEAD'),self.before)
+
+    def test_missing_device_blocks_gradle_before_launch(self):
+        self.prepare()
+        result=self.exercise([])
+        self.assertEqual(result['state'],'FAILED',result)
+        self.assertEqual(result['error_code'],'ADB_NOT_READY')
+        self.assertFalse((self.repo/'app/build/device-args.txt').exists())
+
+    def test_gradle_exit_zero_without_fresh_android_xml_is_not_success(self):
+        self.prepare(xml=None)
+        result=self.exercise(['192.168.1.132:39721'])
+        self.assertEqual(result['state'],'FAILED',result)
+        self.assertEqual(result['error_code'],'REPORTS_MISSING')
+
+
 class DebugBuildFixture(unittest.TestCase):
     setUp=base.Fixture.setUp
     tearDown=base.Fixture.tearDown
