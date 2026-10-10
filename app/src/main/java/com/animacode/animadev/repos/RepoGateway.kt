@@ -129,7 +129,11 @@ class RepoGateway(private val context: Context) {
     }
     fun query(manual: Boolean = false) {
         val r = store.read()
-        if (!r.optBoolean("ready") || !MonitorPolicy.queryAllowed(r.optBoolean("pending"),r.optString("job_id").isNotEmpty())) return
+        // A past job must be queryable even after the embedded runner was
+        // upgraded. Otherwise UNKNOWN permanently blocks helper installation.
+        if (!RepoPolicy.canRecoverJob(r.optBoolean("pending"),
+                r.optString("job_id"),r.optString("job_runner_sha"),
+                r.optString("installed_sha"))) return
         store.edit { it.put("manual_query", manual) }
         dispatch("QUERY")
     }
