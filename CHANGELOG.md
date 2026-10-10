@@ -1,5 +1,17 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-10 23:50 GMT+03:00 · 0.4.0-beta.10-dev.33 (47)
+- RU: Начат отдельный скин Emerald Glass по утверждённым макетам: чёрно-графитовая палитра, зелёные акценты, стеклянные карточки и векторная графика Compose.
+- EN: Started the opt-in Emerald Glass skin from approved references: dark graphite, emerald highlights, frosted cards and Compose-drawn vector graphics.
+- RU: Новый экран списка проектов показывает реальные ветки, состояние дерева, SHA, сохранены добавление и удаление проектов.
+- EN: New Projects screen uses real branches, worktree status and SHA; existing add/remove actions remain.
+- RU: Новый рабочий экран проекта с реальными Git/Tests/Build/History действиями, копированием SHA и защищённым переходом к сборке.
+- EN: Redesigned project dashboard with functional Git/Tests/Build/History actions, copy SHA and guarded Build entry.
+- RU: Начато оформление Debug APK Build, существующие Git-проверки и подпись Release AAB не меняются. Pulse доступен как прежде.
+- EN: Began Debug APK Build restyling without changing Git guards or Release signing; Pulse is preserved.
+- RU: План оставшихся экранов и проверок — docs/EMERALD_GLASS_ROADMAP.md.
+- EN: Remaining screens and acceptance checklist — docs/EMERALD_GLASS_ROADMAP.md.
+
 ## 2026-10-10 23:11 GMT+03:00 · 0.4.0-beta.9-dev.32 (46)
 - RU: Расширена английская локализация экранов Git, веток, тестов, сборок, монитора, истории, подписи и Termux.
 - EN: Expanded English coverage for Git, branches, tests, builds, job monitoring, history, signing and Termux.
