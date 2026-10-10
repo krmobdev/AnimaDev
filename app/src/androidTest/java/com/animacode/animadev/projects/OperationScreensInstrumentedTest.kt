@@ -82,35 +82,25 @@ class OperationScreensInstrumentedTest {
         compose.onNodeWithText("Собрать Release AAB").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Собрать Debug APK").assertDoesNotExist()
     }
-    @Test fun apkButtonAndNotificationTargetInstallerFlow() {
+    @Test fun apkButtonUsesSystemInstallerFlowNotTermuxOpen() {
         val artifact=JSONObject().put("path","/storage/emulated/0/Download/fixture.apk")
             .put("sha256","a".repeat(64)).put("size",2048)
-        var sent:android.content.Intent?=null
-        val wrapper=object:android.content.ContextWrapper(context) {
-            override fun checkSelfPermission(permission:String)=android.content.pm.PackageManager.PERMISSION_GRANTED
-            override fun startService(service:android.content.Intent):android.content.ComponentName? {
-                sent=service
-                return service.component
-            }
-        }
-        compose.setContent {MaterialTheme {BuildArtifactCard(wrapper,artifact)}}
-        compose.onNodeWithText("Открыть · установить приложение").assertIsDisplayed().assertIsEnabled().performClick()
-        compose.runOnIdle {
-            assertEquals("com.termux.app.RunCommandService",sent?.component?.className)
-            val args=sent?.getStringArrayExtra("com.termux.RUN_COMMAND_ARGUMENTS")!!
-            assertEquals("-c",args[0])
-            assertTrue(args[2].matches(Regex("[a-f0-9]{32}")))
-            assertEquals(artifact.getString("path"),args[3])
-            assertEquals(artifact.getString("sha256"),args[4])
-            assertEquals("2048",args[5])
-            assertTrue(args[1].contains("application/vnd.android.package-archive"))
-        }
+        compose.setContent {MaterialTheme {BuildArtifactCard(context,artifact)}}
+        compose.onNodeWithText("Установить APK").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithText("Открыть · установить приложение").assertDoesNotExist()
         val intent=ArtifactGateway.intent(context,artifact)
         assertEquals(ArtifactOpenReceiver::class.java.name,intent.component?.className)
         assertEquals("com.animacode.animadev.OPEN_ARTIFACT",intent.action)
         assertEquals(artifact.getString("sha256"),intent.getStringExtra("sha256"))
     }
-    @Test fun previousBuildFailureRemainsVisibleAfterGitCheck() {
+    @Test fun aabOffersFolderInsteadOfInstaller() {
+        val artifact=JSONObject().put("path","/storage/emulated/0/Download/fixture.aab")
+            .put("sha256","a".repeat(64)).put("size",2048)
+        compose.setContent {MaterialTheme {BuildArtifactCard(context,artifact)}}
+        compose.onNodeWithText("Открыть папку").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithText("Установить APK").assertDoesNotExist()
+    }
+    @Test fun previousBuildFailureOnlyAppearsInHistoryAfterGitCheck() {
         val record=seed()
         val failed=JSONObject().put("project_id","animaquiz").put("job_id","e".repeat(32))
             .put("action","BUILD_DEBUG").put("state","FAILED").put("error_code","GRADLE_FAILED")
@@ -118,8 +108,8 @@ class OperationScreensInstrumentedTest {
         record.put("action","CHECK").put("state","SUCCEEDED").put("build_job",failed)
         RepoStore(context).write(record)
         compose.setContent {MaterialTheme {BuildScreen(context,project,false,null,{}, {})}}
-        compose.onNodeWithText("Последняя Debug-сборка").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Не удалось собрать Debug APK").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Последняя Debug-сборка").assertDoesNotExist()
+        compose.onNodeWithText("Не удалось собрать Debug APK").assertDoesNotExist()
         compose.onNodeWithText("9 из 10 успешно").assertDoesNotExist()
     }
 
