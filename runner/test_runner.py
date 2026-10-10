@@ -135,6 +135,16 @@ class Fixture(unittest.TestCase):
         self.assertEqual(self.engine.query(jid,'animaquiz','BUILD_DEBUG')['state'],'INTERRUPTED')
         self.assertEqual(git(self.repo,'rev-parse','HEAD'),self.before)
 
+    def test_device_tests_share_global_gradle_slot_and_support_ctrl_c(self):
+        first=uuid.uuid4().hex
+        self.engine.start(first,'animaquiz','TEST_DEVICE',spawn=False)
+        with self.assertRaises(Denied) as cm:
+            self.engine.start(uuid.uuid4().hex,'animaquiz','BUILD_DEBUG',spawn=False)
+        self.assertEqual(cm.exception.code,'JOB_BUSY')
+        result=self.engine.cancel(first,'animaquiz','TEST_DEVICE')
+        self.assertEqual(result['state'],'INTERRUPTED')
+        self.assertEqual(result['error_code'],'CANCELLED')
+
     def test_cancel_running_verified_job_sets_one_shot_flag(self):
         jid=uuid.uuid4().hex
         self.engine.start(jid,'animaquiz','TEST',spawn=False)
