@@ -20,7 +20,13 @@ object SettingsPolicy {
         SettingEntry("about","version","Версия AnimaDev","Версия приложения и Android"),
         SettingEntry("about","diagnostics","Диагностика","Связь Termux и очищенные журналы заданий")
     )
-    fun search(query:String)=query.trim().takeIf {it.isNotEmpty()}?.let {q->entries.filter {(it.title+" "+it.description).contains(q,true)}} ?: emptyList()
+    fun search(query:String,english:Boolean=false)=query.trim().takeIf {it.isNotEmpty()}?.let {q->
+        entries.filter {entry->
+            (entry.title+" "+entry.description).contains(q,true) ||
+                (english && (AppTranslation.translate(entry.title,true)+" "+
+                    AppTranslation.translate(entry.description,true)).contains(q,true))
+        }
+    } ?: emptyList()
     fun toolbarTitle(target:String)=when(section(target)) {
         "appearance"->"Внешний вид";"git"->"Проекты и Git";"profiles"->"Профили";"signing"->"Подпись AAB";"jobs"->"Ожидание заданий";"notifications"->"Уведомления";"files"->"Файлы и загрузки";"about"->"О приложении";else->"Настройки"
     }
