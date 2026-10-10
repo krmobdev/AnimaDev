@@ -42,6 +42,11 @@ import com.animacode.animadev.repos.*
     } else null
     val pending=r.optBoolean("pending");val blocked=store.blocked();val ready=r.optBoolean("ready")
     val available=HelperPolicy.mayRun(permitted,termuxVersion!=null,ready,pending,blocked)
+    // Recovery is safe even when a previous job is UNKNOWN: QUERY never starts Gradle.
+    val canRecover=RepoPolicy.canRecoverJob(pending,r.optString("job_id"),
+        r.optString("job_runner_sha"),r.optString("installed_sha")) &&
+        permitted && termuxVersion!=null
+    val activeOrUnknown=blocked || r.optString("state")=="UNKNOWN"
     var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)}
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -124,6 +129,20 @@ import com.animacode.animadev.repos.*
                                 else->"Состояние проекта изменилось. Обновите локальный снимок."
                             },style=MaterialTheme.typography.bodyMedium)
                         }
+                        if(activeOrUnknown && r.optString("job_id").isNotBlank()) {
+                            Text("Сборочный слот занят: "+r.optString("action")+" · "+
+                                r.optString("state")+" · "+r.optString("job_id").take(12),
+                                style=MaterialTheme.typography.bodySmall,
+                                color=MaterialTheme.colorScheme.error)
+                            OutlinedButton(onClick={gateway.query(true)},
+                                enabled=canRecover,modifier=Modifier.fillMaxWidth()) {
+                                Icon(AppIcons.Refresh,null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Уточнить старое задание по ID")
+                            }
+                            Text("Чтение статуса не запускает тесты повторно и не изменяет Git.",
+                                style=MaterialTheme.typography.bodySmall)
+                        }
                         if(!prepared || needStatus) {
                             OutlinedButton(onClick={gateway.start("STATUS",project.id,project.path)},
                                 enabled=available,modifier=Modifier.fillMaxWidth()) {
@@ -163,12 +182,25 @@ import com.animacode.animadev.repos.*
                             placeholder={Text("192.168.1.132:37123")},
                             modifier=Modifier.fillMaxWidth(),
                             enabled=!adbPending)
+                        // Never silently disable the button for a pasted address:
+                        // validation remains strict in AdbDeviceGateway.connect().
+                        if(adbEndpoint.isNotBlank() &&
+                           !AdbDeviceGateway.validLanEndpoint(adbEndpoint)) {
+                            Text("Адрес нужно проверить: укажите локальный IPv4 и порт от 1024 до 65535. "+
+                                "После нажатия появится точная причина отказа.",
+                                style=MaterialTheme.typography.bodySmall,
+                                color=MaterialTheme.colorScheme.error)
+                        }
                         Button(onClick={adb.connect(adbEndpoint)},
                             enabled=permitted && termuxVersion!=null && !adbPending &&
-                                AdbDeviceGateway.validLanEndpoint(adbEndpoint),
+                                adbEndpoint.isNotBlank(),
                             modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
-                            Text("Подключить Pixel через ADB")
+                            Text(if(adbPending)"Соединяемся…" else "Подключить Pixel через ADB")
                         }
+                        if(!permitted || termuxVersion==null)
+                            Text("Для подключения требуется разрешённый Termux RUN_COMMAND. "+
+                                "Откройте настройки интеграции Termux.",
+                                style=MaterialTheme.typography.bodySmall)
                         OutlinedButton(onClick={adb.refresh()},
                             enabled=permitted && termuxVersion!=null && !adbPending,
                             modifier=Modifier.fillMaxWidth()) {
@@ -188,8 +220,16 @@ import com.animacode.animadev.repos.*
                             "VPN не мешает доступу. При USB-подключении разрешите отладку на Pixel.",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        if(!prepared && ready)Text("Сначала нажмите «Подготовить тесты» в разделе Unit-тесты.",
-                            style=MaterialTheme.typography.bodySmall)
+                        if(activeOrUnknown && r.optString("job_id").isNotBlank()) {
+                            OutlinedButton(onClick={gateway.query(true)},enabled=canRecover,
+                                modifier=Modifier.fillMaxWidth()) {
+                                Text("Уточнить статус предыдущего задания")
+                            }
+                        } else if(!prepared && ready) {
+                            Text("Подготовьте Git-снимок в разделе Unit-тесты. "+
+                                "ADB можно подключать независимо от готовности Gradle.",
+                                style=MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
