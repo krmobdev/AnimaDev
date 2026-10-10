@@ -59,14 +59,15 @@ class MainActivity:ComponentActivity() {
         var theme by remember { mutableStateOf(settings.getString("theme","system") ?: "system") }
         var dynamic by remember { mutableStateOf(settings.getBoolean("dynamic",true)) }
         var pulse by remember { mutableStateOf(settings.getBoolean("pulse",true)) }
+        var emerald by remember {mutableStateOf(settings.getBoolean("emerald_glass",false))}
         var language by remember {mutableStateOf(settings.getString("language","system") ?: "system")}
         val english=AppLanguage.english(language,LocalConfiguration.current.locales[0].language)
-        val dark=AppThemePolicy.dark(theme,isSystemInDarkTheme())
-        val colors=if(pulse)pulseColorScheme(dark)
+        val dark=if(emerald)true else AppThemePolicy.dark(theme,isSystemInDarkTheme())
+        val colors=if(emerald)neonColorScheme() else if(pulse)pulseColorScheme(dark)
         else if(dynamic) { if(dark)dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }
         else if(dark)darkColorScheme() else lightColorScheme()
         SideEffect { enableEdgeToEdge(SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT){dark},SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT){dark}) }
-        CompositionLocalProvider(LocalAppLanguage provides language) {
+        CompositionLocalProvider(LocalAppLanguage provides language,LocalNeonSkin provides emerald) {
         MaterialTheme(colorScheme=colors,typography=Typography(
             labelLarge=Typography().labelLarge.copy(textAlign=TextAlign.Center))) {
             val projects=remember { ProjectStore(context) }
@@ -194,6 +195,7 @@ class MainActivity:ComponentActivity() {
                         {dynamic=it;settings.edit().putBoolean("dynamic",it).apply()},
                         settingsSection,{settingsSection=it},
                         pulse=pulse,onPulse={value->pulse=value;settings.edit().putBoolean("pulse",value).apply()},
+                        emerald=emerald,onEmerald={value->emerald=value;settings.edit().putBoolean("emerald_glass",value).apply()},
                         language=language,onLanguage={value->language=value;settings.edit().putString("language",value).apply()},
                         onOpenBuild={projectId->
                             val project=projects.all().firstOrNull {it.id==projectId && it.supported}
