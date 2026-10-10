@@ -19,7 +19,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.animacode.animadev.termux.TermuxGateway
 
-@Composable fun TermuxOverview(context:Context,permitted:Boolean,version:String?,onPermissionUpdated:()->Unit) {
+@Composable fun TermuxOverview(context:Context,permitted:Boolean,version:String?,onPermissionUpdated:()->Unit,
+    onOpenSetup:()->Unit={}) {
     val gateway=remember { CatalogGateway(context) };val data=rememberCatalogRecord(context);val env=data.getJSONObject("environment")
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
     var notifications by remember {mutableStateOf(context.getSystemService(NotificationManager::class.java).areNotificationsEnabled())}
@@ -40,6 +41,21 @@ import com.animacode.animadev.termux.TermuxGateway
         } }
         item {SectionLabel("Android и Gradle");Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {DetailRow("Android SDK",env.optString("sdk").ifEmpty {"Не проверено"});HorizontalDivider(Modifier.padding(horizontal=16.dp));DetailRow("Сохранённые Gradle",env.optString("gradle").ifEmpty {"Не проверено"});DetailRow("Платформа",listOf(env.optString("platform"),env.optString("architecture")).filter {it.isNotBlank()}.joinToString(" · ").ifEmpty {"Не проверено"})} }
         item {SectionLabel("Уведомления");ListItem(headlineContent={Text(if(notifications)"Разрешены" else "Отключены")},supportingContent={Text("Не влияют на доступность Git и тестов")},trailingContent={IconButton(onClick={if(context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,context.packageName)) else notify.launch(Manifest.permission.POST_NOTIFICATIONS)}){Icon(AppIcons.Settings,"Разрешение и настройки уведомлений")}}) }
-        item {Text("Обновления пакетов и Wake Lock пока недоступны.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        item {
+            OutlinedCard {
+                Column(Modifier.fillMaxWidth().padding(16.dp),
+                    verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Text("Локальная Android-сборка",style=MaterialTheme.typography.titleMedium)
+                    Text("Пошаговая установка Java 21, Python, Git и Android SDK, настройка Gradle и AAPT2. Команды запускаются вручную в Termux после проверки.",
+                        style=MaterialTheme.typography.bodySmall)
+                    Button(onClick=onOpenSetup,modifier=Modifier.fillMaxWidth()) {
+                        Text("Подготовка сборки · подробная инструкция")
+                    }
+                    Text("Автоматическая установка не запускается без подтверждения и проверки уже настроенного окружения.",
+                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        item {Text("Обновления пакетов и Wake Lock не выполняются автоматически.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
     }
 }
