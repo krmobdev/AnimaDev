@@ -23,6 +23,13 @@ import com.animacode.animadev.repos.*
     val adb=remember {AdbDeviceGateway(context)}
     var adbVersion by remember {mutableIntStateOf(0)}
     var adbEndpoint by rememberSaveable(project.id) { mutableStateOf("") }
+    var deviceActionMessage by rememberSaveable(project.id) { mutableStateOf("") }
+    LaunchedEffect(adb) {
+        while(true) {
+            kotlinx.coroutines.delay(1500)
+            adb.expire()
+        }
+    }
     DisposableEffect(adb) {
         val listener=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,_->adbVersion++ }
         adb.prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -41,6 +48,8 @@ import com.animacode.animadev.repos.*
         it.optString("branch")==project.branch && it.optString("local_commit")==project.commit
     } else null
     val pending=r.optBoolean("pending");val blocked=store.blocked();val ready=r.optBoolean("ready")
+    val releaseGeneration=ReleaseStore.generation.intValue
+    val releaseBusy=remember(releaseGeneration) { ReleaseStore(context).busy() }
     val available=HelperPolicy.mayRun(permitted,termuxVersion!=null,ready,pending,blocked)
     // Recovery is safe even when a previous job is UNKNOWN: QUERY never starts Gradle.
     val canRecover=RepoPolicy.canRecoverJob(pending,r.optString("job_id"),
@@ -106,7 +115,7 @@ import com.animacode.animadev.repos.*
         } else {
             val prepared=belongs && snap!=null && gateway.mayTest(r,project.id)
             val canRun=available && prepared
-            val canRunDevice=available && !adbPending
+            val canRunDevice=available && !adbPending && !releaseBusy
             val needStatus=r.optString("project_id","animaquiz")!=project.id || snap==null
             item {
                 OutlinedCard(shape=androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
@@ -211,18 +220,27 @@ import com.animacode.animadev.repos.*
                         // The device runner checks the branch, origin, clean worktree,
                         // GitHub SHA and ADB immediately before running Gradle. It does
                         // not need the separate Unit-tests STATUS screen or cached ADB age.
-                        Button(onClick={gateway.start("TEST_DEVICE",project.id,project.path)},
-                            enabled=canRunDevice,
+                        Button(onClick={
+                            deviceActionMessage=gateway.startDeviceWithFeedback(project.id,project.path)
+                        },enabled=canRunDevice,
                             modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
                             Icon(AppIcons.Tests,null)
                             Spacer(Modifier.width(8.dp))
                             Text("Запустить инструментальные тесты")
                         }
+                        if(deviceActionMessage.isNotBlank()) {
+                            Text(deviceActionMessage,style=MaterialTheme.typography.bodyMedium,
+                                color=if(deviceActionMessage.startsWith("Запрос записан"))
+                                    MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                        }
+                        if(belongs && r.optString("action")=="TEST_DEVICE" &&
+                            r.optString("job_id").isNotBlank()) {
+                            JobMonitor(context,r,permitted,onJournal)
+                        }
                         Text(if(deviceReady)
                             "ADB подтвердил Pixel. Перед запуском Gradle устройство будет проверено ещё раз."
-                            else "Pixel ещё не подтверждён. Подключи его через ADB. "+
-                                "Запуск доступен: Termux проверит подключение и покажет "+
-                                "точную ошибку вместо молчаливой блокировки.",
+                            else "Pixel пока не подтверждён. Подключи его через ADB; "+
+                                "перед Gradle Termux самостоятельно проверит устройство.",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("GitHub, ветка и чистота проекта проверяются автоматически "+
@@ -234,6 +252,7 @@ import com.animacode.animadev.repos.*
                                 !permitted -> "Нет разрешения на запуск команд в Termux."
                                 termuxVersion==null -> "Termux не найден."
                                 !ready -> "Обнови помощник Termux кнопкой выше."
+                                releaseBusy -> "Release-сборка занимает очередь. Проверь её статус."
                                 else -> "Сейчас выполняется другое задание. Дождись завершения."
                             },style=MaterialTheme.typography.bodySmall,
                                 color=MaterialTheme.colorScheme.error)
@@ -279,7 +298,8 @@ import com.animacode.animadev.repos.*
         }
         if(belongs && r.optString("job_id").isNotEmpty() &&
             (blocked || r.optString("state")=="UNKNOWN" ||
-             (tool=="git" && r.optString("action") !in setOf("TEST","TEST_DEVICE"))))item {
+             (tool=="git" && r.optString("action") !in setOf("TEST","TEST_DEVICE"))) &&
+            (tool=="git" || r.optString("action")!="TEST_DEVICE"))item {
             JobMonitor(context,r,permitted,onJournal)
         }
     }
