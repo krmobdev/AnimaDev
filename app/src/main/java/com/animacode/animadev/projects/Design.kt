@@ -35,7 +35,7 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
     val view=LocalView.current
     ListItem(headlineContent={Text(title)},supportingContent={Text(value)},trailingContent=trailing ?: if(onClick!=null)({Icon(AppIcons.Chevron,null)}) else null,modifier=if(onClick!=null)Modifier.clickable {feedback.tap(view);onClick()} else Modifier)
 }
-@Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={},pulse:Boolean=true,onPulse:(Boolean)->Unit={},onOpenBuild:(String)->Unit={},language:String="system",onLanguage:(String)->Unit={}) {
+@Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={},pulse:Boolean=true,onPulse:(Boolean)->Unit={},onOpenBuild:(String)->Unit={},language:String="system",onLanguage:(String)->Unit={},emerald:Boolean=false,onEmerald:(Boolean)->Unit={}) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
     val feedback=remember {UiFeedback(context)}
@@ -65,16 +65,19 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
             }
         } else when(category) {
             "appearance"->{
+                item {Preference("Emerald Glass · новый скин",
+                    "Тёмное стекло, зелёное свечение и новый интерфейс проектов. Pulse остаётся доступен.",
+                    trailing={Switch(emerald,onEmerald)})}
                 item {
                     Preference("Pulse · молодёжный дизайн",
-                        if(pulse)"Зелёные акценты, светлая или тёмная палитра" else "Классическая палитра Material",
+                        if(emerald)"Сохранён как запасной стиль" else if(pulse)"Зелёные акценты, светлая или тёмная палитра" else "Классическая палитра Material",
                         trailing={Switch(pulse,onPulse)})
                 }
                 item {Preference("Язык / Language",
                     when(language) {"en"->"English";"ru"->"Русский";else->"System / Как в системе"},
                     {selector="language"})}
                 item {Preference("Тема",themeLabel,{selector="theme"})}
-                item {Preference("Динамические цвета",if(pulse)"Не используются в режиме Pulse" else "Палитра обоев Android",trailing={Switch(dynamic,onDynamic,enabled=!pulse)})}
+                item {Preference("Динамические цвета",if(pulse || emerald)"Не используются в выбранном стиле" else "Палитра обоев Android",trailing={Switch(dynamic,onDynamic,enabled=!pulse && !emerald)})}
                 item {HorizontalDivider(Modifier.padding(horizontal=20.dp,vertical=8.dp))}
                 item {Preference("Вибрация при нажатии","Тактильный отклик для кнопок и навигации",
                     trailing={Switch(haptics,{v->haptics=v;feedback.setVibrations(v);if(v)feedback.tap(view)})})}
