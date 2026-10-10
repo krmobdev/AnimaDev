@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <queries><package android:name="com.termux" /></queries>
     <application android:label="AnimaDev" android:icon="@drawable/ic_launcher"
-        android:allowBackup="false" android:supportsRtl="true" android:theme="@style/AppTheme">
+        android:localeConfig="@xml/locales_config" android:allowBackup="false" android:supportsRtl="true" android:theme="@style/AppTheme">
         <receiver android:name=".projects.ArtifactOpenReceiver" android:exported="false" />
         <receiver android:name=".projects.ArtifactResultReceiver" android:exported="false" />
         <receiver android:name=".projects.ArtifactMoveReceiver" android:exported="false" />
