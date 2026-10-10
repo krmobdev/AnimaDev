@@ -116,6 +116,36 @@ class Fixture(unittest.TestCase):
             self.engine.start(uuid.uuid4().hex,'second','TEST',spawn=False)
         self.assertEqual(cm.exception.code,'JOB_BUSY')
         self.assertEqual(git(self.repo,'rev-parse','HEAD'),self.before)
+    def test_ctrl_c_before_gradle_spawn_does_not_start_any_command(self):
+        jid=uuid.uuid4().hex
+        self.engine.start(jid,'animaquiz','BUILD_DEBUG',spawn=False)
+        cancelled=self.engine.cancel(jid,'animaquiz','BUILD_DEBUG')
+        self.assertEqual(cancelled['state'],'INTERRUPTED')
+        self.assertEqual(cancelled['error_code'],'CANCELLED')
+        self.engine.run_job(jid)
+        self.assertEqual(self.engine.query(jid,'animaquiz','BUILD_DEBUG')['state'],'INTERRUPTED')
+        self.assertEqual(git(self.repo,'rev-parse','HEAD'),self.before)
+
+    def test_cancel_running_verified_job_sets_one_shot_flag(self):
+        jid=uuid.uuid4().hex
+        self.engine.start(jid,'animaquiz','TEST',spawn=False)
+        self.engine.store.update(jid,state='RUNNING',pid=os.getpid(),process_identity=identity(os.getpid()))
+        result=self.engine.cancel(jid,'animaquiz','TEST')
+        self.assertEqual(result['state'],'RUNNING')
+        self.assertTrue(result['cancel_requested'])
+        self.assertTrue(self.engine.cancel(jid,'animaquiz','TEST')['cancel_requested'])
+
+    def test_ctrl_c_rejects_wrong_job_or_git_action(self):
+        jid=uuid.uuid4().hex
+        self.engine.start(jid,'animaquiz','CHECK',spawn=False)
+        with self.assertRaises(Denied) as cm:
+            self.engine.cancel(jid,'animaquiz','CHECK')
+        self.assertEqual(cm.exception.code,'ACTION_DENIED')
+        with self.assertRaises(Denied) as cm:
+            self.engine.cancel(jid,'animaquiz','BUILD_DEBUG')
+        self.assertEqual(cm.exception.code,'RESULT_MALFORMED')
+        self.assertFalse(self.engine.query(jid,'animaquiz','CHECK').get('cancel_requested',False))
+
     def test_missing_query_tombstones_late_start(self):
         jid=uuid.uuid4().hex;a=self.engine.query(jid,'animaquiz','SYNC');self.assertEqual(a['state'],'NOT_STARTED');b=self.engine.start(jid,'animaquiz','SYNC',spawn=False);self.assertEqual(b['state'],'NOT_STARTED');self.engine.run_job(jid);self.assertEqual(git(self.repo,'rev-parse','HEAD'),self.before)
     def test_reopen_store_keeps_result(self):
