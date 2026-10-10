@@ -127,9 +127,13 @@ import com.animacode.animadev.termux.TermuxGateway
                 if(!canDebug) NeonStatus("Build blocked until verified",false)
             }
         }
-        item {OperationTabs(listOf("Debug APK","Release AAB"),buildTab) {
-            if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
-        }}
+        item {
+            if(neon)NeonTabs(listOf("Debug APK","Release AAB"),buildTab) {
+                if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
+            } else OperationTabs(listOf("Debug APK","Release AAB"),buildTab) {
+                if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
+            }
+        }
         if(catalogRefresh)item {Text("Сверяем активную ветку с Termux…",style=MaterialTheme.typography.bodySmall)}
         if(busyOwner!=null)item {
             Text("Очередь занята: "+busyOwner+" · "+when {
@@ -176,19 +180,23 @@ import com.animacode.animadev.termux.TermuxGateway
         }}
         if(buildTab==0)item {DebugBuildResult(context,record,project,permitted,onJournal)}
         if(buildTab==1)item {
-            OutlinedCard(shape=RoundedCornerShape(22.dp),
-                border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
+            Surface(shape=RoundedCornerShape(23.dp),
+                color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainer,
+                border=BorderStroke(1.dp,if(neon)NeonGlass.outline else MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),
                     verticalArrangement=Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically,
                         horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                         Icon(AppIcons.Build,null,tint=MaterialTheme.colorScheme.primary)
                         Column {
-                            Text("Release AAB",style=MaterialTheme.typography.titleLarge)
+                            Text(if(neon)"Release signing" else "Release AAB",
+                                style=MaterialTheme.typography.titleLarge)
                             Text("Подписанный пакет для публикации",
                                 style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    if(neon)NeonSection("Keystore",AppIcons.Build,
+                        "Use the selected signing file and key alias")
                     if(hasSigningKey) {
                         Surface(color=MaterialTheme.colorScheme.surfaceContainerLow,
                             shape=RoundedCornerShape(14.dp)) {
@@ -204,6 +212,8 @@ import com.animacode.animadev.termux.TermuxGateway
                         Text("Сначала выберите JKS и alias в настройках подписи.",
                             style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
                     }
+                    if(neon)NeonSection("Passwords",AppIcons.Info,
+                        "Passwords stay protected by Android Keystore")
                     if(storedCredentials!=null && !showPasswordFields) {
                         Text("Пароль готов к использованию",style=MaterialTheme.typography.bodyMedium,
                             color=MaterialTheme.colorScheme.primary)
@@ -243,6 +253,8 @@ import com.animacode.animadev.termux.TermuxGateway
                         }
                     }
                     if(vaultMessage.isNotBlank())Text(vaultMessage,style=MaterialTheme.typography.bodySmall)
+                    if(neon)NeonSection("Build Actions",AppIcons.Build,
+                        "Sign and verify an Android App Bundle")
                     Button(onClick={
                         tap()
                         val saved=storedCredentials
@@ -254,7 +266,7 @@ import com.animacode.animadev.termux.TermuxGateway
                         releaseScope.launch {releaseMessage=releaseGateway.launch(project,storePass,keyPass)}
                     },enabled=canRelease && effectivePasswordPresent,
                         modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)) {
-                        Text("Собрать Release AAB")
+                        Text(if(neon)"Build Release AAB" else "Собрать Release AAB")
                     }
                     OutlinedButton(onClick={tap();gateway.start("CHECK",project.id,project.path)},
                         enabled=canCheck,modifier=Modifier.fillMaxWidth()) {
@@ -292,7 +304,9 @@ import com.animacode.animadev.termux.TermuxGateway
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp),
                     verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Text("Последняя Release-сборка",style=MaterialTheme.typography.titleMedium)
+                    if(neon)NeonSection("Release AAB status",AppIcons.History,
+                        "Signed bundle · local Termux build")
+                    else Text("Последняя Release-сборка",style=MaterialTheme.typography.titleMedium)
                     Text("Job ID: "+releaseState.optString("id"),
                         style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Git SHA: "+releaseState.optString("sha").ifBlank {"Не определён"},
@@ -319,6 +333,15 @@ import com.animacode.animadev.termux.TermuxGateway
                         Text("Ошибка: "+it,color=MaterialTheme.colorScheme.error,
                             style=MaterialTheme.typography.bodySmall)
                     }
+                    if(neon)NeonStatus(
+                        when(state) {
+                            "SUCCEEDED"->"Ready for publishing"
+                            "FAILED"->"Build failed"
+                            "CANCELLED"->"Cancelled"
+                            "UNKNOWN"->"Needs verification"
+                            "REQUESTED"->"Running in Termux"
+                            else->state
+                        },state=="SUCCEEDED")
                     Text(when(state) {
                         "SUCCEEDED"->"Готово к отправке"
                         "FAILED"->"Не удалось собрать"
