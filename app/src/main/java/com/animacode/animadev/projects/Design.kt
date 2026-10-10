@@ -9,6 +9,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.animacode.animadev.repos.NotificationSettings
 import com.animacode.animadev.repos.MonitorPolicy
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -33,7 +37,25 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
     val context=androidx.compose.ui.platform.LocalContext.current
     val feedback=remember {UiFeedback(context)}
     val view=LocalView.current
-    ListItem(headlineContent={Text(title)},supportingContent={Text(value)},trailingContent=trailing ?: if(onClick!=null)({Icon(AppIcons.Chevron,null)}) else null,modifier=if(onClick!=null)Modifier.clickable {feedback.tap(view);onClick()} else Modifier)
+    if(LocalNeonSkin.current) Surface(
+        modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=5.dp)
+            .then(if(onClick!=null)Modifier.clickable {feedback.tap(view);onClick()} else Modifier),
+        color=NeonGlass.surface,shape=RoundedCornerShape(19.dp),
+        border=BorderStroke(1.dp,NeonGlass.outline)) {
+        Row(Modifier.fillMaxWidth().padding(15.dp),
+            verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                Text(title,style=MaterialTheme.typography.titleMedium,
+                    fontWeight=FontWeight.SemiBold,color=NeonGlass.white)
+                Text(value,style=MaterialTheme.typography.bodySmall,color=NeonGlass.muted)
+            }
+            if(trailing!=null)trailing()
+            else if(onClick!=null)Icon(AppIcons.Chevron,null,tint=NeonGlass.green)
+        }
+    } else ListItem(headlineContent={Text(title)},supportingContent={Text(value)},
+        trailingContent=trailing ?: if(onClick!=null)({Icon(AppIcons.Chevron,null)}) else null,
+        modifier=if(onClick!=null)Modifier.clickable {feedback.tap(view);onClick()} else Modifier)
 }
 @Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={},pulse:Boolean=true,onPulse:(Boolean)->Unit={},onOpenBuild:(String)->Unit={},language:String="system",onLanguage:(String)->Unit={},emerald:Boolean=false,onEmerald:(Boolean)->Unit={}) {
     val focus=LocalFocusManager.current
@@ -88,7 +110,15 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
                 if(results.isEmpty())item {DetailRow("Ничего не найдено","Попробуйте другое название или описание")}
                 results.forEach {entry->item(key=entry.section+entry.id){Preference(entry.title,entry.description,{openSection(entry.section+"/"+entry.id)})}}
             }
-        } else when(category) {
+        } else {
+            if(neon)item {
+                val sectionTitle=settingsSections.firstOrNull{it.first==category}?.second
+                    ?: "Настройки"
+                NeonSection(sectionTitle,AppIcons.Settings,
+                    "Настройки сохраняются автоматически",
+                    modifier=Modifier.padding(horizontal=20.dp,vertical=12.dp))
+            }
+            when(category) {
             "appearance"->{
                 item {Preference("Emerald Glass · новый скин",
                     "Тёмное стекло, зелёное свечение и новый интерфейс проектов. Pulse остаётся доступен.",
@@ -130,6 +160,7 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
                 item {Preference("AnimaDev",context.packageManager.getPackageInfo(context.packageName,0).versionName ?: "Версия недоступна")}
                 item {Preference("Диагностика","Связь и инструменты — в разделе Termux. Очищенные журналы и отправка отчётов — в истории проекта.")}
                 item {Preference("Android","${android.os.Build.VERSION.RELEASE} · API ${android.os.Build.VERSION.SDK_INT}")}
+            }
             }
         }
     }
