@@ -23,6 +23,20 @@ class MonitorTests(unittest.TestCase):
         while True:
             p=self.journal.page(self.job,cursor);text+=p['text'];cursor=p['next_offset']
             if not p['more']:return text,cursor
+    def test_real_cpu_utilization_formula_and_unknown_samples(self):
+        self.assertEqual(monitor.cpu_usage_percent(100,200,1.0,100),100.0)
+        self.assertEqual(monitor.cpu_usage_percent(100,350,1.0,100),250.0)
+        self.assertIsNone(monitor.cpu_usage_percent(None,100,1,100))
+        self.assertIsNone(monitor.cpu_usage_percent(200,100,1,100))
+        self.assertIsNone(monitor.cpu_usage_percent(100,200,0,100))
+
+    def test_available_memory_reads_only_linux_memavailable(self):
+        path=self.root/'meminfo'
+        path.write_text('MemTotal: 100000 kB\nMemAvailable: 512000 kB\n')
+        self.assertEqual(monitor.available_memory_mib(str(path)),500)
+        path.write_text('MemTotal: 100000 kB\\n')
+        self.assertIsNone(monitor.available_memory_mib(str(path)))
+
     def test_old_schema_migration_preserves_job(self):
         self.job['stdout']='legacy output'
         with self.store.transaction() as c:self.store.save(c,self.job)
