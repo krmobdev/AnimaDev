@@ -295,6 +295,9 @@ def device_init_script(jid):
             p.extensions.getByName('androidComponents').finalizeDsl { android ->
                 def originalId = android.defaultConfig.applicationId
                 if (originalId == 'com.animacode.quizapp') {
+                    // Keep the known test-only package identity: update in place,
+                    // avoiding collisions with its literal test provider authority.
+                    android.defaultConfig.testApplicationId = 'com.animacode.quizapp.debug.test'
                     // OS backup seed/restore/verify is a separate multi-process audit.
                     android.defaultConfig.testInstrumentationRunnerArguments['notClass'] =
                         'com.animacode.quizapp.data.NativeBackupPhaseInstrumentedTest'
