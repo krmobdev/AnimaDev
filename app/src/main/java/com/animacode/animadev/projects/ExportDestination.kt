@@ -23,6 +23,51 @@ object DestinationPolicy {
 class ExportDestination(private val context:Context) {
     val prefs=context.getSharedPreferences("files_v1",Context.MODE_PRIVATE)
     fun selected()=prefs.getString("tree","") ?: ""
+
+    /**
+     * Termux can export directly only to Android primary shared storage.
+     * SAF-only providers (including cloud storage and SD cards) cannot be
+     * treated as filesystem paths. Never silently ignore the chosen folder.
+     */
+    fun artifactDirectory():String? {
+        val selection=selected()
+        if(selection.isEmpty())return "/storage/emulated/0/Download"
+        if(!available(selection))return null
+        return runCatching {
+            val uri=Uri.parse(selection)
+            check(uri.authority=="com.android.externalstorage.documents")
+            val id=DocumentsContract.getTreeDocumentId(uri)
+            check(id.startsWith("primary:"))
+            val relative=id.removePrefix("primary:")
+            val segments=relative.split('/')
+            check(segments.isNotEmpty() && segments.all {
+                it.matches(Regex("[\\p{L}\\p{N}_ ().&-]{1,80}")) &&
+                it!="." && it!=".."
+            })
+            "/storage/emulated/0/"+segments.joinToString("/")
+        }.getOrNull()
+    }
+
+    /** A persisted SAF grant is required before Android may read a Termux APK. */
+    fun artifactUri(path:String):Uri? {
+        val root=artifactDirectory() ?:return null
+        val tree=selected().takeIf {it.isNotEmpty()} ?:return null
+        val name=path.substringAfterLast('/')
+        if(path!="$root/$name" || !name.matches(Regex("[A-Za-z0-9_-]+[.](apk|aab)")))return null
+        return runCatching {
+            val treeUri=Uri.parse(tree)
+            DocumentsContract.buildDocumentUriUsingTree(
+                treeUri,DocumentsContract.getTreeDocumentId(treeUri)+"/"+name)
+        }.getOrNull()
+    }
+
+    /** Android DocumentsUI starts at the selected folder (or Downloads). */
+    fun folderUri():Uri {
+        val selectedTree=selected()
+        if(selectedTree.isNotEmpty() && available(selectedTree))return Uri.parse(selectedTree)
+        return DocumentsContract.buildTreeDocumentUri(
+            "com.android.externalstorage.documents","primary:Download")
+    }
     fun label()=prefs.getString("label",DestinationPolicy.DEFAULT) ?: DestinationPolicy.DEFAULT
     fun available(value:String=selected()):Boolean {
         if(value.isEmpty())return true
