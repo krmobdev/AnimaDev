@@ -50,7 +50,7 @@ def _valid_project(req):
     except (OSError,ValueError):
         raise ReleaseFailure("PROJECT_DENIED")
     if req["root"]==str(HOME/"quizapp"):
-        if req["id"]!="animaquiz" or req["remote"]!="github.com/krmobdev/quizapp" or req["branch"]!="test/decomposition-v1":
+        if req["id"]!="animaquiz" or req["remote"]!="github.com/krmobdev/quizapp" or req["branch"] not in ("main","test/decomposition-v1"):
             raise ReleaseFailure("PROJECT_DENIED")
     elif req["id"]!=hashlib.sha256(req["root"].encode()).hexdigest()[:32]:
         raise ReleaseFailure("PROJECT_DENIED")
