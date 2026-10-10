@@ -18,6 +18,7 @@ android {
         applicationId = "com.animacode.animadev"
         minSdk = 33
         targetSdk = 35
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = 27
         versionName = "0.4.0-beta.8-dev.13"
     }
@@ -39,6 +40,11 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }
