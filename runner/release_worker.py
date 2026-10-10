@@ -45,7 +45,7 @@ def _valid_project(req):
             raise ValueError()
         if root.resolve()!=root.absolute() or not root.is_dir():raise ValueError()
         marker=root/".git"
-        if marker.is_symlink() or not marker.exists():raise ValueError()
+        if marker.is_symlink() or not marker.is_dir():raise ValueError()
     except (OSError,ValueError):
         raise ReleaseFailure("PROJECT_DENIED")
     if req["root"]==str(HOME/"quizapp"):
@@ -87,7 +87,7 @@ def _git_clean(root, req, fetch=False):
     normalized=origin.replace("git@github.com:","github.com/").removesuffix(".git")
     if normalized!=req["remote"]:
         raise ReleaseFailure("REMOTE_MISMATCH")
-    if _git(root,"status","--porcelain=v1","--untracked-files=no"):
+    if _git(root,"status","--porcelain=v1","--untracked-files=all"):
         raise ReleaseFailure("REPO_DIRTY")
     if fetch:
         _git(root,"fetch","--no-tags","origin",req["branch"],timeout=120)
@@ -137,6 +137,8 @@ def run(payload):
     if type(payload) is not dict or set(payload)!=required or not isinstance(payload["request_id"],str) or not RX_ID.fullmatch(payload["request_id"]):
         raise ReleaseFailure("RESULT_MALFORMED")
     project=payload["project"]
+    request=payload["request_id"]
+    alias=payload["alias"]
     root=_valid_project(project)
     if type(payload["alias"]) is not str or not ALIAS.fullmatch(payload["alias"]):
         raise ReleaseFailure("SIGNING_INPUT_DENIED")
@@ -195,7 +197,7 @@ def run(payload):
                 raise ReleaseFailure("ARTIFACT_INVALID")
             signed=unsigned.parent/(".animadev-"+project["id"]+"-"+sha[:12]+"-"+os.urandom(4).hex()+".aab")
             try:
-                meta=sign_bundle(unsigned,signed,key_bytes,store_password,key_password,payload_alias,
+                meta=sign_bundle(unsigned,signed,key_bytes,store_password,key_password,alias,
                                  jarsigner="/data/data/com.termux/files/usr/bin/jarsigner")
                 if _git_clean(root,project)!=sha:
                     raise ReleaseFailure("BUILD_OUTDATED")
@@ -222,10 +224,6 @@ def main():
         request_id=payload.get("request_id","") if isinstance(payload,dict) else ""
         if not isinstance(request_id,str) or not RX_ID.fullmatch(request_id):
             raise ReleaseFailure("RESULT_MALFORMED")
-        # Explicitly captured nonsecret fields before secrets are cleared inside run.
-        global request,payload_alias
-        request=request_id
-        payload_alias=payload.get("alias")
         artifact=run(payload)
         print(json.dumps({"version":1,"request_id":request_id,"ok":True,
                           "artifact":artifact},ensure_ascii=False))
