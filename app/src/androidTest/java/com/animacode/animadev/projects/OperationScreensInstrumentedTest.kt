@@ -2,6 +2,10 @@ package com.animacode.animadev.projects
 
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -111,6 +115,66 @@ class OperationScreensInstrumentedTest {
         compose.onNodeWithText("Последняя Debug-сборка").assertDoesNotExist()
         compose.onNodeWithText("Не удалось собрать Debug APK").assertDoesNotExist()
         compose.onNodeWithText("9 из 10 успешно").assertDoesNotExist()
+    }
+
+
+    @Test fun deviceJournalBackRestoresDeviceTab() {
+        seed()
+        compose.setContent {MaterialTheme {
+            var journal by remember {mutableStateOf(false)}
+            var currentTab by rememberSaveable {mutableIntStateOf(0)}
+            if(journal) Button(onClick={journal=false}){Text("Назад из журнала")}
+            else ProjectTools(context,project,"tests",false,null,{}, {journal=true}, {},
+                currentTab,{currentTab=it})
+        }}
+        compose.onNodeWithText("На устройстве").performScrollTo().performClick()
+        compose.onNodeWithText("9 из 10 успешно").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Открыть журнал").performScrollTo().performClick()
+        compose.onNodeWithText("Назад из журнала").performClick()
+        compose.onNodeWithText("9 из 10 успешно").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Запустить unit-тесты").assertDoesNotExist()
+    }
+
+    @Test fun debugJournalBackRestoresBuildTab() {
+        val state=seed()
+        val job=JSONObject().put("project_id","animaquiz").put("job_id","f".repeat(32))
+            .put("action","BUILD_DEBUG").put("state","FAILED")
+            .put("message","Ошибка Debug APK")
+        state.put("action","BUILD_DEBUG").put("job_id","f".repeat(32))
+            .put("state","FAILED").put("job",job)
+        assertTrue(RepoStore(context).write(state))
+        compose.setContent {MaterialTheme {
+            var journal by remember {mutableStateOf(false)}
+            var currentTab by rememberSaveable {mutableIntStateOf(0)}
+            if(journal) Button(onClick={journal=false}){Text("Назад из журнала")}
+            else BuildScreen(context,project,false,null,{}, {journal=true},
+                currentTab,{currentTab=it})
+        }}
+        compose.onNodeWithText("Последняя Debug-сборка").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Открыть журнал сборки").performScrollTo().performClick()
+        compose.onNodeWithText("Назад из журнала").performClick()
+        compose.onNodeWithText("Последняя Debug-сборка").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Собрать Release AAB").assertDoesNotExist()
+    }
+
+    @Test fun releaseTabSurvivesScreenDisposal() {
+        seed()
+        compose.setContent {MaterialTheme {
+            var journal by remember {mutableStateOf(false)}
+            var currentTab by rememberSaveable {mutableIntStateOf(0)}
+            androidx.compose.foundation.layout.Column {
+                Button(onClick={journal=!journal}){Text("Переключить экран")}
+                if(!journal) BuildScreen(context,project,false,null,{}, {},currentTab,{currentTab=it})
+                else Text("Экран журнала")
+            }
+        }}
+        compose.onNodeWithText("Release AAB").performScrollTo().performClick()
+        compose.onNodeWithText("Собрать Release AAB").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Переключить экран").performClick()
+        compose.onNodeWithText("Экран журнала").assertIsDisplayed()
+        compose.onNodeWithText("Переключить экран").performClick()
+        compose.onNodeWithText("Собрать Release AAB").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Собрать Debug APK").assertDoesNotExist()
     }
 
 }
