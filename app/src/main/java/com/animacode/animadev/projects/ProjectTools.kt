@@ -66,7 +66,7 @@ import com.animacode.animadev.repos.*
                     Text("Восстановить состояние задания",style=MaterialTheme.typography.titleMedium)
                     Text("Операция: "+r.optString("action")+
                         " · "+r.optString("state")+
-                        "\\nJob ID: "+r.optString("job_id").take(12),
+                        "\nJob ID: "+r.optString("job_id").take(12),
                         style=MaterialTheme.typography.bodySmall)
                     Text("Termux может уже завершить задачу, пока Android показывает старый статус. "+
                         "Проверка читает сохранённый результат по ID и не запускает Gradle повторно.",
