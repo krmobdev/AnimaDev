@@ -54,10 +54,10 @@ class JournalCache(context: Context) : SQLiteOpenHelper(context, "journal_cache.
     }
     fun cursor(job: String, view: String): Long = readableDatabase.rawQuery("SELECT MAX(next) FROM pages WHERE job=? AND view=?",arrayOf(job,view)).use { if(it.moveToFirst()) it.getLong(0) else 0 }
     fun header(job: String): String = readableDatabase.rawQuery("SELECT data FROM history WHERE job=?",arrayOf(job)).use { c ->
-        if(!c.moveToFirst()) "AnimaQuiz · Job ID: $job\n" else JSONObject(c.getString(0)).let { j ->
+        if(!c.moveToFirst()) "Задание · Job ID: $job\n" else JSONObject(c.getString(0)).let { j ->
             val start=j.optDouble("started_at",j.optDouble("created_at",0.0));val end=j.optDouble("ended_at",0.0)
             buildString {
-                append("AnimaQuiz · ${j.optString("action")}\nJob ID: $job\nРабочий каталог: ~/quizapp\n")
+                append("Задание · ${j.optString("action")}\nJob ID: $job\nПроект: ${j.optString("project_id")}\n")
                 val snapshot=j.optJSONObject("snapshot")
                 append("Ветка: ${snapshot?.optString("branch")?.ifEmpty { "не подтверждена" } ?: "не сохранена"}\n")
                 append("Коммит: ${snapshot?.optString("local_commit")?.ifEmpty { "не подтверждён" } ?: "не сохранён"}\n")
