@@ -26,6 +26,11 @@ import com.animacode.animadev.termux.TermuxGateway
     val hasSigningKey=signing.hasDocument(project.id)
     val releaseStore=remember {ReleaseStore(context)}
     val releaseGateway=remember {ReleaseGateway(context)}
+    val vault=remember {SigningSecretVault(context)}
+    var vaultGeneration by remember(project.id){mutableIntStateOf(0)}
+    val vaultSaved=remember(project.id,vaultGeneration){vault.has(project.id)}
+    val storedCredentials=remember(project.id,vaultGeneration,signing.documentUri(project.id),signing.alias(project.id)) {if(vaultSaved)vault.load(project.id,signing.documentUri(project.id),signing.alias(project.id)) else null}
+    var vaultMessage by remember(project.id){mutableStateOf("")}
     val releaseGeneration=ReleaseStore.generation.intValue
     val releaseState=remember(releaseGeneration) {releaseStore.read()}
     val releaseForProject=releaseState.optString("project")==project.id
@@ -62,6 +67,7 @@ import com.animacode.animadev.termux.TermuxGateway
     var releaseMessage by remember(project.id){mutableStateOf("")}
     val releaseScope=rememberCoroutineScope()
     val canRelease=canDebug && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseOrDebugBusy
+    val effectivePasswordPresent=releasePassword.isNotEmpty() || storedCredentials?.storePassword?.isNotEmpty()==true
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {Text(project.name,style=MaterialTheme.typography.titleMedium)
@@ -118,26 +124,45 @@ import com.animacode.animadev.termux.TermuxGateway
                 OutlinedTextField(releaseKeyPassword,{releaseKeyPassword=it},
                     label={Text("Пароль ключа, если отличается")},
                     visualTransformation=PasswordVisualTransformation(),singleLine=true,
-                    enabled=!releaseBusy,modifier=Modifier.fillMaxWidth())
+                    enabled=!releaseOrDebugBusy,modifier=Modifier.fillMaxWidth())
+                if(vaultSaved) {
+                    Text(if(storedCredentials!=null)"Пароли сохранены в Android Keystore для этого JKS и alias. Вводить заново не требуется."
+                         else "Сохранённые секреты не подходят к выбранному JKS/alias или недоступны. Удалите их и сохраните заново.",
+                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick={vaultMessage=if(vault.forget(project.id))"Сохранённые пароли удалены с устройства." else "Не удалось удалить секреты.";vaultGeneration++},
+                        enabled=!releaseOrDebugBusy,modifier=Modifier.fillMaxWidth()){Text("Удалить сохранённые пароли")}
+                } else {
+                    OutlinedButton(onClick={
+                        val ok=vault.save(project.id,signing.documentUri(project.id),signing.alias(project.id),
+                            releasePassword,releaseKeyPassword)
+                        vaultMessage=if(ok)"Пароли зашифрованы Android Keystore и сохранены только на этом устройстве."
+                            else "Не удалось защитить пароль. Проверьте JKS, alias и введённый пароль."
+                        if(ok){releasePassword="";releaseKeyPassword="";vaultGeneration++}
+                    },enabled=!releaseOrDebugBusy && hasSigningKey && signing.alias(project.id).isNotBlank() && releasePassword.isNotEmpty(),
+                        modifier=Modifier.fillMaxWidth()){Text("Сохранить пароли в защищённом хранилище")}
+                }
+                if(vaultMessage.isNotBlank())Text(vaultMessage,style=MaterialTheme.typography.bodySmall)
                 Button(onClick={
-                    val storePass=releasePassword
-                    val keyPass=releaseKeyPassword
+                    val saved=storedCredentials
+                    val storePass=releasePassword.ifEmpty {saved?.storePassword.orEmpty()}
+                    val keyPass=if(releasePassword.isNotEmpty())releaseKeyPassword else
+                        releaseKeyPassword.ifEmpty {saved?.keyPassword.orEmpty()}
                     releasePassword=""
                     releaseKeyPassword=""
                     releaseMessage="Подготавливаю защищённое задание…"
                     releaseScope.launch {
                         releaseMessage=releaseGateway.launch(project,storePass,keyPass)
                     }
-                },enabled=canRelease && releasePassword.isNotEmpty(),
+                },enabled=canRelease && effectivePasswordPresent,
                   modifier=Modifier.fillMaxWidth()) {Text("Собрать подписанный Release AAB")}
-                if(!canRelease || releasePassword.isEmpty())Text(when {
+                if(!canRelease || !effectivePasswordPresent)Text(when {
                     !canDebug -> blockReason
                     !hasSigningKey -> "Сначала выберите файл JKS в настройках подписи."
                     signing.alias(project.id).isBlank() -> "Укажите и сохраните alias закрытого ключа."
-                    releasePassword.isEmpty() -> "Введите пароль JKS для подписания Release AAB."
+                    !effectivePasswordPresent -> "Введите пароль JKS или сохраните его в защищённом хранилище."
                     else -> "Запуск заблокирован текущим заданием."
                 },style=MaterialTheme.typography.bodySmall)
-                Text("Ключ и пароли передаются только по локальному Unix-сокету с проверкой UID приложений. В Intent, аргументах и настройках секретов нет. Для подписи используются анонимные файлы оперативной памяти.",
+                Text("Сохранение пароля необязательно. Секреты шифруются ключом Android Keystore и привязаны к выбранному JKS/alias. При сборке они передаются только по локальному Unix-сокету с проверкой UID, без GitHub и журналов.",
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
 
                 if(releaseMessage.isNotBlank())Text(releaseMessage,style=MaterialTheme.typography.bodySmall)
