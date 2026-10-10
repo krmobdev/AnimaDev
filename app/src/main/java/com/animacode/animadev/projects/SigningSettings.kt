@@ -163,9 +163,9 @@ class SigningStore(private val context: Context) {
                     try {
                         context.contentResolver.openInputStream(Uri.parse(uri))?.use {
                             SigningVerification.check(it,name,selectedAlias,password,key)
-                        } ?: SigningVerification.Outcome.INVALID_SELECTION
+                        } ?: SigningVerification.Outcome.FILE_UNREADABLE
                     } catch (_: Exception) {
-                        SigningVerification.Outcome.UNSUPPORTED_OR_BAD_STORE_PASSWORD
+                        SigningVerification.Outcome.FILE_UNREADABLE
                     } finally {
                         password.fill(0.toChar())
                         key.fill(0.toChar())
