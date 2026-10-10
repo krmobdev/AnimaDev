@@ -227,7 +227,7 @@ DEBUG_COMMAND = ('./gradlew', ':app:assembleDebug', '--offline', '--no-daemon', 
 DEBUG_APK = 'app/build/outputs/apk/debug/app-debug.apk'
 DOWNLOADS = pathlib.Path('/storage/emulated/0/Download')
 
-def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT, output_dir=str(DOWNLOADS)):
+def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT, output_dir=None):
     """Build only clean exact GitHub SHA and persist a verified fresh APK."""
     import zipfile
     initial = guard.snapshot()
@@ -273,11 +273,16 @@ def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT
             if 'AndroidManifest.xml' not in z.namelist(): raise ValueError()
     except (OSError,ValueError,zipfile.BadZipFile):
         return dict(state='FAILED',error_code='BUILD_ARTIFACT_INVALID',exit_code=code,snapshot=after)
-    if (not isinstance(output_dir, str) or not output_dir.startswith('/storage/emulated/0/')
+    # Direct fixture tests may override DOWNLOADS; user-supplied folders must
+    # always be verified against the primary shared-storage root.
+    if output_dir is None: output_dir=str(DOWNLOADS)
+    if (not isinstance(output_dir, str) or
+            (output_dir!=str(DOWNLOADS) and not output_dir.startswith('/storage/emulated/0/'))
             or len(output_dir)>520):
         return dict(state='FAILED',error_code='DOWNLOADS_UNAVAILABLE',exit_code=code,snapshot=after)
     parts=output_dir[len('/storage/emulated/0/'):].split('/')
-    if not all(re.fullmatch(r'[\w ().&-]{1,80}',item) and item not in ('.','..') for item in parts):
+    if (output_dir!=str(DOWNLOADS) and
+            not all(re.fullmatch(r'[\w ().&-]{1,80}',item) and item not in ('.','..') for item in parts)):
         return dict(state='FAILED',error_code='DOWNLOADS_UNAVAILABLE',exit_code=code,snapshot=after)
     folder=pathlib.Path(output_dir)
     if not folder.is_dir() or folder.is_symlink() or folder.resolve()!=folder.absolute():
