@@ -33,6 +33,7 @@ class MainActivity:ComponentActivity() {
     private var version by mutableStateOf<String?>(null)
     private var requestedJournal by mutableStateOf("")
     private var requestedRelease by mutableStateOf(false)
+    private var requestedBuild by mutableStateOf(false)
     private val termux by lazy { TermuxGateway(this) }
     override fun onResume() {
         super.onResume()
@@ -41,10 +42,10 @@ class MainActivity:ComponentActivity() {
         // Restore a previously authorized Pixel, never during a running Gradle job.
         if(permitted && version!=null) AdbDeviceGateway(this).autoRestore()
     }
-    override fun onNewIntent(intent:Intent) { super.onNewIntent(intent);setIntent(intent);requestedJournal=intent.getStringExtra("journal_job") ?: "";requestedRelease=intent.getBooleanExtra("open_release",false) }
+    override fun onNewIntent(intent:Intent) { super.onNewIntent(intent);setIntent(intent);requestedJournal=intent.getStringExtra("journal_job") ?: "";requestedRelease=intent.getBooleanExtra("open_release",false);requestedBuild=intent.getBooleanExtra("open_build",false) }
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState);enableEdgeToEdge();requestedJournal=NavigationState.notificationTarget(intent.getStringExtra("journal_job") ?: "",savedInstanceState!=null)
-        requestedRelease=intent.getBooleanExtra("open_release",false);setContent { BetaApp() }
+        requestedRelease=intent.getBooleanExtra("open_release",false);requestedBuild=intent.getBooleanExtra("open_build",false);setContent { BetaApp() }
     }
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable private fun BetaApp() {
@@ -112,14 +113,14 @@ class MainActivity:ComponentActivity() {
                     }
                 }
             }
-            LaunchedEffect(requestedRelease) {
-                if(requestedRelease) {
-                    val id=ReleaseStore(context).read().optString("project")
+            LaunchedEffect(requestedRelease,requestedBuild) {
+                if(requestedRelease || requestedBuild) {
+                    val id=if(requestedRelease)ReleaseStore(context).read().optString("project") else store.read().optString("project_id")
                     val target=projects.all().firstOrNull {it.id==id && it.supported}
                     if(target!=null) {
                         selected=target.id;projects.select(target.id);top="projects";route="build"
                     }
-                    requestedRelease=false
+                    requestedRelease=false;requestedBuild=false
                 }
             }
             LaunchedEffect(requestedJournal) {
