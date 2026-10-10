@@ -27,7 +27,7 @@ Unit tests run local Gradle tasks; On device runs instrumentation tests using co
 A signed AAB requires a JKS and alias. Passwords are transferred over a local protected channel and must not enter arguments, repositories or logs. AAB is for publishing, not direct installation. Open its folder and review the Release journal in History.
 
 ## Appearance skins
-Emerald Glass is an opt-in second visual style under Settings → Appearance, disabled by default. It uses dark graphite panels and emerald highlights. Projects, Git, jobs, signing, history and folder preferences survive switching. Projects, the project dashboard, Build, Tests, History, Branches, Termux, the Settings index and About now have Emerald styling. Existing controls and safety policies remain in place; on-device visual acceptance is still required.
+Emerald Glass is an opt-in second visual style under Settings → Appearance, disabled by default. It uses dark graphite panels and emerald highlights. Projects, Git, jobs, signing, history and folder preferences survive switching. Projects, the project dashboard, Build, Tests, History, Branches, Termux, the Settings index and About now have Emerald styling. Existing controls and safety policies remain in place; live monitor, filtered journals and nested settings also use Emerald cards. Raw logs, SHA and paths are not translated; on-device visual acceptance is still required.
 
 ## Language
 Open Settings → Appearance → Language to choose System default, Russian or English. User-facing labels, statuses and diagnostics follow the selected language. Raw Git/Gradle logs are left in their original language, and paths, hashes and job IDs are not rewritten.
