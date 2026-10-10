@@ -20,14 +20,14 @@ repository, job, Git, signing and storage state remain unchanged. No invented da
 - [x] Test UI: Unit / On-device tabs and guarded actions; preserved existing journal navigation
 - [x] History: action filters and real job statuses
 - [x] Branches: active branch, actual SHA and existing safe verified checkout
-- [ ] Job monitor / journal: unified Emerald Glass layout
+- [x] Job monitor / journal: Emerald status, stage, controls, safe raw logs, event timeline
 
 ## Sprint 3 — planned
 - [x] Termux environment / tools / SDK overview, real versions from probes
-- [x] Settings index redesigned, preserving existing search and preferences; nested sections need polish
+- [x] Settings index and nested sections use Emerald cards, preserving original preferences
 - [x] About branded hero, changelog and bilingual bundled documentation
 - [ ] Polish: 60-fps-friendly animations, insets, small-screen layouts, long labels
-- [ ] RU / EN accessibility; screenshots / instrumentation tests; regression tests
+- [ ] RU / EN accessibility and screenshots / device instrumentation verification (new RU caption and navigation regression tests added)
 
 ## Non-negotiable correctness
 - Never display reference/mock data as real Git, Gradle, SDK or test results
