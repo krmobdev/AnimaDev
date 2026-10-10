@@ -119,6 +119,14 @@ class RepoGateway(private val context: Context) {
         dispatch("START")
         }
     }
+    fun cancel() {
+        val r=store.read()
+        if(!r.optBoolean("ready") || r.optBoolean("pending") ||
+            r.optString("action") !in setOf("TEST","BUILD_DEBUG") ||
+            r.optString("state") !in setOf("REQUESTED","QUEUED","RUNNING") ||
+            r.optString("job_id").isBlank()) return
+        dispatch("CANCEL")
+    }
     fun query(manual: Boolean = false) {
         val r = store.read()
         if (!r.optBoolean("ready") || !MonitorPolicy.queryAllowed(r.optBoolean("pending"),r.optString("job_id").isNotEmpty())) return
