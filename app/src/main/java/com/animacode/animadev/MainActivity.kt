@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,12 +31,13 @@ class MainActivity:ComponentActivity() {
     private var permitted by mutableStateOf(false)
     private var version by mutableStateOf<String?>(null)
     private var requestedJournal by mutableStateOf("")
+    private var requestedRelease by mutableStateOf(false)
     private val termux by lazy { TermuxGateway(this) }
     override fun onResume() { super.onResume();permitted=termux.permitted();version=termux.installedVersion() }
-    override fun onNewIntent(intent:Intent) { super.onNewIntent(intent);setIntent(intent);requestedJournal=intent.getStringExtra("journal_job") ?: "" }
+    override fun onNewIntent(intent:Intent) { super.onNewIntent(intent);setIntent(intent);requestedJournal=intent.getStringExtra("journal_job") ?: "";requestedRelease=intent.getBooleanExtra("open_release",false) }
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState);enableEdgeToEdge();requestedJournal=NavigationState.notificationTarget(intent.getStringExtra("journal_job") ?: "",savedInstanceState!=null)
-        setContent { BetaApp() }
+        requestedRelease=intent.getBooleanExtra("open_release",false);setContent { BetaApp() }
     }
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable private fun BetaApp() {
@@ -46,8 +48,22 @@ class MainActivity:ComponentActivity() {
         val settings=remember { context.getSharedPreferences("interface_v1",MODE_PRIVATE) }
         var theme by remember { mutableStateOf(settings.getString("theme","system") ?: "system") }
         var dynamic by remember { mutableStateOf(settings.getBoolean("dynamic",true)) }
-        val dark=when(theme) { "dark"->true;"light"->false;else->isSystemInDarkTheme() }
-        val colors=if(dynamic) { if(dark)dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) } else if(dark)darkColorScheme() else lightColorScheme()
+        var pulse by remember { mutableStateOf(settings.getBoolean("pulse",true)) }
+        val dark=if(pulse)true else when(theme) { "dark"->true;"light"->false;else->isSystemInDarkTheme() }
+        val colors=if(pulse)darkColorScheme(
+            primary=AnimaPulse.green,onPrimary=AnimaPulse.dark,
+            primaryContainer=Color(0xFF173C2C),onPrimaryContainer=AnimaPulse.green,
+            secondary=Color(0xFF79C9FF),onSecondary=AnimaPulse.dark,
+            secondaryContainer=Color(0xFF24484A),onSecondaryContainer=Color.White,
+            tertiary=Color(0xFFFFCF80),
+            background=Color(0xFF0B1113),onBackground=Color.White,
+            surface=Color(0xFF111A1C),onSurface=Color.White,
+            surfaceVariant=AnimaPulse.panel,onSurfaceVariant=AnimaPulse.muted,
+            surfaceContainerLow=AnimaPulse.panel,
+            outline=AnimaPulse.border,outlineVariant=Color(0xFF30453E),
+            error=Color(0xFFFF8279))
+        else if(dynamic) { if(dark)dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }
+        else if(dark)darkColorScheme() else lightColorScheme()
         SideEffect { enableEdgeToEdge(SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT){dark},SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT){dark}) }
         MaterialTheme(colorScheme=colors) {
             val projects=remember { ProjectStore(context) }
@@ -92,6 +108,16 @@ class MainActivity:ComponentActivity() {
                         if(!catalog.prefs.getBoolean("pending",false))
                             catalog.read("PATH",selectedProject.path)
                     }
+                }
+            }
+            LaunchedEffect(requestedRelease) {
+                if(requestedRelease) {
+                    val id=ReleaseStore(context).read().optString("project")
+                    val target=projects.all().firstOrNull {it.id==id && it.supported}
+                    if(target!=null) {
+                        selected=target.id;projects.select(target.id);top="projects";route="build"
+                    }
+                    requestedRelease=false
                 }
             }
             LaunchedEffect(requestedJournal) {
@@ -143,6 +169,7 @@ class MainActivity:ComponentActivity() {
                         {theme=it;settings.edit().putString("theme",it).apply()},
                         {dynamic=it;settings.edit().putBoolean("dynamic",it).apply()},
                         settingsSection,{settingsSection=it},
+                        pulse=pulse,onPulse={value->pulse=value;settings.edit().putBoolean("pulse",value).apply()},
                         onOpenBuild={projectId->
                             val project=projects.all().firstOrNull {it.id==projectId && it.supported}
                             if(project!=null) {
