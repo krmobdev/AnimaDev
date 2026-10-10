@@ -239,10 +239,12 @@ def run(payload):
                 raise ReleaseFailure("ARTIFACT_INVALID")
             signed=unsigned.parent/(".animadev-"+project["id"]+"-"+sha[:12]+"-"+os.urandom(4).hex()+".aab")
             try:
+                if cancel_path.is_file():raise ReleaseFailure("CANCELLED")
                 meta=sign_bundle(unsigned,signed,key_bytes,store_password,key_password,alias,
                                  jarsigner="/data/data/com.termux/files/usr/bin/jarsigner")
                 if _git_clean(root,project)!=sha:
                     raise ReleaseFailure("BUILD_OUTDATED")
+                if cancel_path.is_file():raise ReleaseFailure("CANCELLED")
                 artifact=_export(signed,request,project,sha,meta)
             finally:
                 try:signed.unlink()
