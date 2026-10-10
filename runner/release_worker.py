@@ -1,4 +1,4 @@
-"""One-shot Release AAB worker. Secrets arrive ONLY via peer-verified Unix socket.
+"""One-shot Release AAB worker. Secrets arrive ONLY via authenticated hybrid envelope.
 
 This source is concatenated after release_signer.py from the signed Android APK.
 No dynamic shell commands, keystore paths, secret environment variables, Git writes,
@@ -13,8 +13,6 @@ import pathlib
 import re
 import subprocess
 import sys
-import socket
-import struct
 import time
 
 HOME=pathlib.Path("/data/data/com.termux/files/home")
@@ -224,46 +222,36 @@ def run(payload):
         key_password[:]=b"\0"*len(key_password)
 
 def _receive_secure_payload():
-    # Only public connection coordinates enter Termux RUN_COMMAND_ARGUMENTS.
-    if len(sys.argv)!=4:
+    # Termux has no permission to connect to an unrelated Android app's
+    # Unix socket on many devices. Only an RSA-OAEP/AES-GCM envelope enters
+    # the RUN_COMMAND_STDIN extra; the one-time RSA private key stays in Termux.
+    if len(sys.argv)!=3 or not RX_ID.fullmatch(sys.argv[1]) or not re.fullmatch(r"[a-f0-9]{64}",sys.argv[2]):
         raise ReleaseFailure("CHANNEL_DENIED")
-    name, request_id, uid_text=sys.argv[1:]
-    if not re.fullmatch(r"animadev-release-[a-f0-9]{32}",name) or not RX_ID.fullmatch(request_id) or not uid_text.isdecimal():
-        raise ReleaseFailure("CHANNEL_DENIED")
+    request,expected_sha=sys.argv[1:]
+    source=STATE/"ReleaseTransport.java"
     try:
-        expected_uid=int(uid_text)
-        if expected_uid<10000 or expected_uid>999999:
-            raise ValueError()
-        with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as client:
-            client.settimeout(20)
-            client.connect("\0"+name)
-            pid,uid,gid=struct.unpack("3i",client.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))
-            if uid!=expected_uid:
-                raise ReleaseFailure("PEER_UID_DENIED")
-            client.sendall(request_id.encode("ascii"))
-            def exact(n):
-                result=bytearray()
-                while len(result)<n:
-                    chunk=client.recv(n-len(result))
-                    if not chunk:raise ReleaseFailure("CHANNEL_CLOSED")
-                    result.extend(chunk)
-                return bytes(result)
-            size=struct.unpack(">I",exact(4))[0]
-            if size<=0 or size>MAX_MESSAGE:raise ReleaseFailure("CHANNEL_DENIED")
-            raw=exact(size)
-            obj=json.loads(raw)
-            if type(obj) is not dict or obj.get("request_id")!=request_id:
-                raise ReleaseFailure("CHANNEL_DENIED")
-            return obj
-    except (OSError,TimeoutError,ValueError,UnicodeError,json.JSONDecodeError):
-        raise ReleaseFailure("CHANNEL_UNAVAILABLE")
+        if source.is_symlink() or not source.is_file() or hashlib.sha256(source.read_bytes()).hexdigest()!=expected_sha:
+            raise ReleaseFailure("CHANNEL_DENIED")
+        ciphertext=sys.stdin.buffer.read(230001)
+        if not 500<=len(ciphertext)<=230000:
+            raise ReleaseFailure("ENVELOPE_MISSING")
+        result=subprocess.run(["java",str(source),"decrypt",request],input=ciphertext,
+            stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=90,check=False)
+        if result.returncode!=0 or not 50<=len(result.stdout)<=MAX_MESSAGE:
+            raise ReleaseFailure("TRANSPORT_DECRYPT_FAILED")
+        payload=json.loads(result.stdout)
+        if type(payload) is not dict or payload.get("request_id")!=request:
+            raise ReleaseFailure("CHANNEL_DENIED")
+        return payload
+    except (OSError,subprocess.TimeoutExpired,ValueError,UnicodeError,json.JSONDecodeError):
+        raise ReleaseFailure("TRANSPORT_UNAVAILABLE")
 
 def main():
     os.umask(0o077)
     request_id=""
     try:
-        if len(sys.argv)>=3 and RX_ID.fullmatch(sys.argv[2]):
-            request_id=sys.argv[2]
+        if len(sys.argv)>=2 and RX_ID.fullmatch(sys.argv[1]):
+            request_id=sys.argv[1]
         payload=_receive_secure_payload()
         request_id=payload.get("request_id","") if isinstance(payload,dict) else ""
         if not isinstance(request_id,str) or not RX_ID.fullmatch(request_id):
