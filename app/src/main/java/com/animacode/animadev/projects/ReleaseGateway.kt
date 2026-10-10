@@ -76,6 +76,8 @@ class ReleaseGateway(private val context:Context) {
            || TermuxGateway(context).installedVersion()==null) {
             return "Сначала проверьте GitHub SHA и готовность Termux. Повторный запуск при активном задании запрещён."
         }
+        val outputDir=ExportDestination(context).artifactDirectory()
+            ?:return "Выбранная папка сохранения недоступна для Termux. Выберите папку основной памяти или Загрузки."
         if(!signing.hasDocument(project.id))return "Выберите файл JKS через настройки подписи."
         val alias=signing.alias(project.id).trim()
         if(!alias.matches(Regex("[A-Za-z0-9_.-]{1,100}")))return "Проверьте alias ключа."
@@ -116,6 +118,7 @@ class ReleaseGateway(private val context:Context) {
             val payload=JSONObject().put("request_id",request).put("project",profile)
                 .put("alias",alias).put("keystore",Base64.encodeToString(key,Base64.NO_WRAP))
                 .put("store_password",storePassword).put("key_password",keyPassword)
+                .put("output_dir",outputDir)
             val reserved=synchronized(BuildConcurrencyPolicy.launchMonitor) {
                 val current=RepoStore(context)
                 if(current.blocked() || current.read().optBoolean("pending"))false
@@ -185,7 +188,8 @@ object ReleaseWire {
             raw.getString("commit")==sha &&
             raw.getString("sha256").matches(Regex("[a-f0-9]{64}")) &&
             raw.getLong("size")>1024 &&
-            raw.getString("path").matches(Regex("/storage/emulated/0/Download/[A-Za-z0-9_-]{1,120}[.]aab"))
+            raw.getString("path").endsWith(".aab") &&
+            ArtifactPolicy.valid(raw.getString("path"),raw.getString("sha256"),raw.getLong("size"))
     }.getOrDefault(false)
 }
 class ReleaseResultReceiver:BroadcastReceiver() {
@@ -208,7 +212,7 @@ class ReleaseResultReceiver:BroadcastReceiver() {
                 val artifact=payload.getJSONObject("artifact")
                 check(ReleaseWire.validArtifact(artifact,record.getString("sha")))
                 record.put("artifact",artifact).put("state","SUCCEEDED")
-                    .put("message","Release AAB подписан, проверен и сохранён в Загрузки.")
+                    .put("message","Release AAB подписан, проверен и сохранён в выбранную папку.")
             } else {
                 val code=payload.optString("error_code","RESULT_UNCONFIRMED")
                 if(!code.matches(Regex("[A-Z_]{3,50}")))error("Malformed code")
