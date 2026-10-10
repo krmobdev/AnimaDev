@@ -15,6 +15,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -70,9 +72,19 @@ fun neonColorScheme():ColorScheme=darkColorScheme(
     Surface(modifier=modifier,shape=shape,
         border=BorderStroke(1.dp,if(glowing)NeonGlass.green.copy(alpha=.34f) else NeonGlass.outline),
         color=NeonGlass.surface,contentColor=NeonGlass.white) {
+        val ambient=if(glowing)Modifier.drawWithCache {
+            val origin=Offset(size.width*.93f,size.height*.05f)
+            val radius=maxOf(size.width,size.height)*.88f
+            val light=Brush.radialGradient(
+                listOf(NeonGlass.green.copy(alpha=.12f),Color.Transparent),
+                center=origin,radius=radius)
+            onDrawBehind {drawCircle(brush=light,radius=radius,center=origin)}
+        } else Modifier
         Box(Modifier.background(if(glowing)NeonGlass.gradient else
-            Brush.verticalGradient(listOf(Color(0xFF1C242B),Color(0xFF12181D))))) {
-            Column(Modifier.padding(19.dp),verticalArrangement=Arrangement.spacedBy(12.dp),content=content)
+            Brush.verticalGradient(listOf(Color(0xFF1C242B),Color(0xFF12181D))))
+            .then(ambient)) {
+            Column(Modifier.padding(19.dp),verticalArrangement=Arrangement.spacedBy(12.dp),
+                content=content)
         }
     }
 }
