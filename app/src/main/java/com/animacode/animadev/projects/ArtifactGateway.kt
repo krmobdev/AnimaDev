@@ -1,93 +1,122 @@
 package com.animacode.animadev.projects
 
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.DocumentsContract
+import android.provider.Settings
 import android.widget.Toast
-import com.animacode.animadev.termux.TermuxGateway
+import com.animacode.animadev.MainActivity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.util.UUID
+import java.security.MessageDigest
 
 object ArtifactPolicy {
-    fun valid(path:String,sha:String,size:Long)=
-        path.matches(Regex("/storage/emulated/0/Download/[A-Za-z0-9_-]+\\.(apk|aab)")) &&
-        sha.matches(Regex("[a-f0-9]{64}")) && size in 1024L..536870912L
+    private val name=Regex("[A-Za-z0-9_-]+[.](apk|aab)")
+    fun valid(path:String,sha:String,size:Long):Boolean {
+        if(!sha.matches(Regex("[a-f0-9]{64}")) || size !in 1024L..536870912L)return false
+        if(!path.startsWith("/storage/emulated/0/") || !name.matches(path.substringAfterLast('/')))return false
+        val parent=path.removePrefix("/storage/emulated/0/").substringBeforeLast('/',"")
+        return parent.isNotEmpty() && parent.split('/').all {
+            it.matches(Regex("[\\p{L}\\p{N}_ ().&-]{1,80}")) && it!="." && it!=".."
+        }
+    }
 }
 
-/** The Termux app grants its own file URI to Android's installer; no storage bypass. */
+/** Install from Android's own SAF content URI, not a background termux-open command. */
 object ArtifactGateway {
     fun intent(context:Context,artifact:JSONObject)=Intent(context,ArtifactOpenReceiver::class.java)
         .setAction("com.animacode.animadev.OPEN_ARTIFACT")
-        .putExtra("path",artifact.optString("path")).putExtra("sha256",artifact.optString("sha256"))
+        .putExtra("path",artifact.optString("path"))
+        .putExtra("sha256",artifact.optString("sha256"))
         .putExtra("size",artifact.optLong("size"))
 
-    fun open(context:Context,artifact:JSONObject) {
-        val path=artifact.optString("path");val sha=artifact.optString("sha256");val size=artifact.optLong("size")
-        if(!ArtifactPolicy.valid(path,sha,size)) {message(context,"Нет проверенного файла сборки.");return}
-        val termux=TermuxGateway(context)
-        if(!termux.permitted() || termux.installedVersion()==null) {
-            message(context,"Для открытия нужен Termux и разрешение RUN_COMMAND в настройках AnimaDev.");return
+    suspend fun install(context:Context,artifact:JSONObject,uri:Uri) {
+        val path=artifact.optString("path")
+        val sha=artifact.optString("sha256")
+        val size=artifact.optLong("size")
+        if(!path.endsWith(".apk") || !ArtifactPolicy.valid(path,sha,size)) {
+            message(context,"Нет проверенного APK.");return
         }
-        val id=UUID.randomUUID().toString().replace("-","")
-        val prefs=context.getSharedPreferences("artifact_open_v1",Context.MODE_PRIVATE)
-        val now=System.currentTimeMillis()
-        prefs.edit().apply {
-            prefs.all.forEach {(key,value)->if(value is Long && now-value>60000)remove(key)}
-            putLong(id,now)
-        }.apply()
-        val callback=PendingIntent.getBroadcast(context,id.hashCode(),
-            Intent(context,ArtifactResultReceiver::class.java)
-                .setAction("com.animacode.animadev.ARTIFACT_RESULT")
-                .setData(Uri.parse("animadev://artifact/$id")),
-            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_MUTABLE)
-        try {
-            val script=context.assets.open("artifact/open_artifact.py").bufferedReader().use {it.readText()}
-            val command=Intent("com.termux.RUN_COMMAND").apply {
-                setClassName("com.termux","com.termux.app.RunCommandService")
-                putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
-                putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",script,id,path,sha,size.toString()))
-                putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
-                putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
-                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL","AnimaDev · открыть готовую сборку")
-                putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
+        val actual=withContext(Dispatchers.IO) {
+            runCatching {
+                val hash=MessageDigest.getInstance("SHA-256")
+                var length=0L
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    val buffer=ByteArray(1024*1024)
+                    while(true) {
+                        val n=input.read(buffer)
+                        if(n<0)break
+                        length+=n
+                        if(length>size)error("size")
+                        hash.update(buffer,0,n)
+                    }
+                } ?:error("read")
+                length==size && hash.digest().joinToString("") { "%02x".format(it) }==sha
+            }.getOrDefault(false)
+        }
+        if(!actual) {message(context,"APK недоступен или SHA-256 не совпадает. Выберите файл этой сборки.");return}
+        if(Build.VERSION.SDK_INT>=26 && !context.packageManager.canRequestPackageInstalls()) {
+            message(context,"Разрешите установку из AnimaDev, затем нажмите кнопку ещё раз.")
+            runCatching {
+                context.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:"+context.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
-            check(context.startService(command)!=null)
-            message(context,if(path.endsWith(".apk"))"Открываю установщик Android…" else "Открываю AAB…")
+            return
+        }
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri,"application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch(_:Exception) {message(context,"Не удалось запустить системный установщик APK.")}
+    }
+
+    fun openFolder(context:Context,artifact:JSONObject) {
+        val path=artifact.optString("path")
+        if(!ArtifactPolicy.valid(path,artifact.optString("sha256"),artifact.optLong("size"))) {
+            message(context,"Нет проверенного файла сборки.");return
+        }
+        val destination=ExportDestination(context)
+        val folder=destination.folderUri()
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(folder,DocumentsContract.Document.MIME_TYPE_DIR)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
         } catch(_:Exception) {
-            callback.cancel();prefs.edit().remove(id).apply()
-            message(context,"Android не разрешил открыть файл. Откройте Termux и проверьте разрешение RUN_COMMAND.")
+            try {
+                context.startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    type="*/*"
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    putExtra(DocumentsContract.EXTRA_INITIAL_URI,folder)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            } catch(_:Exception) {message(context,"Не удалось открыть системный файловый менеджер.")}
         }
     }
+
     internal fun message(context:Context,text:String)=Toast.makeText(context,text,Toast.LENGTH_LONG).show()
 }
 
-/** Notification actions are explicit, private PendingIntents, never external file paths. */
+/** Notification returns to the foreground build screen; it never claims installation succeeded. */
 class ArtifactOpenReceiver:BroadcastReceiver() {
     override fun onReceive(context:Context,intent:Intent) {
         if(intent.action!="com.animacode.animadev.OPEN_ARTIFACT")return
-        ArtifactGateway.open(context,JSONObject().put("path",intent.getStringExtra("path"))
-            .put("sha256",intent.getStringExtra("sha256")).put("size",intent.getLongExtra("size",0)))
-    }
-}
-class ArtifactResultReceiver:BroadcastReceiver() {
-    override fun onReceive(context:Context,intent:Intent) {
-        if(intent.action!="com.animacode.animadev.ARTIFACT_RESULT" ||
-            intent.data?.scheme!="animadev" || intent.data?.host!="artifact")return
-        val id=intent.data?.lastPathSegment ?: return
-        val prefs=context.getSharedPreferences("artifact_open_v1",Context.MODE_PRIVATE)
-        if(!id.matches(Regex("[a-f0-9]{32}")) || !prefs.contains(id))return
-        prefs.edit().remove(id).apply()
-        val result=intent.getBundleExtra("result")
-        val payload=runCatching {JSONObject(result?.getString("stdout").orEmpty())}.getOrNull()
-        val success=result?.containsKey("exitCode")==true && result.getInt("exitCode")==0 &&
-            result.getInt("err",-1)==-1 && payload!=null && payload.optString("request_id")==id && payload.optBoolean("ok")
-        if(success)return // Dispatch is confirmed; Android still asks the user to install.
-        ArtifactGateway.message(context,when(payload?.optString("error_code")) {
-            "ARTIFACT_CHANGED"->"Файл изменился или повреждён. Соберите APK заново."
-            "OPENER_MISSING"->"В Termux отсутствует termux-open. Обновите пакет termux-tools."
-            else->"Не удалось открыть сборку. Проверьте файл в Загрузках и запуск Termux."
+        val path=intent.getStringExtra("path").orEmpty()
+        if(!ArtifactPolicy.valid(path,intent.getStringExtra("sha256").orEmpty(),
+            intent.getLongExtra("size",0L)))return
+        context.startActivity(Intent(context,MainActivity::class.java).apply {
+            putExtra("open_build",true)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         })
     }
+}
+
+/** Kept for compatibility with older explicit callbacks from installed versions. */
+class ArtifactResultReceiver:BroadcastReceiver() {
+    override fun onReceive(context:Context,intent:Intent) = Unit
 }
