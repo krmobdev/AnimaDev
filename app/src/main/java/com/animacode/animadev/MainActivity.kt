@@ -56,24 +56,8 @@ class MainActivity:ComponentActivity() {
         var theme by remember { mutableStateOf(settings.getString("theme","system") ?: "system") }
         var dynamic by remember { mutableStateOf(settings.getBoolean("dynamic",true)) }
         var pulse by remember { mutableStateOf(settings.getBoolean("pulse",true)) }
-        val dark=if(pulse)true else when(theme) { "dark"->true;"light"->false;else->isSystemInDarkTheme() }
-        val colors=if(pulse)darkColorScheme(
-            primary=AnimaPulse.green,onPrimary=AnimaPulse.dark,
-            primaryContainer=Color(0xFF173C2C),onPrimaryContainer=AnimaPulse.green,
-            secondary=Color(0xFF79C9FF),onSecondary=AnimaPulse.dark,
-            secondaryContainer=Color(0xFF24484A),onSecondaryContainer=Color.White,
-            tertiary=Color(0xFFFFCF80),
-            background=Color(0xFF0B1113),onBackground=Color.White,
-            surface=Color(0xFF111A1C),onSurface=Color.White,
-            surfaceVariant=AnimaPulse.panel,onSurfaceVariant=AnimaPulse.muted,
-            surfaceContainerLowest=Color(0xFF0B1113),
-            surfaceContainerLow=Color(0xFF162123),
-            surfaceContainer=AnimaPulse.panel,
-            surfaceContainerHigh=Color(0xFF253335),
-            surfaceContainerHighest=Color(0xFF2D3C3E),
-            surfaceBright=Color(0xFF344547),surfaceDim=Color(0xFF0B1113),
-            outline=AnimaPulse.border,outlineVariant=Color(0xFF30453E),
-            error=Color(0xFFFF8279))
+        val dark=AppThemePolicy.dark(theme,isSystemInDarkTheme())
+        val colors=if(pulse)pulseColorScheme(dark)
         else if(dynamic) { if(dark)dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }
         else if(dark)darkColorScheme() else lightColorScheme()
         SideEffect { enableEdgeToEdge(SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT){dark},SystemBarStyle.auto(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT){dark}) }

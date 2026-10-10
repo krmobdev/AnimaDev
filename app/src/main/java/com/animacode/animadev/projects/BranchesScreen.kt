@@ -65,27 +65,27 @@ import org.json.JSONObject
             items(rows,key={it.name}) {b->
                 OutlinedCard(modifier=Modifier.fillMaxWidth().clickable {feedback.tap(feedbackView);selectedBranch=b},
                     shape=RoundedCornerShape(24.dp),
-                    colors=CardDefaults.outlinedCardColors(containerColor=if(b.active)AnimaPulse.dark else MaterialTheme.colorScheme.surfaceContainerLow),
+                    colors=CardDefaults.outlinedCardColors(containerColor=if(b.active)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow),
                     border=BorderStroke(if(b.active)2.dp else 1.dp,
-                        if(b.active)AnimaPulse.green else MaterialTheme.colorScheme.outlineVariant)) {
+                        if(b.active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),
                         verticalArrangement=Arrangement.spacedBy(11.dp)) {
                 Text(b.name,style=if(b.active)MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                     fontWeight=if(b.active)FontWeight.Black else FontWeight.Bold,
-                    color=if(b.active)AnimaPulse.green else if(b.default)gold else MaterialTheme.colorScheme.onSurface)
-                if(b.active)Surface(color=AnimaPulse.green,shape=RoundedCornerShape(40.dp)) {
+                    color=if(b.active)MaterialTheme.colorScheme.primary else if(b.default)gold else MaterialTheme.colorScheme.onSurface)
+                if(b.active)Surface(color=MaterialTheme.colorScheme.primary,shape=RoundedCornerShape(40.dp)) {
                     Text("● АКТИВНАЯ СЕЙЧАС",Modifier.padding(horizontal=12.dp,vertical=5.dp),
                         style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Black,
-                        color=AnimaPulse.dark)
+                        color=MaterialTheme.colorScheme.onPrimary)
                 }
-                Text(listOfNotNull(if(b.default)"Главная" else null,if(b.active)"Активная" else null,if(b.local!=null && b.remote!=null)"Локальная + origin" else if(b.local!=null)"Локальная" else "origin").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=if(b.active)AnimaPulse.green else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(listOfNotNull(if(b.default)"Главная" else null,if(b.active)"Активная" else null,if(b.local!=null && b.remote!=null)"Локальная + origin" else if(b.local!=null)"Локальная" else "origin").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=if(b.active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Последний коммит: "+BranchPolicy.date(b.lastCommit?.date.orEmpty()),
-                    style=MaterialTheme.typography.bodyMedium,color=if(b.active)Color.White else MaterialTheme.colorScheme.onSurface)
-                b.local?.let {Text("Локальный SHA: "+it.sha.take(12),style=MaterialTheme.typography.bodySmall,color=if(b.active)AnimaPulse.muted else MaterialTheme.colorScheme.onSurfaceVariant)}
+                    style=MaterialTheme.typography.bodyMedium,color=if(b.active)MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface)
+                b.local?.let {Text("Локальный SHA: "+it.sha.take(12),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
                 b.remote?.let {if(b.local==null || b.local.sha!=it.sha)
                     Text("Origin SHA: "+it.sha.take(12)+" · "+BranchPolicy.date(it.date),style=MaterialTheme.typography.bodySmall)}
-                Text(b.comparison,style=MaterialTheme.typography.bodySmall,color=if(b.active)AnimaPulse.muted else MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(if(b.active)"Текущая рабочая ветка" else "Нажмите для выбора ветки",style=MaterialTheme.typography.labelSmall,color=if(b.active)AnimaPulse.green else MaterialTheme.colorScheme.primary)
+                Text(b.comparison,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if(b.active)"Текущая рабочая ветка" else "Нажмите для выбора ветки",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
             }}}
             if(rows.isEmpty())item {Text(if(search.isNotBlank())"В загруженных страницах совпадений нет" else "Ветки пока не получены")}
             if(metadata.optBoolean("branches_more"))item {com.animacode.animadev.projects.ActionButton(onClick={feedback.tap(feedbackView);gateway.read("BRANCHES",project.path,metadata.optLong("branches_next"))},enabled=permitted && !pending,modifier=Modifier.fillMaxWidth()){Text("Загрузить следующие ветки")};Text("Страницы ограничены временем и размером ответа. Изменения refs во время чтения требуют обновить список.",style=MaterialTheme.typography.bodySmall)}

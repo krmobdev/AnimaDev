@@ -91,7 +91,7 @@ import com.animacode.animadev.termux.TermuxGateway
         item {
             Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Text("BUILD STUDIO",style=MaterialTheme.typography.labelLarge,
-                    color=AnimaPulse.green)
+                    color=MaterialTheme.colorScheme.primary)
                 Text(project.name,style=MaterialTheme.typography.headlineLarge)
                 ActiveBranchHero(project.branch,project.commit,project.dirty)
                 if(catalogRefresh)Text("Сверяем активную ветку с Termux…",

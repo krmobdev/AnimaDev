@@ -65,18 +65,18 @@ import org.json.JSONObject
                 val dirty=snapshot?.optBoolean("dirty") ?: p.dirty
                 val active=p.supported && record.optString("project_id","animaquiz")==p.id && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
                 Card(onClick={onOpen(p)},shape=RoundedCornerShape(24.dp),
-                    colors=CardDefaults.cardColors(containerColor=AnimaPulse.panel),
-                    border=BorderStroke(1.dp,AnimaPulse.border)) {
+                    colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainer),
+                    border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline)) {
                     Row(Modifier.fillMaxWidth().padding(start=16.dp,top=12.dp,bottom=12.dp,end=4.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-                        Surface(shape=RoundedCornerShape(15.dp),color=AnimaPulse.dark) { Icon(AppIcons.Folder,null,tint=AnimaPulse.green,modifier=Modifier.padding(10.dp)) }
+                        Surface(shape=RoundedCornerShape(15.dp),color=MaterialTheme.colorScheme.primaryContainer) { Icon(AppIcons.Folder,null,tint=MaterialTheme.colorScheme.primary,modifier=Modifier.padding(10.dp)) }
                         Column(Modifier.weight(1f).padding(horizontal=12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)) {
                             Text(p.name,style=MaterialTheme.typography.titleLarge,color=Color.White,
                                 fontWeight=FontWeight.ExtraBold,maxLines=1,overflow=TextOverflow.Ellipsis)
                             Text("● "+branch.ifEmpty { "Ветка не проверена" },
                                 style=MaterialTheme.typography.titleSmall,
                                 fontWeight=FontWeight.Bold,maxLines=1,
-                                overflow=TextOverflow.Ellipsis,color=AnimaPulse.green)
-                            Text(if(active)"${record.optString("action")} · ${MonitorPolicy.label(record.optString("state"),false,false)}" else if(p.error.isNotEmpty())"Нужна проверка" else if(p.worktree)"Worktree · только просмотр" else when(dirty){true->"Локальные изменения";false->"Чисто";else->"Не проверено"},style=MaterialTheme.typography.labelMedium,color=if(active)AnimaPulse.green else AnimaPulse.muted)
+                                overflow=TextOverflow.Ellipsis,color=MaterialTheme.colorScheme.primary)
+                            Text(if(active)"${record.optString("action")} · ${MonitorPolicy.label(record.optString("state"),false,false)}" else if(p.error.isNotEmpty())"Нужна проверка" else if(p.worktree)"Worktree · только просмотр" else when(dirty){true->"Локальные изменения";false->"Чисто";else->"Не проверено"},style=MaterialTheme.typography.labelMedium,color=if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Box { IconButton(onClick={haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick);menu=true}) {Icon(AppIcons.More,"Меню ${p.name}")}
                             DropdownMenu(menu,{menu=false}) {DropdownMenuItem(text={Text("Убрать из приложения")},onClick={menu=false;remove=p})}
@@ -157,14 +157,14 @@ import org.json.JSONObject
         if(isActiveJob)item {
             Surface(onClick={open(if(record.optString("action")=="TEST")"tests" else "build")},
                 shape=androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-                color=AnimaPulse.panel) {
+                color=MaterialTheme.colorScheme.surfaceContainer) {
                 Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Text("ЗАДАНИЕ В РАБОТЕ",color=AnimaPulse.green,
+                    Text("ЗАДАНИЕ В РАБОТЕ",color=MaterialTheme.colorScheme.primary,
                         style=MaterialTheme.typography.labelLarge)
                     Text(MonitorPolicy.label(record.optString("state"),false,false),
                         color=androidx.compose.ui.graphics.Color.White)
                     LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Text("Открыть монитор →",color=AnimaPulse.muted)
+                    Text("Открыть монитор →",color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

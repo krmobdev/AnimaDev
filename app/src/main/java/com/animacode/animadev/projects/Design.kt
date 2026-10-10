@@ -66,7 +66,7 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
             "appearance"->{
                 item {
                     Preference("Pulse · молодёжный дизайн",
-                        if(pulse)"Графит, электрический зелёный и яркие акценты" else "Классическая палитра Material",
+                        if(pulse)"Зелёные акценты, светлая или тёмная палитра" else "Классическая палитра Material",
                         trailing={Switch(pulse,onPulse)})
                 }
                 item {Preference("Тема",themeLabel,{selector="theme"})}
