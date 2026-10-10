@@ -12,6 +12,25 @@ class NavigationPolicyTest {
     @Test fun toolBackKeepsProject() { val n=NavigationState().openProject("one").tool("tests").back()!!;assertEquals("workspace",n.route);assertEquals("one",n.project) }
     @Test fun rootSwitchClearsTool() { val n=NavigationState().openProject("one").tool("git").switchRoot("termux").back()!!;assertEquals("list",n.route);assertEquals("projects",n.section);assertEquals("one",n.project) }
     @Test fun journalFromTestsReturnsToTests() { val n=NavigationState().openProject("one").tool("tests").journal("owned").back()!!;assertEquals("tests",n.route);assertEquals("one",n.project);assertEquals("",n.job) }
+    @Test fun journalOpenedFromBuildReturnsToBuild() {
+        val n=NavigationState(section="projects",route="journal",project="animaquiz",
+            job="active",journalParent="build").back()!!
+        assertEquals("build",n.route)
+        assertEquals("animaquiz",n.project)
+        assertEquals("",n.job)
+    }
+    @Test fun journalOpenedFromWorkspaceReturnsToWorkspace() {
+        val n=NavigationState(section="projects",route="journal",project="animaquiz",
+            job="owned",journalParent="workspace").back()!!
+        assertEquals("workspace",n.route)
+        assertEquals("",n.job)
+    }
+    @Test fun testTabsDoNotChangeJournalBackTarget() {
+        val n=NavigationState(section="projects",route="journal",project="animaquiz",
+            job="deviceTest",journalParent="tests").back()!!
+        assertEquals("tests",n.route)
+        assertEquals("animaquiz",n.project)
+    }
     @Test fun journalFromHistoryReturnsToHistory() { val n=NavigationState().openProject("one").tool("history").journal("owned").back()!!;assertEquals("history",n.route) }
     @Test fun notificationJournalDefaultsToHistory() { val n=NavigationState().openProject("one").journal("owned").back()!!;assertEquals("history",n.route) }
     @Test fun journalFromGitReturnsToGit() { val n=NavigationState().openProject("one").tool("git").journal("owned").back()!!;assertEquals("git",n.route) }
