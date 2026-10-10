@@ -14,7 +14,7 @@ class MainActivityInstrumentedTest {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         // Fresh per-job IDs protect the owner's installed application and secrets.
         assertTrue(context.packageName.matches(Regex(
-            "com\\\\.animacode\\\\.animadev(?:\\\\.devicefixture)?(?:\\\\.animadevtests\\\\.j[a-f0-9]{32})?")))
+            """com\.animacode\.animadev(?:\.devicefixture)?(?:\.animadevtests\.j[a-f0-9]{32})?""")))
         ActivityScenario.launch(MainActivity::class.java).use {scenario ->
             scenario.onActivity {activity ->
                 assertFalse(activity.isFinishing)

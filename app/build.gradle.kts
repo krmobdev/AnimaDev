@@ -59,7 +59,7 @@ dependencies {
 tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }
     .configureEach { dependsOn(prepareReleaseScripts) }
 
-// Release Lint reads generated assets as model inputs; Gradle 9 requires
-// an explicit dependency in addition to mergeReleaseAssets.
-tasks.matching { it.name.contains("Release") && it.name.contains("lint", ignoreCase = true) }
+// Both Debug and Release Lint read generated assets as model inputs.
+// Gradle 9 requires this dependency in addition to asset merging.
+tasks.matching { it.name.contains("lint", ignoreCase = true) }
     .configureEach { dependsOn(prepareReleaseScripts) }
