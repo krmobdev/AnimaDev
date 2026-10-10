@@ -40,7 +40,7 @@ def _create_memfd(name):
 def _ram_fd(label, data):
     fd = _create_memfd("animadev-"+label)
     try:
-        os.fchmod(fd, 0o600)
+        # Android bionic memfd is anonymous, and SELinux denies fchmod on it.
         view = memoryview(data)
         try:
             offset = 0
