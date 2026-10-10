@@ -9,6 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import kotlinx.coroutines.launch
 import com.animacode.animadev.repos.*
 import com.animacode.animadev.termux.TermuxGateway
 
@@ -23,6 +25,17 @@ import com.animacode.animadev.termux.TermuxGateway
     val canDebug=project.supported && ready && gateway.mayBuild(record,project.id)
     val signing=remember {SigningStore(context)}
     val hasSigningKey=signing.hasDocument(project.id)
+    val releaseStore=remember {ReleaseStore(context)}
+    val releaseGateway=remember {ReleaseGateway(context)}
+    val releaseGeneration=ReleaseStore.generation.intValue
+    val releaseState=remember(releaseGeneration) {releaseStore.read()}
+    val releaseForProject=releaseState.optString("project")==project.id
+    val releaseBusy=releaseStore.busy()
+    var releasePassword by remember(project.id){mutableStateOf("")}
+    var releaseKeyPassword by remember(project.id){mutableStateOf("")}
+    var releaseMessage by remember(project.id){mutableStateOf("")}
+    val releaseScope=rememberCoroutineScope()
+    val canRelease=canDebug && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseBusy
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {Text(project.name,style=MaterialTheme.typography.titleMedium)
@@ -48,10 +61,41 @@ import com.animacode.animadev.termux.TermuxGateway
         item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
             Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text("Release AAB",style=MaterialTheme.typography.titleMedium)
-                Button(onClick={},enabled=false,modifier=Modifier.fillMaxWidth()){Text("Собрать Release AAB")}
-                Text(if(!hasSigningKey)"Выберите файл ключа .jks или .keystore через настройки подписи."
-                     else "Ключ выбран. Защищённая передача пароля пока не готова. Выпуск AAB заблокирован.",
+                Text(if(hasSigningKey)"Файл: "+signing.fileLabel(project.id)+" · alias: "+signing.alias(project.id)
+                     else "Выберите JKS и alias в настройках подписи.",
+                    style=MaterialTheme.typography.bodySmall)
+                OutlinedTextField(releasePassword,{releasePassword=it},
+                    label={Text("Пароль хранилища JKS")},
+                    visualTransformation=PasswordVisualTransformation(),singleLine=true,
+                    enabled=!releaseBusy,modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(releaseKeyPassword,{releaseKeyPassword=it},
+                    label={Text("Пароль ключа, если отличается")},
+                    visualTransformation=PasswordVisualTransformation(),singleLine=true,
+                    enabled=!releaseBusy,modifier=Modifier.fillMaxWidth())
+                Button(onClick={
+                    val storePass=releasePassword
+                    val keyPass=releaseKeyPassword
+                    releasePassword=""
+                    releaseKeyPassword=""
+                    releaseMessage="Подготавливаю защищённое задание…"
+                    releaseScope.launch {
+                        releaseMessage=releaseGateway.launch(project,storePass,keyPass)
+                    }
+                },enabled=canRelease && releasePassword.isNotEmpty(),
+                  modifier=Modifier.fillMaxWidth()) {Text("Собрать подписанный Release AAB")}
+                Text("Ключ и пароли передаются локально в Termux через stdin; в аргументах и настройках не сохраняются. Подпись использует анонимные файлы оперативной памяти.",
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                if(!canDebug)Text("Нужна предварительная проверка GitHub SHA и чистого проекта.",
+                    style=MaterialTheme.typography.bodySmall)
+                if(releaseMessage.isNotBlank())Text(releaseMessage,style=MaterialTheme.typography.bodySmall)
+                if(releaseForProject) {
+                    Text("Release: "+releaseState.optString("state"),style=MaterialTheme.typography.titleSmall)
+                    Text(releaseState.optString("message"),style=MaterialTheme.typography.bodySmall)
+                    releaseState.optJSONObject("artifact")?.let {artifact->
+                        Text("Файл: "+artifact.optString("path"),style=MaterialTheme.typography.bodySmall)
+                        Text("SHA-256: "+artifact.optString("sha256"),style=MaterialTheme.typography.bodySmall)
+                    }
+                }
             }
         }}
         val job=if(belongs)record.optJSONObject("job") else null
