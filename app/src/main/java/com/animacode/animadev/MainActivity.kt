@@ -172,7 +172,7 @@ class MainActivity:ComponentActivity() {
                 route=="settings"->SettingsPolicy.toolbarTitle(settingsSection);top=="termux"->"Termux";route=="list"->"Проекты";route=="branches"->"Ветки";route=="git"->"Git";route=="tests"->"Тесты";route=="build"->"Сборка";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
             Scaffold(
                 contentWindowInsets=WindowInsets.safeDrawing,
-                topBar={TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(!root)IconButton(onClick={clickFeedback();back()}){Icon(AppIcons.Back,"Вернуться")}},actions={
+                topBar={if(!(emerald && root && top=="projects")) TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(!root)IconButton(onClick={clickFeedback();back()}){Icon(AppIcons.Back,"Вернуться")}},actions={
                     Box { IconButton(onClick={clickFeedback();menu=true}){Icon(AppIcons.More,"Меню приложения")}
                         DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
                             DropdownMenuItem(text={Text(if(english)"Settings" else "Настройки")},leadingIcon={Icon(AppIcons.Settings,null)},onClick={clickFeedback();menu=false;if(route!="settings"){settingsParent=route;settingsSection="";route="settings"}})
@@ -182,9 +182,16 @@ class MainActivity:ComponentActivity() {
                         }
                     }
                 })},
-                bottomBar={if(root)NavigationBar {
-                    NavigationBarItem(selected=top=="projects",onClick={clickFeedback();top="projects";route="list";journalJob=""},icon={Icon(AppIcons.Folder,null)},label={Text("Проекты")})
-                    NavigationBarItem(selected=top=="termux",onClick={clickFeedback();top="termux";route="list";journalJob=""},icon={Icon(AppIcons.Terminal,null)},label={Text("Termux")})
+                bottomBar={if(root) {
+                    if(emerald) NeonBottomBar(
+                        onProjects={clickFeedback();top="projects";route="list";journalJob=""},
+                        onTermux={clickFeedback();top="termux";route="list";journalJob=""},
+                        projectsSelected=top=="projects"
+                    )
+                    else NavigationBar {
+                        NavigationBarItem(selected=top=="projects",onClick={clickFeedback();top="projects";route="list";journalJob=""},icon={Icon(AppIcons.Folder,null)},label={Text("Проекты")})
+                        NavigationBarItem(selected=top=="termux",onClick={clickFeedback();top="termux";route="list";journalJob=""},icon={Icon(AppIcons.Terminal,null)},label={Text("Termux")})
+                    }
                 }}
             ) { padding -> Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when {
