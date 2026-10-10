@@ -133,21 +133,11 @@ import com.animacode.animadev.repos.*
                 val stale=gitSnap!=null && project.commit.isNotBlank() &&
                     localSha.isNotBlank() && localSha!=project.commit && !justSynced
                 val canReceive=available && !stale && gateway.maySync(r,project.id)
-                val headline=when {
-                    working->"Git · операция выполняется"
-                    gitJob && jobState in setOf("FAILED","TIMED_OUT","INTERRUPTED") -> "Ошибка Git · подробности ниже"
-                    gitJob && jobState=="UNKNOWN" -> "Неизвестен результат Git"
-                    gitSnap==null->"Сначала проверьте Git"
-                    !branchOk->"Ветка не разрешена"
-                    !remoteOk->"Origin не подтверждён"
-                    dirty->"Есть локальные изменения"
-                    !checked->"GitHub ещё не проверен"
-                    ahead>0 && behind>0->"Ветки разошлись"
-                    ahead>0->"Есть локальные коммиты"
-                    behind>0->"Доступны обновления"
-                    justSynced->"Исходники обновлены"
-                    else->"Исходники актуальны"
-                }
+                val headline=GitScreenStatus.headline(
+                    working=working,state=jobState,hasJob=gitJob,
+                    hasSnapshot=gitSnap!=null,branchAllowed=branchOk,originOk=remoteOk,
+                    dirty=dirty,checked=checked,ahead=ahead,behind=behind,
+                    justSynced=justSynced)
                 Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                     Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
                         Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -191,7 +181,7 @@ import com.animacode.animadev.repos.*
                         com.animacode.animadev.projects.ActionButton(onClick={confirmSync=true},
                             enabled=canReceive,modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {
                             Icon(AppIcons.Git,null);Spacer(Modifier.width(10.dp))
-                            Text("Получить "+behind+" коммитов")
+                            Text("Получить "+behind+" "+GitScreenStatus.commitWord(behind))
                         }
                         Text(if(canReceive)"Получение только по подтверждению. Termux повторно проверит безопасность."
                             else when {
