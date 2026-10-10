@@ -170,7 +170,8 @@ object ArtifactGateway {
         }
     }
 
-    internal fun message(context:Context,text:String)=Toast.makeText(context,text,Toast.LENGTH_LONG).show()
+    internal fun message(context:Context,text:String)=Toast.makeText(context,
+        AppTranslation.translate(text,AppLanguage.english(context)),Toast.LENGTH_LONG).show()
 }
 
 /** Notification returns to the foreground build screen; it never claims installation succeeded. */
