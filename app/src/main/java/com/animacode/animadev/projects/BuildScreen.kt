@@ -128,9 +128,9 @@ import com.animacode.animadev.termux.TermuxGateway
             }
         }
         item {
-            if(neon)NeonTabs(listOf("Debug APK","Release AAB"),buildTab) {
+            if(neon)NeonTabs(listOf("Debug APK","Release AAB"),buildTab,onSelect={
                 if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
-            } else OperationTabs(listOf("Debug APK","Release AAB"),buildTab) {
+            }) else OperationTabs(listOf("Debug APK","Release AAB"),buildTab) {
                 if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
             }
         }
