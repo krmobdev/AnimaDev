@@ -41,6 +41,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import com.animacode.animadev.projects.AppIcons
+import com.animacode.animadev.projects.LocalNeonSkin
+import com.animacode.animadev.projects.NeonGlass
+import com.animacode.animadev.projects.NeonSection
+import com.animacode.animadev.projects.NeonStatus
+import com.animacode.animadev.projects.NeonTabs
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 @Composable
 fun HighlightedLogChunk(chunk:String) {
@@ -59,16 +67,31 @@ fun HighlightedLogChunk(chunk:String) {
             }
         }
     }
+    val neon=LocalNeonSkin.current
     if(JournalPresentation.isCommand(chunk) && !expanded) {
-        ListItem(headlineContent={Text(annotated.subSequence(0,minOf(100,annotated.length)),maxLines=2,overflow=TextOverflow.Ellipsis)},supportingContent={Text("Полная команда · раскрыть")},trailingContent={IconButton(onClick={expanded=true}){Icon(AppIcons.Chevron,"Раскрыть команду")}})
+        ListItem(headlineContent={Text(annotated.subSequence(0,minOf(100,annotated.length)),maxLines=2,overflow=TextOverflow.Ellipsis)},
+            supportingContent={Text("Полная команда · раскрыть")},
+            trailingContent={IconButton(onClick={expanded=true}){Icon(AppIcons.Chevron,"Раскрыть команду")}},
+            colors=ListItemDefaults.colors(containerColor=if(neon)NeonGlass.raised else scheme.surface))
         return
     }
-    SelectionContainer { Text(annotated,modifier=Modifier.fillMaxWidth(),fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodySmall,softWrap=true) }
+    if(neon)Surface(
+        color=NeonGlass.surface,shape=RoundedCornerShape(12.dp),
+        border=BorderStroke(1.dp,NeonGlass.outline.copy(alpha=.6f))) {
+        SelectionContainer {
+            Text(annotated,modifier=Modifier.fillMaxWidth().padding(10.dp),
+                fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodySmall,softWrap=true)
+        }
+    } else SelectionContainer {
+        Text(annotated,modifier=Modifier.fillMaxWidth(),fontFamily=FontFamily.Monospace,
+            style=MaterialTheme.typography.bodySmall,softWrap=true)
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class,ExperimentalMaterial3Api::class)
 @Composable
 fun JournalScreen(context: Context, requestedJob: String = "") {
+    val neon=LocalNeonSkin.current
     val store=remember { RepoStore(context) }; val gateway=remember { RepoGateway(context) }
     val cache=remember { JournalCache(context) }; val prefs=remember { context.getSharedPreferences("monitor_settings",Context.MODE_PRIVATE) }
     val scope=rememberCoroutineScope()
@@ -175,9 +198,24 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
     }
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.padding(horizontal=16.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.fillMaxWidth()
+            .then(if(neon) Modifier.background(NeonGlass.surface) else Modifier)
+            .padding(horizontal=16.dp,vertical=if(neon)14.dp else 8.dp),
+            verticalArrangement=Arrangement.spacedBy(if(neon)11.dp else 6.dp)) {
+            if(neon) {
+                NeonSection("Job journal",AppIcons.History,
+                    "${actionForJob()} · ${jobId.take(8).ifBlank {"No job selected"}}")
+                val activeState=if(jobId==record.optString("job_id"))
+                    record.optString("state")
+                    else jobs.firstOrNull{it.optString("job_id")==jobId}?.optString("state").orEmpty()
+                if(activeState.isNotBlank()) NeonStatus(activeState,
+                    activeState=="SUCCEEDED" || activeState in setOf("QUEUED","RUNNING","REQUESTED"))
+            }
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Text("${actionForJob()} · ${jobId.take(8)}",Modifier.weight(1f),style=MaterialTheme.typography.titleSmall)
+                Text("${actionForJob()} · ${jobId.take(8)}",Modifier.weight(1f),
+                    style=MaterialTheme.typography.titleSmall,
+                    color=if(neon)NeonGlass.muted else Color.Unspecified,maxLines=1,
+                    overflow=TextOverflow.Ellipsis)
                 IconButton(onClick={showSearch=!showSearch;if(!showSearch)search=""}) {Icon(AppIcons.Search,"Поиск в журнале")}
                 IconButton(onClick={loadAll=true},enabled=!loadAll && jobId.isNotEmpty()){Icon(AppIcons.Refresh,"Обновить журнал")}
             IconButton(onClick={scope.launch {
@@ -221,11 +259,15 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                     }
                 }
             }
-            FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            if(neon)NeonTabs(
+                labels=listOf("Important","All"),selected=if(view=="IMPORTANT")0 else 1,
+                onSelect={index->view=if(index==0)"IMPORTANT" else "ALL";loadAll=true})
+            else FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected=view=="IMPORTANT",onClick={view="IMPORTANT";loadAll=true},label={Text("Важное")})
                 FilterChip(selected=view=="ALL",onClick={view="ALL";loadAll=true},label={Text("Всё")})
             }
-            if(showSearch)OutlinedTextField(search,{search=it},label={Text("Поиск по доступному журналу")},singleLine=true,modifier=Modifier.fillMaxWidth())
+            if(showSearch)OutlinedTextField(search,{search=it},label={Text("Поиск по доступному журналу")},
+                shape=RoundedCornerShape(17.dp),singleLine=true,modifier=Modifier.fillMaxWidth())
             if(notice.isNotEmpty())Text(notice,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
             if(!record.optBoolean("ready"))com.animacode.animadev.projects.ActionButton(
                 onClick={gateway.install()},
@@ -234,9 +276,12 @@ fun JournalScreen(context: Context, requestedJob: String = "") {
                 Text("Обновить помощник")
             }
         }
-        if(loadAll || historyLoading || exporting)LinearProgressIndicator(Modifier.fillMaxWidth()) else HorizontalDivider()
+        if(loadAll || historyLoading || exporting)LinearProgressIndicator(Modifier.fillMaxWidth())
+        else HorizontalDivider(color=if(neon)NeonGlass.outline else MaterialTheme.colorScheme.outlineVariant)
         Box(Modifier.weight(1f)) {
-            LazyColumn(Modifier.fillMaxSize().padding(horizontal=16.dp),state=scroll,contentPadding=PaddingValues(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            LazyColumn(Modifier.fillMaxSize().padding(horizontal=16.dp),state=scroll,
+                contentPadding=PaddingValues(vertical=12.dp),
+                verticalArrangement=Arrangement.spacedBy(if(neon)7.dp else 8.dp)) {
                 items(displayed) {chunk->HighlightedLogChunk(chunk)}
             }
     val thumb=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.55f)
