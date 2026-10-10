@@ -35,7 +35,7 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
     val view=LocalView.current
     ListItem(headlineContent={Text(title)},supportingContent={Text(value)},trailingContent=trailing ?: if(onClick!=null)({Icon(AppIcons.Chevron,null)}) else null,modifier=if(onClick!=null)Modifier.clickable {feedback.tap(view);onClick()} else Modifier)
 }
-@Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={},onOpenBuild:(String)->Unit={}) {
+@Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={},pulse:Boolean=true,onPulse:(Boolean)->Unit={},onOpenBuild:(String)->Unit={}) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
     val feedback=remember {UiFeedback(context)}
@@ -64,8 +64,13 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
             }
         } else when(category) {
             "appearance"->{
+                item {
+                    Preference("Pulse · молодёжный дизайн",
+                        if(pulse)"Графит, электрический зелёный и яркие акценты" else "Классическая палитра Material",
+                        trailing={Switch(pulse,onPulse)})
+                }
                 item {Preference("Тема",themeLabel,{selector="theme"})}
-                item {Preference("Динамические цвета","Палитра обоев Android",trailing={Switch(dynamic,onDynamic)})}
+                item {Preference("Динамические цвета",if(pulse)"Не используются в режиме Pulse" else "Палитра обоев Android",trailing={Switch(dynamic,onDynamic,enabled=!pulse)})}
                 item {HorizontalDivider(Modifier.padding(horizontal=20.dp,vertical=8.dp))}
                 item {Preference("Вибрация при нажатии","Тактильный отклик для кнопок и навигации",
                     trailing={Switch(haptics,{v->haptics=v;feedback.setVibrations(v);if(v)feedback.tap(view)})})}
