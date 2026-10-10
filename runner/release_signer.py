@@ -21,10 +21,24 @@ class SigningError(Exception):
         super().__init__(code)
         self.code = code
 
-def _ram_fd(label, data):
-    if not hasattr(os, "memfd_create"):
+def _create_memfd(name):
+    if hasattr(os, "memfd_create"):
+        return os.memfd_create(name,flags=0)
+    # Python on Android/Termux may omit this binding although bionic libc supports it.
+    import ctypes
+    libc=ctypes.CDLL(None,use_errno=True)
+    fn=getattr(libc,"memfd_create",None)
+    if fn is None:
         raise SigningError("MEMFD_UNAVAILABLE")
-    fd = os.memfd_create("animadev-"+label, flags=0)
+    fn.argtypes=(ctypes.c_char_p,ctypes.c_uint)
+    fn.restype=ctypes.c_int
+    fd=fn(name.encode("ascii"),0)
+    if fd<0:
+        raise SigningError("MEMFD_UNAVAILABLE")
+    return fd
+
+def _ram_fd(label, data):
+    fd = _create_memfd("animadev-"+label)
     try:
         os.fchmod(fd, 0o600)
         view = memoryview(data)
