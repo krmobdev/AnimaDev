@@ -15,6 +15,16 @@ plugins {
 if (providers.gradleProperty("animadevDeviceFixture").orNull == "true") {
     layout.buildDirectory.set(layout.projectDirectory.dir("build/device-fixture"))
 }
+val supportAssets = layout.buildDirectory.dir("generated/animadev-support-assets")
+val prepareSupportDocs by tasks.registering(Copy::class) {
+    from(rootProject.file("CHANGELOG.md"))
+    from(rootProject.file("docs/USER_GUIDE.md"))
+    from(rootProject.file("docs/USER_GUIDE_EN.md"))
+    from(rootProject.file("docs/TERMUX_SETUP.md"))
+    from(rootProject.file("docs/TERMUX_SETUP_EN.md"))
+    into(supportAssets.map {it.dir("support")})
+}
+
 android {
     namespace = "com.animacode.animadev"
     compileSdk = 37
@@ -24,10 +34,11 @@ android {
         minSdk = 33
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 44
-        versionName = "0.4.0-beta.8-dev.30"
+        versionCode = 45
+        versionName = "0.4.0-beta.9-dev.31"
     }
     sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
+    sourceSets.getByName("main").assets.srcDir(supportAssets.get().asFile)
     buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -63,3 +74,7 @@ tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets
 // Gradle 9 requires this dependency in addition to asset merging.
 tasks.matching { it.name.contains("lint", ignoreCase = true) }
     .configureEach { dependsOn(prepareReleaseScripts) }
+
+// In-app documentation and change log are copied from the same tracked GitHub files.
+tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }
+    .configureEach { dependsOn(prepareSupportDocs) }
