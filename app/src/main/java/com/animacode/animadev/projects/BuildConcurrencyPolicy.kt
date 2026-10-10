@@ -7,7 +7,7 @@ object BuildConcurrencyPolicy {
 
     fun repoBusy(jobId:String, state:String, action:String):Boolean =
         jobId.isNotBlank() && state in activeStates &&
-            action in setOf("TEST", "BUILD_DEBUG", "BUILD_RELEASE")
+            action in setOf("TEST", "TEST_DEVICE", "BUILD_DEBUG", "BUILD_RELEASE")
     fun releaseBusy(state:String):Boolean=state in setOf("REQUESTED", "QUEUED", "RUNNING", "UNKNOWN")
 
     fun owner(debugProject:String, debugJobId:String, debugState:String, debugAction:String,
