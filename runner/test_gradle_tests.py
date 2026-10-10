@@ -320,6 +320,12 @@ class InstrumentationFixture(unittest.TestCase):
         for forbidden in ('delete','clear','fallbackToDestructiveMigration','exec','commandLine'):
             self.assertNotIn(forbidden,script)
 
+    def test_ordinary_profile_explicitly_excludes_only_quiz_os_backup_phase(self):
+        script=gt.device_init_script(uuid.uuid4().hex)
+        self.assertIn("originalId == 'com.animacode.quizapp'",script)
+        self.assertIn("testInstrumentationRunnerArguments['notClass']",script)
+        self.assertIn("com.animacode.quizapp.data.NativeBackupPhaseInstrumentedTest",script)
+
     def test_isolation_rejects_non_job_input(self):
         for invalid in ('', 'x'*32, "abc';exec('rm')", '../secret'):
             with self.assertRaises(ValueError):gt.device_init_script(invalid)

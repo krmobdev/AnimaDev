@@ -181,6 +181,9 @@ import com.animacode.animadev.repos.*
                     Column(Modifier.fillMaxWidth().padding(20.dp),
                         verticalArrangement=Arrangement.spacedBy(12.dp)) {
                         Text("Инструментальные тесты",style=MaterialTheme.typography.titleLarge)
+                        if(project.id=="animaquiz")Text("Обычный набор · OS backup/restore проверяется отдельно",
+                            style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("Реальное устройство · ADB · :app:connectedDebugAndroidTest",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)

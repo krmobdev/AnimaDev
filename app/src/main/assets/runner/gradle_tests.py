@@ -293,7 +293,13 @@ def device_init_script(jid):
         p.pluginManager.withPlugin('com.android.application') {
             p.layout.buildDirectory.set(p.layout.projectDirectory.dir('build/animadev-device-j%s'))
             p.extensions.getByName('androidComponents').finalizeDsl { android ->
-                android.defaultConfig.applicationId = android.defaultConfig.applicationId + '%s'
+                def originalId = android.defaultConfig.applicationId
+                if (originalId == 'com.animacode.quizapp') {
+                    // OS backup seed/restore/verify is a separate multi-process audit.
+                    android.defaultConfig.testInstrumentationRunnerArguments['notClass'] =
+                        'com.animacode.quizapp.data.NativeBackupPhaseInstrumentedTest'
+                }
+                android.defaultConfig.applicationId = originalId + '%s'
             }
         }
     }
@@ -427,6 +433,7 @@ def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT,a
         os.chmod(init,0o600)
         command=DEVICE_COMMAND+('--init-script',str(init))
         log('event','Изолированный тестовый пакет · установленное приложение и его база не изменяются')
+        log('event','Профиль: обычные инструментальные тесты. Для com.animacode.quizapp сценарий NativeBackupPhaseInstrumentedTest не выполняется: OS backup/restore требует отдельной многофазной проверки.')
         log('command','bash '+ ' '.join(command))
         code,unknown=process(guard.root,env,log,on_process,identity,redact,
                              timeout,getattr(guard,'observe',lambda:None),command)
