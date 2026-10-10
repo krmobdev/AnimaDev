@@ -1,6 +1,9 @@
 package com.animacode.animadev.projects
 
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -96,7 +99,9 @@ object OperationResultPolicy {
         JobMonitor(context,record,permitted,onJournal)
         return
     }
-    val job=(if(current)record.optJSONObject("job") else null) ?: record.optJSONObject("build_job") ?: return
+    // Older jobs belong exclusively to History, never linger on the Build screen.
+    if(!current)return
+    val job=record.optJSONObject("job") ?: return
     if(!OperationResultPolicy.matches(project.id,job.optString("project_id",project.id),
             "BUILD_DEBUG",job.optString("action")) || job.optString("state") !in RepoPolicy.terminalStates)return
     val success=job.optString("state")=="SUCCEEDED"
@@ -119,6 +124,11 @@ object OperationResultPolicy {
 
 @Composable fun BuildArtifactCard(context:Context,artifact:JSONObject) {
     var details by remember(artifact.optString("sha256")) {mutableStateOf(false)}
+    val scope=rememberCoroutineScope()
+    val destination=remember(context) {ExportDestination(context)}
+    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {uri->
+        if(uri!=null)scope.launch {ArtifactGateway.install(context,artifact,uri)}
+    }
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             val apk=artifact.optString("path").endsWith(".apk")
@@ -127,9 +137,18 @@ object OperationResultPolicy {
             Text(artifact.optString("path").substringAfterLast('/'),style=MaterialTheme.typography.bodyMedium)
             Text("Размер: ${artifact.optLong("size")/1024/1024} МБ · Git ${artifact.optString("commit").take(12)}",
                 style=MaterialTheme.typography.bodySmall)
-            ActionButton(onClick={ArtifactGateway.open(context,artifact)}) {
-                Text(if(apk)"Открыть · установить приложение" else "Открыть AAB")
+            ActionButton(onClick={
+                if(apk) {
+                    val direct=destination.artifactUri(artifact.optString("path"))
+                    if(direct!=null)scope.launch {ArtifactGateway.install(context,artifact,direct)}
+                    else picker.launch(arrayOf("application/vnd.android.package-archive","application/octet-stream"))
+                } else ArtifactGateway.openFolder(context,artifact)
+            }) {
+                Text(if(apk)"Установить APK" else "Открыть папку")
             }
+            if(apk && destination.artifactUri(artifact.optString("path"))==null)
+                Text("Выберите этот APK в системном проводнике. Перед установкой проверим его SHA-256.",
+                    style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             ActionButton(onClick={details=!details}) {Text(if(details)"Скрыть сведения о файле" else "Сведения о файле")}
             if(details) {
                 Text(artifact.optString("path"),style=MaterialTheme.typography.bodySmall)
