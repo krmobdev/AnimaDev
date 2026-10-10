@@ -23,7 +23,8 @@ import com.animacode.animadev.repos.*
 import com.animacode.animadev.termux.TermuxGateway
 
 @Composable fun BuildScreen(context:Context,project:LocalProject,permitted:Boolean,termuxVersion:String?,
-                           onPermissionUpdated:()->Unit,onJournal:(String)->Unit) {
+                           onPermissionUpdated:()->Unit,onJournal:(String)->Unit,
+                           selectedBuildTab:Int?=null,onBuildTabChange:((Int)->Unit)?=null) {
     val feedback=remember {UiFeedback(context)}
     val view=LocalView.current
     fun tap(){feedback.tap(view)}
@@ -91,11 +92,14 @@ import com.animacode.animadev.termux.TermuxGateway
     val releaseScope=rememberCoroutineScope()
     val canRelease=canDebug && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseOrDebugBusy
     val effectivePasswordPresent=releasePassword.isNotEmpty() || storedCredentials?.storePassword?.isNotEmpty()==true
-    var buildTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
+    var fallbackBuildTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
+    val buildTab=selectedBuildTab ?: fallbackBuildTab
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
         item {OperationProjectHeader(project)}
-        item {OperationTabs(listOf("Debug APK","Release AAB"),buildTab) {buildTab=it}}
+        item {OperationTabs(listOf("Debug APK","Release AAB"),buildTab) {
+            if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
+        }}
         if(catalogRefresh)item {Text("Сверяем активную ветку с Termux…",style=MaterialTheme.typography.bodySmall)}
         if(busyOwner!=null)item {
             Text("Очередь занята: "+busyOwner+" · "+when {
