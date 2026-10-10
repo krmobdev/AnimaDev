@@ -64,7 +64,8 @@ try:
             stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,timeout=18,check=False)
         response=(connection.stdout+connection.stderr).decode('utf-8','replace').lower()
-        connect_status=('CONNECTED' if connection.returncode==0 and 'connected' in response and 'failed' not in response\n                        else 'CONNECT_REFUSED' if 'refused' in response else 'CONNECT_FAILED')
+        connect_status=('CONNECTED' if connection.returncode==0 and 'connected' in response and 'failed' not in response
+                        else 'CONNECT_REFUSED' if 'refused' in response else 'CONNECT_FAILED')
     else:
         connect_status='NOT_ATTEMPTED'
     p=subprocess.run(['/data/data/com.termux/files/usr/bin/adb','devices','-l'],
