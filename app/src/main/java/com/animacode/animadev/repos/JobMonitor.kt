@@ -44,6 +44,7 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
         Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("Задание · $projectName · "+when(record.optString("action")) {
                 "TEST"->"Unit-тесты"
+                "TEST_DEVICE"->"Инструментальные тесты · ADB"
                 "BUILD_DEBUG"->"Debug APK"
                 else->"Git / "+record.optString("action")
             },style=MaterialTheme.typography.titleMedium)
