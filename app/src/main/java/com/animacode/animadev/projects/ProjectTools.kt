@@ -115,7 +115,8 @@ import com.animacode.animadev.repos.*
         } else {
             val prepared=belongs && snap!=null && gateway.mayTest(r,project.id)
             val canRun=available && prepared
-            val canRunDevice=available && !adbPending && !releaseBusy
+            val canRunDevice=DeviceTestLaunchPolicy.canStart(permitted,termuxVersion!=null,ready,
+                pending,blocked,adbPending,releaseBusy)
             val needStatus=r.optString("project_id","animaquiz")!=project.id || snap==null
             item {
                 OutlinedCard(shape=androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
