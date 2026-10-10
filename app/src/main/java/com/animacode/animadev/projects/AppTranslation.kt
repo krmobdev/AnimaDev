@@ -299,6 +299,7 @@ object AppTranslation {
         dictionary[original]?.let {return it}
         AppTranslationExtra.dictionary[original]?.let {return it}
         AppTranslationMore.dictionary[original]?.let {return it}
+        AppTranslationStatus.dictionary[original]?.let {return it}
         AppTranslationDynamic.translate(original)?.let {return it}
         // Only replace a known UI prefix. Global substitutions in arbitrary
         // text risk altering paths, branch names, job IDs and raw diagnostics.
