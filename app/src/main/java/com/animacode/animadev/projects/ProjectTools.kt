@@ -28,9 +28,13 @@ import com.animacode.animadev.repos.*
         onDispose {adb.prefs.unregisterOnSharedPreferenceChangeListener(listener)}
     }
     adb.expire()
-    val adbState=adb.prefs.getString("message","Устройство ещё не проверено.").orEmpty()
-    val adbPending=adb.prefs.getBoolean("pending",false)
-    val deviceReady=adb.recentDevice()
+    // Observing adbVersion is essential: the Termux callback updates
+    // SharedPreferences off-screen, so Compose must re-read those values.
+    val adbState=remember(adbVersion) {
+        adb.prefs.getString("message","Устройство ещё не проверено.").orEmpty()
+    }
+    val adbPending=remember(adbVersion) {adb.prefs.getBoolean("pending",false)}
+    val deviceReady=remember(adbVersion) {adb.recentDevice()}
     val belongs=r.optString("project_id","animaquiz")==project.id
     val snap=if(belongs)r.optJSONObject("snapshot")?.takeIf {
         it.optString("branch")==project.branch && it.optString("local_commit")==project.commit
