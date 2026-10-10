@@ -16,8 +16,8 @@ android {
         applicationId = "com.animacode.animadev"
         minSdk = 33
         targetSdk = 35
-        versionCode = 22
-        versionName = "0.4.0-beta.8-dev.8"
+        versionCode = 23
+        versionName = "0.4.0-beta.8-dev.9"
     }
     sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
     buildFeatures { compose = true }
