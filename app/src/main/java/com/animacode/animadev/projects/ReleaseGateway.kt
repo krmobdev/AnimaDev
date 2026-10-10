@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.net.LocalServerSocket
 import android.os.Build
 import android.util.Base64
 import androidx.compose.runtime.mutableIntStateOf
@@ -12,7 +13,12 @@ import com.animacode.animadev.repos.RepoGateway
 import com.animacode.animadev.repos.RepoStore
 import com.animacode.animadev.termux.TermuxGateway
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import org.json.JSONObject
 import java.util.UUID
 
@@ -92,6 +98,7 @@ class ReleaseGateway(private val context:Context) {
             } ?: return "Нет подписывающего модуля в APK."
             if(script.length>60_000)return "Подписывающий модуль повреждён."
             val request=UUID.randomUUID().toString().replace("-","")
+            val socketName="animadev-release-"+UUID.randomUUID().toString().replace("-","")
             val profile=JSONObject().put("id",project.id).put("name",project.name)
                 .put("root",project.path)
                 .put("remote",if(project.id=="animaquiz")"github.com/krmobdev/quizapp" else project.remote)
@@ -99,36 +106,78 @@ class ReleaseGateway(private val context:Context) {
             val payload=JSONObject().put("request_id",request).put("project",profile)
                 .put("alias",alias).put("keystore",Base64.encodeToString(key,Base64.NO_WRAP))
                 .put("store_password",storePassword).put("key_password",keyPassword)
-            if(!store.begin(project.id,request,sha))return "Не удалось сохранить идентификатор задания."
-            val callbackIntent=Intent(context,ReleaseResultReceiver::class.java).apply {
-                action=ReleaseWire.CALLBACK
-                this.data=Uri.parse("animadev://release/$request")
-            }
-            val flags=PendingIntent.FLAG_ONE_SHOT or
-                if(Build.VERSION.SDK_INT>=31)PendingIntent.FLAG_MUTABLE else 0
-            val callback=PendingIntent.getBroadcast(context,request.hashCode(),callbackIntent,flags)
-            val command=Intent("com.termux.RUN_COMMAND").apply {
-                setClassName("com.termux","com.termux.app.RunCommandService")
-                putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
-                putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",script))
-                putExtra("com.termux.RUN_COMMAND_STDIN",payload.toString())
-                putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
-                putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
-                putExtra("com.termux.RUN_COMMAND_BACKGROUND_CUSTOM_LOG_LEVEL","0")
-                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL","AnimaDev · подписать Release AAB")
-                putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
-            }
-            return try {
-                if(context.startService(command)==null) {
+            val recipientUid=try {
+                @Suppress("DEPRECATION")
+                context.packageManager.getApplicationInfo("com.termux",0).uid
+            } catch(_:Exception) { return "Не удалось подтвердить установленный Termux." }
+            val server=try {LocalServerSocket(socketName)}
+                catch(_:Exception) {return "Android запретил защищённый локальный канал. Секреты не отправлены."}
+            try {
+                if(!store.begin(project.id,request,sha))return "Не удалось сохранить идентификатор задания."
+                val callbackIntent=Intent(context,ReleaseResultReceiver::class.java).apply {
+                    action=ReleaseWire.CALLBACK
+                    this.data=Uri.parse("animadev://release/$request")
+                }
+                val flags=PendingIntent.FLAG_ONE_SHOT or
+                    if(Build.VERSION.SDK_INT>=31)PendingIntent.FLAG_MUTABLE else 0
+                val callback=PendingIntent.getBroadcast(context,request.hashCode(),callbackIntent,flags)
+                // Important: the Intent contains NO credential bytes, only public socket coordinates.
+                val command=Intent("com.termux.RUN_COMMAND").apply {
+                    setClassName("com.termux","com.termux.app.RunCommandService")
+                    putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
+                    putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",script,socketName,request,context.applicationInfo.uid.toString()))
+                    putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
+                    putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
+                    putExtra("com.termux.RUN_COMMAND_BACKGROUND_CUSTOM_LOG_LEVEL","0")
+                    putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL","AnimaDev · подписать Release AAB")
+                    putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
+                }
+                try {
+                    if(context.startService(command)==null) {
+                        callback.cancel()
+                        store.failed(request,"Termux не подтвердил запуск. Статус неизвестен; повтор заблокирован.")
+                        return "Termux не подтвердил запуск Release."
+                    }
+                } catch (_:Exception) {
                     callback.cancel()
-                    store.failed(request,"Служба Termux недоступна. Статус неизвестен; повтор заблокирован.")
-                    "Termux не подтвердил запуск Release."
-                } else "Подписанная сборка запущена. Результат появится в этом разделе."
-            } catch (_:Exception) {
-                callback.cancel()
-                store.failed(request,"Android отказал в запуске. Проверьте Termux; автоматического повтора нет.")
-                "Не удалось отправить задание Termux."
-            }
+                    store.failed(request,"Android отказал в запуске. Статус неизвестен; повтор заблокирован.")
+                    return "Не удалось отправить задание Termux."
+                }
+                val accepted=withContext(Dispatchers.IO) {
+                    val watchdog=CoroutineScope(Dispatchers.IO).launch {
+                        delay(20_000)
+                        runCatching {server.close()}
+                    }
+                    try {
+                        server.accept().use {client->
+                            client.soTimeout=8_000
+                            // Linux kernel credentials, not a caller-supplied string.
+                            if(client.peerCredentials.uid!=recipientUid) return@withContext false
+                            val greeting=ByteArray(32)
+                            DataInputStream(client.inputStream).readFully(greeting)
+                            if(!greeting.contentEquals(request.toByteArray(Charsets.US_ASCII)))
+                                return@withContext false
+                            val encoded=payload.toString().toByteArray(Charsets.UTF_8)
+                            try {
+                                if(encoded.size>180_000) return@withContext false
+                                val output=DataOutputStream(client.outputStream)
+                                output.writeInt(encoded.size)
+                                output.write(encoded)
+                                output.flush()
+                            } finally {encoded.fill(0)}
+                            true
+                        }
+                    } catch (_:Exception) {false}
+                    finally {
+                        watchdog.cancel()
+                    }
+                }
+                if(!accepted) {
+                    store.failed(request,"Локальный канал не прошёл проверку UID/nonce или недоступен. Передача секрета отменена.")
+                    return "Защищённое соединение с Termux не установлено. Секреты не переданы."
+                }
+                return "Termux принял задание. Подписанный AAB появится после проверки SHA и сертификата."
+            } finally {runCatching {server.close()}}
         } finally {key.fill(0)}
     }
 }
