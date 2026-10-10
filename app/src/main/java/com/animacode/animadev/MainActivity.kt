@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.animacode.animadev.termux.TermuxGateway
 import com.animacode.animadev.repos.*
 import com.animacode.animadev.projects.*
+import com.animacode.animadev.projects.Text
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
