@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 
 @Composable fun SectionLabel(text:String) { Text(text,style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary,modifier=Modifier.padding(top=8.dp,bottom=4.dp)) }
@@ -26,14 +27,21 @@ import androidx.compose.ui.unit.dp
     }
 }
 val settingsSections=listOf("appearance" to "Внешний вид","git" to "Проекты и Git","profiles" to "Профили тестирования и сборки","signing" to "Подпись Release AAB","jobs" to "Выполнение заданий и ожидание","notifications" to "Уведомления","files" to "Файлы и загрузки","about" to "О приложении / Диагностика")
-private val descriptions=mapOf("appearance" to "Тема и динамические цвета","git" to "Получение изменений, локальные репозитории","profiles" to "Тесты и Debug APK","signing" to "Выбор JKS, alias и переход к подписанной сборке","jobs" to "Предупреждения и защитный предел","notifications" to "Разрешение Android и состояние заданий","files" to "Папка отчётов и загрузок","about" to "Версия, Android и диагностика")
+private val descriptions=mapOf("appearance" to "Тема, динамические цвета, вибрация и звуки","git" to "Получение изменений, локальные репозитории","profiles" to "Тесты и Debug APK","signing" to "Выбор JKS, alias и переход к подписанной сборке","jobs" to "Предупреждения и защитный предел","notifications" to "Разрешение Android и состояние заданий","files" to "Папка отчётов и загрузок","about" to "Версия, Android и диагностика")
 
 @Composable private fun Preference(title:String,value:String,onClick:(()->Unit)?=null,trailing:(@Composable ()->Unit)?=null) {
-    ListItem(headlineContent={Text(title)},supportingContent={Text(value)},trailingContent=trailing ?: if(onClick!=null)({Icon(AppIcons.Chevron,null)}) else null,modifier=if(onClick!=null)Modifier.clickable(onClick=onClick) else Modifier)
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val feedback=remember {UiFeedback(context)}
+    val view=LocalView.current
+    ListItem(headlineContent={Text(title)},supportingContent={Text(value)},trailingContent=trailing ?: if(onClick!=null)({Icon(AppIcons.Chevron,null)}) else null,modifier=if(onClick!=null)Modifier.clickable {feedback.tap(view);onClick()} else Modifier)
 }
 @Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={},onOpenBuild:(String)->Unit={}) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
+    val feedback=remember {UiFeedback(context)}
+    val view=LocalView.current
+    var haptics by remember {mutableStateOf(feedback.vibrations())}
+    var sounds by remember {mutableStateOf(feedback.sounds())}
     fun openSection(value:String){focus.clearFocus();keyboard?.hide();onSection(value)}
     var query by rememberSaveable {mutableStateOf("")}
     var selector by rememberSaveable {mutableStateOf("")}
@@ -48,7 +56,7 @@ private val descriptions=mapOf("appearance" to "Тема и динамическ
         if(section.isEmpty()) {
             item {OutlinedTextField(query,{query=it},label={Text("Поиск настроек")},leadingIcon={Icon(AppIcons.Search,null)},trailingIcon={if(query.isNotEmpty())IconButton(onClick={query=""}){Icon(AppIcons.Close,"Очистить поиск")}},singleLine=true,modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp))}
             if(query.isBlank())settingsSections.forEach {(id,title)->item(key=id) {
-                ListItem(headlineContent={Text(title)},supportingContent={Text(descriptions.getValue(id))},leadingContent={Icon(when(id){"git"->AppIcons.Git;"profiles"->AppIcons.Tests;"signing"->AppIcons.Build;"jobs"->AppIcons.Waiting;"files"->AppIcons.Folder;"about"->AppIcons.Info;"notifications"->AppIcons.Notifications;else->AppIcons.Palette},null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},modifier=Modifier.clickable{openSection(id)})
+                ListItem(headlineContent={Text(title)},supportingContent={Text(descriptions.getValue(id))},leadingContent={Icon(when(id){"git"->AppIcons.Git;"profiles"->AppIcons.Tests;"signing"->AppIcons.Build;"jobs"->AppIcons.Waiting;"files"->AppIcons.Folder;"about"->AppIcons.Info;"notifications"->AppIcons.Notifications;else->AppIcons.Palette},null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},modifier=Modifier.clickable{feedback.tap(view);openSection(id)})
             }} else {
                 val results=SettingsPolicy.search(query)
                 if(results.isEmpty())item {DetailRow("Ничего не найдено","Попробуйте другое название или описание")}
@@ -58,6 +66,12 @@ private val descriptions=mapOf("appearance" to "Тема и динамическ
             "appearance"->{
                 item {Preference("Тема",themeLabel,{selector="theme"})}
                 item {Preference("Динамические цвета","Палитра обоев Android",trailing={Switch(dynamic,onDynamic)})}
+                item {HorizontalDivider(Modifier.padding(horizontal=20.dp,vertical=8.dp))}
+                item {Preference("Вибрация при нажатии","Тактильный отклик для кнопок и навигации",
+                    trailing={Switch(haptics,{v->haptics=v;feedback.setVibrations(v);if(v)feedback.tap(view)})})}
+                item {Preference("Звуки нажатий","Системный звук клика, учитывает настройки громкости Android",
+                    trailing={Switch(sounds,{v->sounds=v;feedback.setSounds(v);if(v)feedback.tap(view)})})}
+                item {DetailRow("Отклик интерфейса","Переключатели работают независимо. Тишина и отключённая системная вибрация также учитываются Android.")}
             }
             "git"->{
                 item {Preference("Получение изменений","GitHub → Termux · только безопасный fast-forward. Push и автоматическое разрешение конфликтов недоступны.")}
