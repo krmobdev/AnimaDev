@@ -16,14 +16,48 @@ class AdbDeviceGateway(private val context:Context) {
         return prefs.getInt("count",0)==1 && !prefs.getBoolean("pending",false) &&
             System.currentTimeMillis()-prefs.getLong("verified_at",0) in 0..90_000
     }
-    fun refresh() {
+    companion object {
+        /** IPv4 LAN endpoint only. Pairing ports must not be guessed or scanned. */
+        fun validLanEndpoint(value:String):Boolean {
+            val segments=value.trim().split(":")
+            if(segments.size!=2)return false
+            val octets=segments[0].split(".")
+            if(octets.size!=4 || octets.any {it.isEmpty() || it.length>3 || it.any {c->!c.isDigit()} })return false
+            val n=octets.mapNotNull {it.toIntOrNull()}
+            if(n.size!=4 || n.any {it !in 0..255})return false
+            val port=segments[1].toIntOrNull() ?: return false
+            if(port !in 1024..65535)return false
+            return n[0]==10 || (n[0]==172 && n[1] in 16..31) ||
+                (n[0]==192 && n[1]==168)
+        }
+    }
+    fun connect(endpoint:String) {
+        if(!validLanEndpoint(endpoint)) {
+            prefs.edit().putString("message",
+                "Укажи IP и порт подключения с основного экрана Pixel, например 192.168.1.132:37123. "+
+                "Порт из окна «Сопряжение» не подходит.").apply()
+            return
+        }
+        refresh(endpoint.trim())
+    }
+    fun refresh(endpoint:String="") {
         if(prefs.getBoolean("pending",false) &&
             System.currentTimeMillis()-prefs.getLong("sent_at",0)<30_000)return
         val request=UUID.randomUUID().toString().replace("-","")
         val code="""
 import json,re,subprocess,sys
 req=sys.argv[1]
+endpoint=sys.argv[2] if len(sys.argv)>2 else ''
 try:
+    if endpoint:
+        import ipaddress
+        host,port=endpoint.rsplit(':',1)
+        ip=ipaddress.ip_address(host)
+        if ip.version!=4 or not ip.is_private or not 1024<=int(port)<=65535:
+            raise ValueError('endpoint')
+        subprocess.run(['/data/data/com.termux/files/usr/bin/adb','connect',endpoint],
+            stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,timeout=18,check=False)
     p=subprocess.run(['/data/data/com.termux/files/usr/bin/adb','devices','-l'],
        stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
        timeout=18,check=False)
@@ -40,7 +74,7 @@ except Exception:
     print(json.dumps({'request_id':req,'ok':False,'count':0,'device':''}))
 """.trimIndent()
         if(!prefs.edit().putString("request",request).putLong("sent_at",System.currentTimeMillis())
-            .putBoolean("pending",true).putString("message","Проверяем adb devices -l в Termux…").commit())return
+            .putBoolean("pending",true).putString("message",if(endpoint.isBlank())"Проверяем adb devices -l в Termux…" else "Подключаем Pixel и проверяем ADB…").commit())return
         val callback=PendingIntent.getBroadcast(context,request.hashCode(),
             Intent(context,AdbDeviceReceiver::class.java).apply {
                 action="com.animacode.animadev.ADB_DEVICES"
@@ -49,7 +83,7 @@ except Exception:
         val call=Intent("com.termux.RUN_COMMAND").apply {
             setClassName("com.termux","com.termux.app.RunCommandService")
             putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
-            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",code,request))
+            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",code,request,endpoint))
             putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
             putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
             putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL","AnimaDev · обнаружение устройства ADB")
