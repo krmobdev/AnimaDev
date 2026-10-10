@@ -145,14 +145,17 @@ class RepoGateway(private val context: Context) {
         val oldId = initial.optString("job_id")
         start("TEST_DEVICE",projectId,projectPath)
         val current = store.read()
-        return if (current.optString("job_id").matches(Regex("[a-f0-9]{32}")) &&
+        val accepted = current.optString("job_id").matches(Regex("[a-f0-9]{32}")) &&
             current.optString("job_id") != oldId &&
             current.optString("project_id") == projectId &&
-            current.optString("action") == "TEST_DEVICE") {
-            "Запрос записан: " + current.optString("job_id").take(12) +
+            current.optString("action") == "TEST_DEVICE"
+        return when {
+            !accepted -> "Команда не принята. Проверьте предыдущие задания, разрешение Termux и очередь Release."
+            current.optString("state") == "UNKNOWN" ->
+                "Задание " + current.optString("job_id").take(12) +
+                    ": Android не подтвердил отправку. Проверяйте состояние по ID, не запускайте повторно."
+            else -> "Запрос записан: " + current.optString("job_id").take(12) +
                 ". Ожидаем подтверждение Termux; это ещё не результат тестов."
-        } else {
-            "Команда не принята. Проверьте состояние предыдущего задания, разрешение Termux и очередь Release."
         }
     }
     fun cancel() {
