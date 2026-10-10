@@ -334,6 +334,7 @@ def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT):
     env=dict(guard.env)
     for key in ('JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','GRADLE_OPTS','JAVA_OPTS'):
         env.pop(key,None)
+    env['ANDROID_SERIAL']=devices[0]
     log('event','ADB: одно устройство, серийный номер '+devices[0][:24])
     log('command','bash ./gradlew :app:connectedDebugAndroidTest --offline --no-daemon --rerun-tasks --console=plain')
     code,unknown=process(guard.root,env,log,on_process,identity,redact,
@@ -344,6 +345,10 @@ def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT):
     try:result['tests']=summary(before,device_reports(guard.root))
     except ReportError as e:
         if code==0:result['error_code']=e.code
+    # The target must remain exactly the same throughout installation and test run.
+    if adb_devices()!=devices:
+        return dict(state='FAILED',error_code='ADB_NOT_READY',exit_code=code,
+                    snapshot=snapshot,tests=None)
     after=guard.snapshot()
     guard.require(after,clean=True)
     result['snapshot']=after
