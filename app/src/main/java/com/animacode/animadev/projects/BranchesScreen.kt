@@ -37,7 +37,7 @@ import org.json.JSONObject
     val pending=gateway.prefs.getBoolean("pending",false)
     val light=MaterialTheme.colorScheme.surface.luminance()>0.5f
     val gold=if(light)Color(0xFF775A00) else Color(0xFFFFD977)
-    LazyColumn(Modifier.fillMaxSize().imePadding(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    LazyColumn(Modifier.fillMaxSize().imePadding(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=20.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {
             Text(project.name,style=MaterialTheme.typography.titleMedium)
             Text("Выберите строку, чтобы посмотреть коммиты и при необходимости явно переключиться. Переключение допустимо только для чистого AnimaQuiz с совпадающим SHA на GitHub.",
@@ -54,11 +54,14 @@ import org.json.JSONObject
                 Text("Загружено веток: ${BranchPolicy.merge(refs).size}"+(if(metadata.optBoolean("branches_more"))" · есть следующая страница" else ""),style=MaterialTheme.typography.bodySmall)
                 if(metadata.optString("default_branch").isEmpty())Text("Главная ветка не подтверждена: origin/HEAD отсутствует.",style=MaterialTheme.typography.bodySmall)
                 Text("Origin показывает последний локальный снимок, а не текущие данные GitHub. Для актуальности используйте проверку обновлений в Git.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-            items(rows,key={it.name}) {b->OutlinedCard(modifier=Modifier.fillMaxWidth().clickable {selectedBranch=b}) {Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+            items(rows,key={it.name}) {b->OutlinedCard(modifier=Modifier.fillMaxWidth().clickable {selectedBranch=b},shape=MaterialTheme.shapes.large) {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
                 Text(b.name,style=MaterialTheme.typography.titleMedium,color=if(b.default)gold else MaterialTheme.colorScheme.onSurface)
                 Text(listOfNotNull(if(b.default)"Главная" else null,if(b.active)"Активная" else null,if(b.local!=null && b.remote!=null)"Локальная + origin" else if(b.local!=null)"Локальная" else "origin").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=if(b.active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                b.local?.let {Text("Локально: ${it.sha.take(8)} · ${BranchPolicy.date(it.date)}",style=MaterialTheme.typography.bodySmall)}
-                b.remote?.let {if(b.local==null || b.local.sha!=it.sha)Text("Origin: ${it.sha.take(8)} · ${BranchPolicy.date(it.date)}",style=MaterialTheme.typography.bodySmall)}
+                Text("Последний коммит: "+BranchPolicy.date(b.lastCommit?.date.orEmpty()),
+                    style=MaterialTheme.typography.bodyMedium)
+                b.local?.let {Text("Локальный SHA: "+it.sha.take(12),style=MaterialTheme.typography.bodySmall)}
+                b.remote?.let {if(b.local==null || b.local.sha!=it.sha)
+                    Text("Origin SHA: "+it.sha.take(12)+" · "+BranchPolicy.date(it.date),style=MaterialTheme.typography.bodySmall)}
                 Text(b.comparison,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(if(b.active)"Текущая рабочая ветка" else "Нажмите для выбора ветки",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
             }}}
