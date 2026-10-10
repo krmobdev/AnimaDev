@@ -46,6 +46,7 @@ import org.json.JSONObject
     var explicitPath by rememberSaveable { mutableStateOf("") };var showIssues by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(Unit) { val l=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,_->generation++ };store.prefs.registerOnSharedPreferenceChangeListener(l);onDispose { store.prefs.unregisterOnSharedPreferenceChangeListener(l) } }
     val projects=remember(generation) { store.all() };val info=rememberCatalogRecord(context);val record=rememberRepoRecord(context)
+    val neon=LocalNeonSkin.current
     val registeredGroups=ProjectGrouping.groups(projects.map {ProjectIdentity(it.id,it.path,it.repositoryPath,it.worktree)})
     val primaryProjects=registeredGroups.mapNotNull {g->projects.find {it.id==g.first().id}}
     val catalog=info.getJSONObject("catalog");val a=catalog.optJSONArray("projects")
@@ -54,7 +55,7 @@ import org.json.JSONObject
     val newProjects=foundGroups.mapNotNull {g->found.find {it.id==g.first().id}}.filter {candidate->primaryProjects.none {p->(p.repositoryPath.ifEmpty {p.path})==(candidate.repositoryPath.ifEmpty {candidate.path})}}
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=20.dp,bottom=110.dp),verticalArrangement=Arrangement.spacedBy(17.dp)) {
-            if(LocalNeonSkin.current)item {
+            if(neon)item {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                     Text("Projects",style=MaterialTheme.typography.displaySmall,
                         fontWeight=FontWeight.ExtraBold,color=NeonGlass.white,modifier=Modifier.weight(1f))
@@ -77,7 +78,7 @@ import org.json.JSONObject
                 val branch=p.branch.ifBlank {snapshot?.optString("branch").orEmpty()}
                 val dirty=snapshot?.optBoolean("dirty") ?: p.dirty
                 val active=p.supported && record.optString("project_id","animaquiz")==p.id && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
-                if(LocalNeonSkin.current) {
+                if(neon) {
                     Box {
                         NeonProjectCard(p,branch,dirty,active,onClick={onOpen(p)},onMore={menu=true})
                         DropdownMenu(menu,{menu=false}) {
@@ -106,7 +107,7 @@ import org.json.JSONObject
                 }
             }
         }
-        if(LocalNeonSkin.current) NeonPrimaryAction(
+        if(neon) NeonPrimaryAction(
             title="Добавить проект",icon=AppIcons.Add,
             modifier=Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
                 .padding(start=20.dp,end=20.dp,bottom=10.dp).fillMaxWidth(),
@@ -148,6 +149,7 @@ import org.json.JSONObject
 @Composable fun ProjectWorkspace(context:Context,project:LocalProject,onTool:(String)->Unit,
     permitted:Boolean=false,onJournal:(String)->Unit={}) {
     var worktreesExpanded by rememberSaveable(project.id) { mutableStateOf(false) }
+    val neon=LocalNeonSkin.current
     val catalog=rememberCatalogRecord(context)
     val entries=catalog.getJSONObject("catalog").optJSONArray("projects")
     val worktrees=buildList {
@@ -179,14 +181,31 @@ import org.json.JSONObject
         verticalArrangement=Arrangement.spacedBy(22.dp)) {
         item {
             Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                Text(project.name,style=MaterialTheme.typography.headlineLarge,
-                    fontWeight=androidx.compose.ui.text.font.FontWeight.ExtraBold)
+                if(neon) {
+                    Text("Project",style=MaterialTheme.typography.labelLarge,color=NeonGlass.muted)
+                    Text(project.name,style=MaterialTheme.typography.displaySmall,
+                        fontWeight=FontWeight.ExtraBold,color=NeonGlass.white)
+                    Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement=Arrangement.spacedBy(9.dp)) {
+                        NeonStatus(branch.ifBlank {"Not verified"},dirty==false)
+                        Text(sha.take(12).ifBlank {"SHA not checked"},
+                            style=MaterialTheme.typography.bodyMedium,color=NeonGlass.muted)
+                        IconButton(onClick={
+                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as
+                                android.content.ClipboardManager).setPrimaryClip(
+                                android.content.ClipData.newPlainText("Commit SHA",sha))
+                        },enabled=sha.isNotBlank(),modifier=Modifier.size(38.dp)) {
+                            Icon(AppIcons.Copy,"Copy SHA",tint=NeonGlass.muted)
+                        }
+                    }
+                } else Text(project.name,style=MaterialTheme.typography.headlineLarge,
+                    fontWeight=FontWeight.ExtraBold)
                 if(catalog.optBoolean("pending"))
                     Text("Обновляем реальный HEAD из Termux…",
                         style=MaterialTheme.typography.bodySmall)
             }
         }
-        item {ActiveBranchHero(branch,sha,dirty)}
+        if(!neon)item {ActiveBranchHero(branch,sha,dirty)}
         if(isActiveJob)item {
             val action=record.optString("action")
             val destination=when(action) {
@@ -218,14 +237,37 @@ import org.json.JSONObject
                 }
             }
         }
-        item {
+        if(!neon)item {
             com.animacode.animadev.projects.ActionButton(onClick={open("branches")},modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {
                 Icon(AppIcons.Git,null);Spacer(Modifier.width(10.dp))
                 Text("Ветки и переключение")
             }
         }
         item {
-            Column(verticalArrangement=Arrangement.spacedBy(13.dp)) {
+            if(neon) NeonPanel(Modifier.fillMaxWidth(),glowing=true) {
+                Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("Tools",style=MaterialTheme.typography.titleLarge,
+                        color=NeonGlass.white,fontWeight=FontWeight.Bold,
+                        modifier=Modifier.weight(1f))
+                    Text("‹/›",color=NeonGlass.green,style=MaterialTheme.typography.titleLarge)
+                }
+                Text("Git, tests, builds and project history",
+                    style=MaterialTheme.typography.bodySmall,color=NeonGlass.muted)
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    NeonToolCard("Git","Branches & SHA",AppIcons.Git,Modifier.weight(1f)){open("git")}
+                    NeonToolCard("Tests","Gradle & reports",AppIcons.Tests,Modifier.weight(1f)){open("tests")}
+                }
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    NeonToolCard("Build","Debug & Release",AppIcons.Build,Modifier.weight(1f)){open("build")}
+                    NeonToolCard("History","Jobs & results",AppIcons.History,Modifier.weight(1f)){open("history")}
+                }
+                NeonPrimaryAction("Build Now","Latest commit · "+sha.take(8).ifBlank {"not verified"},
+                    AppIcons.Build,onClick={open("build")})
+                OutlinedButton(onClick={open("branches")},modifier=Modifier.fillMaxWidth()) {
+                    Icon(AppIcons.Git,null);Spacer(Modifier.width(8.dp))
+                    Text("Ветки и переключение")
+                }
+            } else Column(verticalArrangement=Arrangement.spacedBy(13.dp)) {
                 Text("ИНСТРУМЕНТЫ",style=MaterialTheme.typography.titleSmall,
                     color=MaterialTheme.colorScheme.primary)
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
