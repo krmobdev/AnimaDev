@@ -48,6 +48,21 @@ class AppLanguageTest {
         }
     }
 
+    @Test fun translatesConditionalBlockReasonsAndSettings() {
+        assertEquals("Test and build profiles",
+            AppTranslation.translate("Профили тестирования и сборки",true))
+        assertEquals("Job execution and monitoring",
+            AppTranslation.translate("Выполнение заданий и ожидание",true))
+        assertEquals("The working tree has local changes, so this build is blocked.",
+            AppTranslation.translate("В рабочем дереве есть локальные изменения — сборка запрещена.",true))
+        assertEquals("Password encrypted and saved only on this phone.",
+            AppTranslation.translate("Пароль зашифрован и сохранён только на телефоне.",true))
+        assertEquals("Temporary files removed: 4",
+            AppTranslation.translate("Удалено временных файлов: 4",true))
+        assertEquals("Job · AnimaQuiz · Device tests · ADB",
+            AppTranslation.translate("Задание · AnimaQuiz · Инструментальные тесты · ADB",true))
+    }
+
     @Test fun englishSettingsSearch() {
         assertEquals("theme",SettingsPolicy.search("Theme",true).single().id)
         assertTrue(SettingsPolicy.search("Theme",false).isEmpty())
