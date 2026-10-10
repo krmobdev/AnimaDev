@@ -11,6 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -58,7 +59,7 @@ class MainActivity:ComponentActivity() {
         var dynamic by remember { mutableStateOf(settings.getBoolean("dynamic",true)) }
         var pulse by remember { mutableStateOf(settings.getBoolean("pulse",true)) }
         var language by remember {mutableStateOf(settings.getString("language","system") ?: "system")}
-        val english=AppLanguage.english(language)
+        val english=AppLanguage.english(language,LocalConfiguration.current.locales[0].language)
         val dark=AppThemePolicy.dark(theme,isSystemInDarkTheme())
         val colors=if(pulse)pulseColorScheme(dark)
         else if(dynamic) { if(dark)dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }
