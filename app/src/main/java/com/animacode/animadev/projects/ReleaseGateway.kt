@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.net.LocalServerSocket
 import android.os.Build
 import android.util.Base64
 import androidx.compose.runtime.mutableIntStateOf
@@ -13,12 +12,7 @@ import com.animacode.animadev.repos.RepoGateway
 import com.animacode.animadev.repos.RepoStore
 import com.animacode.animadev.termux.TermuxGateway
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.DataInputStream
-import java.io.DataOutputStream
 import org.json.JSONObject
 import java.util.UUID
 
@@ -30,7 +24,16 @@ class ReleaseStore(context:Context) {
         val active=setOf("REQUESTED","UNKNOWN")
     }
     private val prefs=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
-    fun read():JSONObject=runCatching {JSONObject(prefs.getString("job","{}") ?: "{}")}.getOrElse {
+    fun read():JSONObject=runCatching {
+        val state=JSONObject(prefs.getString("job","{}") ?: "{}")
+        if(state.optString("state")=="REQUESTED" && state.optString("phase")=="ENROLLING"
+            && System.currentTimeMillis()-state.optLong("started_at")>180_000L) {
+            state.put("state","FAILED").put("message",
+                "Согласование шифрования не завершилось. JKS не передавался; можно повторить.")
+            prefs.edit().putString("job",state.toString()).commit()
+        }
+        state
+    }.getOrElse {
         JSONObject().put("state","UNKNOWN").put("message","История Release повреждена. Не запускайте повторную сборку.")
     }
     fun busy():Boolean=read().optString("state") in active
@@ -42,7 +45,7 @@ class ReleaseStore(context:Context) {
     fun begin(project:String,id:String,sha:String):Boolean {
         if(busy())return false
         return write(JSONObject().put("project",project).put("id",id).put("sha",sha)
-            .put("state","REQUESTED").put("started_at",System.currentTimeMillis())
+            .put("state","REQUESTED").put("phase","ENROLLING").put("started_at",System.currentTimeMillis())
             .put("message","Termux собирает Release AAB. Задание может занять несколько минут; не запускайте его повторно."))
     }
     fun failedWithoutTransfer(id:String,message:String) {
@@ -103,7 +106,6 @@ class ReleaseGateway(private val context:Context) {
             } ?: return "Нет подписывающего модуля в APK."
             if(script.length>60_000)return "Подписывающий модуль повреждён."
             val request=UUID.randomUUID().toString().replace("-","")
-            val socketName="animadev-release-"+UUID.randomUUID().toString().replace("-","")
             val profile=JSONObject().put("id",project.id).put("name",project.name)
                 .put("root",project.path)
                 .put("remote",if(project.id=="animaquiz")"github.com/krmobdev/quizapp" else project.remote)
@@ -111,89 +113,61 @@ class ReleaseGateway(private val context:Context) {
             val payload=JSONObject().put("request_id",request).put("project",profile)
                 .put("alias",alias).put("keystore",Base64.encodeToString(key,Base64.NO_WRAP))
                 .put("store_password",storePassword).put("key_password",keyPassword)
-            val recipientUid=try {
-                @Suppress("DEPRECATION")
-                context.packageManager.getApplicationInfo("com.termux",0).uid
-            } catch(_:Exception) { return "Не удалось подтвердить установленный Termux." }
-            val server=try {LocalServerSocket(socketName)}
-                catch(_:Exception) {return "Android запретил защищённый локальный канал. Секреты не отправлены."}
-            try {
-                // Atomically reserve the only app-wide build slot before dispatch.
-                val reserved=synchronized(BuildConcurrencyPolicy.launchMonitor) {
-                    val current=RepoStore(context)
-                    if(current.blocked() || current.read().optBoolean("pending"))false
-                    else store.begin(project.id,request,sha)
-                }
-                if(!reserved)return "Уже выполняется другая операция Termux. Дождитесь подтверждения её результата."
-                val callbackIntent=Intent(context,ReleaseResultReceiver::class.java).apply {
-                    action=ReleaseWire.CALLBACK
-                    this.data=Uri.parse("animadev://release/$request")
-                }
-                val flags=PendingIntent.FLAG_ONE_SHOT or
-                    if(Build.VERSION.SDK_INT>=31)PendingIntent.FLAG_MUTABLE else 0
-                val callback=PendingIntent.getBroadcast(context,request.hashCode(),callbackIntent,flags)
-                // Important: the Intent contains NO credential bytes, only public socket coordinates.
-                val command=Intent("com.termux.RUN_COMMAND").apply {
-                    setClassName("com.termux","com.termux.app.RunCommandService")
-                    putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
-                    putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",script,socketName,request,context.applicationInfo.uid.toString()))
-                    putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
-                    putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
-                    putExtra("com.termux.RUN_COMMAND_BACKGROUND_CUSTOM_LOG_LEVEL","0")
-                    putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL","AnimaDev · подписать Release AAB")
-                    putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
-                }
-                try {
-                    if(context.startService(command)==null) {
-                        callback.cancel()
-                        store.failedWithoutTransfer(request,"Termux не подтвердил запуск, секреты не передавались.")
-                        return "Termux не подтвердил запуск Release."
-                    }
-                } catch (_:Exception) {
+            val reserved=synchronized(BuildConcurrencyPolicy.launchMonitor) {
+                val current=RepoStore(context)
+                if(current.blocked() || current.read().optBoolean("pending"))false
+                else store.begin(project.id,request,sha)
+            }
+            if(!reserved)return "Другая операция Termux ещё активна. Дождитесь подтверждения её результата."
+
+            // Stage one: no user secrets, only a Termux-generated one-time RSA public key.
+            val publicKey=ReleaseHybridTransport.enroll(context,request)
+            if(publicKey==null) {
+                store.failedWithoutTransfer(request,"Termux не вернул одноразовый ключ шифрования. JKS не передавался.")
+                return "Не удалось согласовать защищённый обмен с Termux. Секреты не отправлены."
+            }
+            val sealed=ReleaseHybridTransport.seal(request,publicKey,payload)
+            if(sealed==null) {
+                store.failedWithoutTransfer(request,"Не удалось зашифровать JKS для Termux. Ничего не отправлено.")
+                return "Android не смог зашифровать Release-задание."
+            }
+            val transportSha=ReleaseHybridTransport.sourceHash(context)
+            if(!store.write(store.read().put("phase","DISPATCHING")
+                    .put("message","Шифрованное задание отправляется в Termux. Ожидаем подтверждение подписи.")))
+                return "Не удалось сохранить состояние задания. Повторно пока не запускайте."
+
+            val callbackIntent=Intent(context,ReleaseResultReceiver::class.java).apply {
+                action=ReleaseWire.CALLBACK
+                this.data=Uri.parse("animadev://release/$request")
+            }
+            val flags=PendingIntent.FLAG_ONE_SHOT or
+                if(Build.VERSION.SDK_INT>=31)PendingIntent.FLAG_MUTABLE else 0
+            val callback=PendingIntent.getBroadcast(context,request.hashCode(),callbackIntent,flags)
+            // Only ciphertext passes RUN_COMMAND_STDIN. Neither plaintext JKS nor passwords
+            // are present in Android Intent arguments, logs, stdout, or GitHub.
+            val command=Intent("com.termux.RUN_COMMAND").apply {
+                setClassName("com.termux","com.termux.app.RunCommandService")
+                putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
+                putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",script,request,transportSha))
+                putExtra("com.termux.RUN_COMMAND_STDIN",sealed)
+                putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
+                putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
+                putExtra("com.termux.RUN_COMMAND_BACKGROUND_CUSTOM_LOG_LEVEL","0")
+                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL","AnimaDev · зашифрованная сборка Release AAB")
+                putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
+            }
+            return try {
+                if(context.startService(command)==null) {
                     callback.cancel()
-                    store.failedWithoutTransfer(request,"Android отказал в запуске, секреты не передавались.")
-                    return "Не удалось отправить задание Termux."
-                }
-                var transferStarted=false
-                val accepted=withContext(Dispatchers.IO) {
-                    val watchdog=CoroutineScope(Dispatchers.IO).launch {
-                        delay(20_000)
-                        runCatching {server.close()}
-                    }
-                    try {
-                        server.accept().use {client->
-                            client.soTimeout=8_000
-                            // Linux kernel credentials, not a caller-supplied string.
-                            if(client.peerCredentials.uid!=recipientUid) return@withContext false
-                            val greeting=ByteArray(32)
-                            DataInputStream(client.inputStream).readFully(greeting)
-                            if(!greeting.contentEquals(request.toByteArray(Charsets.US_ASCII)))
-                                return@withContext false
-                            val encoded=payload.toString().toByteArray(Charsets.UTF_8)
-                            try {
-                                if(encoded.size>180_000) return@withContext false
-                                val output=DataOutputStream(client.outputStream)
-                                transferStarted=true
-                                output.writeInt(encoded.size)
-                                output.write(encoded)
-                                output.flush()
-                            } finally {encoded.fill(0)}
-                            true
-                        }
-                    } catch (_:Exception) {false}
-                    finally {
-                        watchdog.cancel()
-                    }
-                }
-                if(!accepted) {
-                    if(transferStarted)
-                        store.failed(request,"Состояние передачи не подтверждено. Повторный запуск заблокирован.")
-                    else
-                        store.failedWithoutTransfer(request,"Защищённый канал недоступен. Передача JKS не начиналась.")
-                    return "Защищённое соединение с Termux не установлено. Секреты не переданы."
-                }
-                return "Termux принял задание. Подписанный AAB появится после проверки SHA и сертификата."
-            } finally {runCatching {server.close()}}
+                    store.failedWithoutTransfer(request,"Termux отказал в запуске до передачи шифротекста.")
+                    "Termux не подтвердил запуск. Секреты не раскрыты."
+                } else "Шифрованное задание отправлено в Termux. Сборка и подпись выполняются локально."
+            } catch (_:Exception) {
+                callback.cancel()
+                store.failedWithoutTransfer(request,"Android отклонил передачу зашифрованного задания.")
+                "Android отказал в запуске Termux. Пароли не раскрыты."
+            }
+
         } finally {key.fill(0)}
     }
 }
@@ -235,7 +209,12 @@ class ReleaseResultReceiver:BroadcastReceiver() {
                 if(!code.matches(Regex("[A-Z_]{3,50}")))error("Malformed code")
                 // No secrets, stderr or raw command output are stored or displayed.
                 record.put("state",if(code.endsWith("_UNKNOWN") || code=="RESULT_UNCONFIRMED")"UNKNOWN" else "FAILED")
-                    .put("message","Release не подтверждён: $code. Пароли не сохранены.")
+                    .put("message",when(code) {
+                        "ENVELOPE_MISSING"->"Termux не получил зашифрованное содержимое. Проверьте RUN_COMMAND_STDIN."
+                        "TRANSPORT_DECRYPT_FAILED"->"Termux получил данные, но отклонил шифрование. Проверьте связь и повторите с новым одноразовым ключом."
+                        "TRANSPORT_UNAVAILABLE"->"Не удалось запустить локальный модуль расшифровки в Termux."
+                        else->"Release не подтверждён: $code."
+                    })
             }
             record.put("ended_at",System.currentTimeMillis())
             store.write(record)
