@@ -91,6 +91,7 @@ class RepoGateway(private val context: Context) {
         send(request, arrayOf("-c", script, request, hash, data, helperSha, helperData, monitorSha, monitorData))
     }
     fun start(action: String, projectId: String, projectPath: String) {
+        synchronized(com.animacode.animadev.projects.BuildConcurrencyPolicy.launchMonitor) {
         val project=com.animacode.animadev.projects.ProjectStore(context).all().find {it.id==projectId && it.path==projectPath} ?: return
         if (!ProjectPolicy.canExecute(projectId,projectPath,action,project.worktree,project.remote)) return
         val r = store.read()
@@ -116,6 +117,7 @@ class RepoGateway(private val context: Context) {
             .remove("job")
         if (!store.write(r)) return
         dispatch("START")
+        }
     }
     fun query(manual: Boolean = false) {
         val r = store.read()
