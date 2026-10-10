@@ -121,6 +121,40 @@ class RepoGateway(private val context: Context) {
         dispatch("START")
         }
     }
+    /**
+     * Show a synchronous receipt on the Tests screen. START only acknowledges
+     * a local durable request; a separate Termux callback confirms execution.
+     * Never retry a potentially dispatched job just because its result is late.
+     */
+    fun startDeviceWithFeedback(projectId: String, projectPath: String): String {
+        val project = com.animacode.animadev.projects.ProjectStore(context).all()
+            .firstOrNull { it.id == projectId && it.path == projectPath }
+            ?: return "Команда не отправлена: проект отсутствует в сохранённом каталоге."
+        if (!ProjectPolicy.canExecute(projectId,projectPath,"TEST_DEVICE",project.worktree,project.remote))
+            return "Команда не отправлена: профиль проекта или путь не разрешён."
+        val initial = store.read()
+        val reason = when {
+            !initial.optBoolean("ready") -> "Помощник Termux не готов. Сначала обновите его."
+            initial.optBoolean("pending") -> "Предыдущая команда ещё ожидает ответа Termux."
+            store.blocked() -> "Предыдущее задание не завершено или его результат неизвестен. Проверьте статус по ID."
+            com.animacode.animadev.projects.ReleaseStore(context).busy() ->
+                "Другая Release-сборка занимает очередь. Проверьте её статус перед запуском тестов."
+            else -> ""
+        }
+        if (reason.isNotEmpty()) return "Команда не отправлена: $reason"
+        val oldId = initial.optString("job_id")
+        start("TEST_DEVICE",projectId,projectPath)
+        val current = store.read()
+        return if (current.optString("job_id").matches(Regex("[a-f0-9]{32}")) &&
+            current.optString("job_id") != oldId &&
+            current.optString("project_id") == projectId &&
+            current.optString("action") == "TEST_DEVICE") {
+            "Запрос записан: " + current.optString("job_id").take(12) +
+                ". Ожидаем подтверждение Termux; это ещё не результат тестов."
+        } else {
+            "Команда не принята. Проверьте состояние предыдущего задания, разрешение Termux и очередь Release."
+        }
+    }
     fun cancel() {
         val r=store.read()
         if(!r.optBoolean("ready") || r.optBoolean("pending") ||
