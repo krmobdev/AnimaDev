@@ -297,8 +297,16 @@ object AppTranslation {
     fun translate(original:String,english:Boolean):String {
         if(!english)return original
         dictionary[original]?.let {return it}
-        var output=original
-        for((ru,en) in phrases) output=output.replace(ru,en)
-        return output
+        AppTranslationExtra.dictionary[original]?.let {return it}
+        AppTranslationMore.dictionary[original]?.let {return it}
+        AppTranslationDynamic.translate(original)?.let {return it}
+        // Only replace a known UI prefix. Global substitutions in arbitrary
+        // text risk altering paths, branch names, job IDs and raw diagnostics.
+        if(!original.any {it in 'А'..'я' || it=='Ё' || it=='ё'})return original
+        for((ru,en) in phrases) {
+            if(ru.trim().length<4 || ru.startsWith(" ") || !original.startsWith(ru))continue
+            return en+original.removePrefix(ru)
+        }
+        return original
     }
 }
