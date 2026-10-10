@@ -2,6 +2,7 @@ package com.animacode.animadev.repos
 
 import androidx.compose.material3.Text as MaterialText
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,7 +30,7 @@ import com.animacode.animadev.projects.*
     style:TextStyle=LocalTextStyle.current
 ) {
     MaterialText(
-        text=AppTranslation.translate(text,AppLanguage.english(LocalAppLanguage.current)),
+        text=AppTranslation.translate(text,AppLanguage.english(LocalAppLanguage.current,LocalConfiguration.current.locales[0].language)),
         modifier=modifier,color=color,fontSize=fontSize,fontStyle=fontStyle,
         fontWeight=fontWeight,fontFamily=fontFamily,letterSpacing=letterSpacing,
         textDecoration=textDecoration,textAlign=textAlign,lineHeight=lineHeight,
