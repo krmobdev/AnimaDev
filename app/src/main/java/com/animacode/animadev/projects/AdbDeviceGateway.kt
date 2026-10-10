@@ -17,9 +17,14 @@ class AdbDeviceGateway(private val context:Context) {
             System.currentTimeMillis()-prefs.getLong("verified_at",0) in 0..90_000
     }
     companion object {
+        /** Android IMEs can insert invisible separators into pasted IP:port text.
+         *  Normalize only whitespace, then re-validate the complete IPv4 LAN address.
+         */
+        fun normalizedEndpoint(value:String):String=value.filterNot { it.isWhitespace() ||
+            it=='\u200B' || it=='\u200C' || it=='\u200D' || it=='\uFEFF' }
         /** IPv4 LAN endpoint only. Pairing ports must not be guessed or scanned. */
         fun validLanEndpoint(value:String):Boolean {
-            val segments=value.trim().split(":")
+            val segments=normalizedEndpoint(value).split(":")
             if(segments.size!=2)return false
             val octets=segments[0].split(".")
             if(octets.size!=4 || octets.any {it.isEmpty() || it.length>3 || it.any {c->!c.isDigit()} })return false
@@ -38,7 +43,7 @@ class AdbDeviceGateway(private val context:Context) {
                 "Порт из окна «Сопряжение» не подходит.").apply()
             return
         }
-        refresh(endpoint.trim())
+        refresh(normalizedEndpoint(endpoint))
     }
     fun refresh(endpoint:String="") {
         if(prefs.getBoolean("pending",false) &&
@@ -55,9 +60,13 @@ try:
         ip=ipaddress.ip_address(host)
         if ip.version!=4 or not ip.is_private or not 1024<=int(port)<=65535:
             raise ValueError('endpoint')
-        subprocess.run(['/data/data/com.termux/files/usr/bin/adb','connect',endpoint],
-            stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,timeout=18,check=False)
+        connection=subprocess.run(['/data/data/com.termux/files/usr/bin/adb','connect',endpoint],
+            stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,timeout=18,check=False)
+        response=(connection.stdout+connection.stderr).decode('utf-8','replace').lower()
+        connect_status='CONNECTED' if connection.returncode==0 and 'connected' in response and not 'failed' in response else 'CONNECT_FAILED'
+    else:
+        connect_status='NOT_ATTEMPTED'
     p=subprocess.run(['/data/data/com.termux/files/usr/bin/adb','devices','-l'],
        stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
        timeout=18,check=False)
@@ -69,9 +78,11 @@ try:
             if len(fields)>1 and fields[1]=='device' and re.fullmatch(r'[A-Za-z0-9._:-]{4,128}',fields[0]) and not fields[0].startswith('emulator-'):
                 devices.append(fields[0])
     print(json.dumps({'request_id':req,'ok':p.returncode==0,'count':len(devices),
-       'device':devices[0] if len(devices)==1 else ''}))
+       'device':devices[0] if len(devices)==1 else '',
+       'connect_status':connect_status}))
 except Exception:
-    print(json.dumps({'request_id':req,'ok':False,'count':0,'device':''}))
+    print(json.dumps({'request_id':req,'ok':False,'count':0,'device':'',
+       'connect_status':'TRANSPORT_ERROR'}))
 """.trimIndent()
         if(!prefs.edit().putString("request",request).putLong("sent_at",System.currentTimeMillis())
             .putBoolean("pending",true).putString("message",if(endpoint.isBlank())"Проверяем adb devices -l в Termux…" else "Подключаем Pixel и проверяем ADB…").commit())return
@@ -112,7 +123,7 @@ class AdbDeviceReceiver:BroadcastReceiver() {
             !id.matches(Regex("[a-f0-9]{32}")))return
         val gateway=AdbDeviceGateway(context)
         if(gateway.prefs.getString("request","")!=id)return
-        var count=0;var serial=""
+        var count=0;var serial="";var connection="NOT_ATTEMPTED"
         try {
             val bundle=intent.getBundleExtra("result") ?:error("No reply")
             val out=bundle.getString("stdout","") ?: ""
@@ -122,13 +133,20 @@ class AdbDeviceReceiver:BroadcastReceiver() {
             count=result.getInt("count")
             check(count in 0..32)
             serial=result.optString("device").take(128)
+            connection=result.optString("connect_status","NOT_ATTEMPTED").takeIf {
+                it in setOf("CONNECTED","CONNECT_FAILED","NOT_ATTEMPTED","TRANSPORT_ERROR")
+            } ?: "TRANSPORT_ERROR"
             if(count==1)check(serial.matches(Regex("[A-Za-z0-9._:-]{4,128}")))
-        } catch(_:Exception) {count=0;serial=""}
+        } catch(_:Exception) {count=0;serial="";connection="TRANSPORT_ERROR"}
         gateway.prefs.edit().putBoolean("pending",false).remove("request")
             .putInt("count",count).putLong("verified_at",System.currentTimeMillis())
             .putString("message",when(count) {
                 1->"Устройство готово: $serial"
-                0->"Устройств нет. После adb pair выполните adb connect IP:ПОРТ и проверьте adb devices -l."
+                0->when(connection) {
+                    "CONNECT_FAILED"->"ADB отклонил подключение. Проверьте актуальный IP:порт на основном экране беспроводной отладки Pixel: порт мог измениться. Убедитесь, что VPN не блокирует локальную сеть."
+                    "TRANSPORT_ERROR"->"Не удалось получить ответ ADB в Termux. Проверьте доступ Termux и повторите."
+                    else->"ADB не видит подключённых устройств. После сопряжения нужен adb connect с портом основного экрана беспроводной отладки Pixel."
+                }
                 else->"Обнаружено $count устройств. Отключите лишние: разрешено одно физическое устройство."
             }).commit()
     }
