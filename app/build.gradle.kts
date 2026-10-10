@@ -19,8 +19,8 @@ android {
         minSdk = 33
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 36
-        versionName = "0.4.0-beta.8-dev.22"
+        versionCode = 37
+        versionName = "0.4.0-beta.8-dev.23"
     }
     sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
     buildFeatures { compose = true }
@@ -44,6 +44,9 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:core:1.6.1")
+    // Espresso 3.7.0 replaces reflection into removed InputManager.getInstance.
+    // Required for Compose instrumentation on current Pixel system images.
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
