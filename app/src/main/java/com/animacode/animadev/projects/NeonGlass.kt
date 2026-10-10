@@ -183,3 +183,33 @@ fun neonColorScheme():ColorScheme=darkColorScheme(
         }
     }
 }
+
+/** Two-tab root navigation matching the supplied Projects/Termux reference. */
+@Composable fun NeonBottomBar(onProjects:()->Unit,onTermux:()->Unit,projectsSelected:Boolean) {
+    Surface(color=NeonGlass.background,tonalElevation=0.dp) {
+        Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=10.dp),
+            horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+            listOf(
+                Triple("Projects",AppIcons.Folder,onProjects),
+                Triple("Termux",AppIcons.Terminal,onTermux)
+            ).forEachIndexed {index,(title,icon,handler)->
+                val active=(index==0)==projectsSelected
+                Surface(onClick=handler,modifier=Modifier.weight(1f).height(60.dp),
+                    color=if(active)Color(0xFF143326) else NeonGlass.raised,
+                    shape=RoundedCornerShape(21.dp),
+                    border=BorderStroke(1.dp,if(active)NeonGlass.green.copy(alpha=.4f) else NeonGlass.outline)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal=10.dp),
+                        verticalAlignment=Alignment.CenterVertically,
+                        horizontalArrangement=Arrangement.Center) {
+                        Icon(icon,null,tint=if(active)NeonGlass.green else NeonGlass.muted,
+                            modifier=Modifier.size(23.dp))
+                        Spacer(Modifier.width(9.dp))
+                        Text(title,color=if(active)NeonGlass.softGreen else NeonGlass.muted,
+                            style=MaterialTheme.typography.titleMedium,
+                            fontWeight=if(active)FontWeight.Bold else FontWeight.Normal)
+                    }
+                }
+            }
+        }
+    }
+}
