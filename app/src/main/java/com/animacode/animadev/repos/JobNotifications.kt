@@ -85,7 +85,14 @@ object JobNotifications {
             .setOngoing(running).setAutoCancel(!running)
             .setProgress(0,0,running)
         if(running && start>0)builder.setWhen(start).setUsesChronometer(true)
-        builder.addAction(android.R.drawable.ic_menu_view,"Открыть",tap)
+        val artifact=job?.optJSONObject("artifact")
+        val openArtifact=if(action=="BUILD_DEBUG" && state=="SUCCEEDED" && artifact!=null &&
+            com.animacode.animadev.projects.ArtifactPolicy.valid(artifact.optString("path"),
+                artifact.optString("sha256"),artifact.optLong("size")))
+            PendingIntent.getBroadcast(context,jid.hashCode(),
+                com.animacode.animadev.projects.ArtifactGateway.intent(context,artifact),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE) else null
+        builder.addAction(android.R.drawable.ic_menu_view,"Открыть",openArtifact ?: tap)
         if(running && state in setOf("REQUESTED","QUEUED","RUNNING") &&
             job?.optBoolean("cancel_requested")!=true &&
             action in setOf("TEST","TEST_DEVICE","BUILD_DEBUG")) {

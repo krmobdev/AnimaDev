@@ -61,22 +61,18 @@ import com.animacode.animadev.repos.*
                 "FAILED","INTERRUPTED","TIMED_OUT") &&
             deviceActionMessage.startsWith("Запрос записан")) deviceActionMessage=""
     }
+    var adbDetails by rememberSaveable(project.id) {mutableStateOf(!deviceReady)}
+    var testTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
     var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)}
     var gitDetails by rememberSaveable(project.id) {mutableStateOf(false)}
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
-            Text(project.name,style=MaterialTheme.typography.headlineMedium)
-            if(tool!="git") {
-                Spacer(Modifier.height(12.dp))
-                ActiveBranchHero(project.branch,project.commit,project.dirty)
-            }
+            if(tool=="git")Text(project.name,style=MaterialTheme.typography.headlineMedium)
+            else OperationProjectHeader(project)
         }
-        // Show the actual live job FIRST, not buried after two test cards.
-        if(tool!="git" && belongs && r.optString("action")=="TEST_DEVICE" &&
-            r.optString("job_id").isNotBlank() &&
-            TestScreenStatusPolicy.active(r.optString("state"))) item {
-            JobMonitor(context,r,permitted,onJournal)
+        if(tool!="git")item {
+            OperationTabs(listOf("Unit-тесты","На устройстве"),testTab) {testTab=it}
         }
         if(!permitted)item {Button(onClick={grant.launch(com.animacode.animadev.termux.TermuxGateway.PERMISSION)}){Text("Разрешить Termux")} }
         if(termuxVersion==null)item {Text("Termux не найден. Действия недоступны.",color=MaterialTheme.colorScheme.error)}
@@ -273,7 +269,7 @@ import com.animacode.animadev.repos.*
             val canRunDevice=DeviceTestLaunchPolicy.canStart(permitted,termuxVersion!=null,ready,
                 pending,blocked,adbPending,releaseBusy)
             val needStatus=r.optString("project_id","animaquiz")!=project.id || snap==null
-            item {
+            if(testTab==0)item {
                 OutlinedCard(shape=androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
                     modifier=Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(20.dp),
@@ -282,6 +278,7 @@ import com.animacode.animadev.repos.*
                         Text("Gradle · :app:testDebugUnitTest",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        TestOperationResult(context,r,project,"TEST",permitted,onJournal)
                         if(!ready) {
                             Text("Сначала обновите локальный помощник Termux (кнопка выше).",
                                 color=MaterialTheme.colorScheme.error)
@@ -319,7 +316,7 @@ import com.animacode.animadev.repos.*
                     }
                 }
             }
-            item {
+            if(testTab==1)item {
                 OutlinedCard(shape=androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
                     modifier=Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(20.dp),
@@ -331,9 +328,14 @@ import com.animacode.animadev.repos.*
                         Text("Реальное устройство · ADB · :app:connectedDebugAndroidTest",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        TestOperationResult(context,r,project,"TEST_DEVICE",permitted,onJournal)
                         Text(adbState,style=MaterialTheme.typography.bodyMedium,
                             color=if(deviceReady)MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
+                        ActionButton(onClick={adbDetails=!adbDetails}) {
+                            Text(if(adbDetails)"Скрыть подключение ADB" else "Настроить подключение ADB")
+                        }
+                        if(adbDetails) {
                         Text("Для Wi-Fi укажи IP:порт с основного экрана беспроводной отладки Pixel. "+
                             "Это не порт из окна сопряжения.",
                             style=MaterialTheme.typography.bodySmall,
@@ -368,6 +370,7 @@ import com.animacode.animadev.repos.*
                             Icon(AppIcons.Refresh,null)
                             Spacer(Modifier.width(8.dp))
                             Text(if(adbPending)"Проверяем ADB…" else "Проверить устройства · adb devices")
+                        }
                         }
                         // The device runner checks the branch, origin, clean worktree,
                         // GitHub SHA and ADB immediately before running Gradle. It does
@@ -411,46 +414,9 @@ import com.animacode.animadev.repos.*
                     }
                 }
             }
-            listOf("test_job" to "Unit-тесты","device_test_job" to "Тесты на устройстве").forEach { (field,title) ->
-                val test=if(belongs)r.optJSONObject(field) else null
-                if(test!=null && test.optString("state") in RepoPolicy.terminalStates)item {
-                    OutlinedCard(modifier=Modifier.fillMaxWidth()) {
-                        Column(Modifier.fillMaxWidth().padding(18.dp),
-                            verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                            Text(title+" · "+MonitorPolicy.label(test.optString("state"),false,false),
-                                style=MaterialTheme.typography.titleMedium)
-                            test.optJSONObject("tests")?.let {counts->
-                                Text("${counts.optLong("passed")} из ${counts.optLong("total")} успешно",
-                                    style=MaterialTheme.typography.titleLarge)
-                                Text("Ошибок ${counts.optLong("failed")} · пропущено ${counts.optLong("skipped")}",
-                                    style=MaterialTheme.typography.bodySmall)
-                            }
-                            if(test.optString("state") != "SUCCEEDED") {
-                                val reason=TestResultPresentation.message(test.optString("action"),
-                                    test.optString("error_code"),
-                                    test.optString("message").ifBlank { "Тесты не завершились успешно." })
-                                Text(reason,style=MaterialTheme.typography.bodyMedium,
-                                    color=MaterialTheme.colorScheme.error)
-                                test.optString("error_code").takeIf { it.isNotBlank() }?.let { code ->
-                                    Text("Код: $code",style=MaterialTheme.typography.bodySmall,
-                                        color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            TestSummary.details(test.optJSONObject("tests")).takeIf { it.isNotBlank() }?.let {
-                                Text(it,style=MaterialTheme.typography.bodySmall,
-                                    color=MaterialTheme.colorScheme.error)
-                            }
-                            OutlinedButton(onClick={onJournal(test.optString("job_id"))},
-                                modifier=Modifier.fillMaxWidth()) {Text("Открыть журнал")}
-                        }
-                    }
-                }
-            }
         }
-        if(belongs && r.optString("job_id").isNotEmpty() &&
-            (blocked || r.optString("state")=="UNKNOWN" ||
-             (tool=="git" && blocked)) &&
-            (tool=="git" || r.optString("action")!="TEST_DEVICE"))item {
+        if(tool=="git" && belongs && r.optString("job_id").isNotEmpty() &&
+            (blocked || r.optString("state")=="UNKNOWN"))item {
             JobMonitor(context,r,permitted,onJournal)
         }
     }

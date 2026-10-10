@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.animation.animateContentSize
@@ -86,39 +87,26 @@ import com.animacode.animadev.termux.TermuxGateway
     val releaseScope=rememberCoroutineScope()
     val canRelease=canDebug && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseOrDebugBusy
     val effectivePasswordPresent=releasePassword.isNotEmpty() || storedCredentials?.storePassword?.isNotEmpty()==true
+    var buildTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
-        item {
-            Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                Text("BUILD STUDIO",style=MaterialTheme.typography.labelLarge,
-                    color=MaterialTheme.colorScheme.primary)
-                Text(project.name,style=MaterialTheme.typography.headlineLarge)
-                ActiveBranchHero(project.branch,project.commit,project.dirty)
-                if(catalogRefresh)Text("Сверяем активную ветку с Termux…",
-                    style=MaterialTheme.typography.bodySmall)
-            }
-        }
+        item {OperationProjectHeader(project)}
+        item {OperationTabs(listOf("Debug APK","Release AAB"),buildTab) {buildTab=it}}
+        if(catalogRefresh)item {Text("Сверяем активную ветку с Termux…",style=MaterialTheme.typography.bodySmall)}
         if(busyOwner!=null)item {
-            Card(shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                    Text("Сборочный слот занят",style=MaterialTheme.typography.titleMedium)
-                    Text("Проект: "+busyOwner+" · "+(if(releaseBusy)"Release AAB" else if(record.optString("action")=="TEST")"Unit-тесты" else "Debug APK"))
-                    Text("Состояние: "+(if(releaseBusy)releaseState.optString("state") else record.optString("state")))
-                    val start=if(releaseBusy)releaseState.optLong("started_at") else
-                        ((record.optJSONObject("job")?.optDouble("started_at",0.0) ?: 0.0)*1000).toLong()
-                    if(start>0)Text("Выполняется: "+(maxOf(0L,now-start)/60_000)+" мин "+(maxOf(0L,now-start)/1000%60)+" с")
-                    LinearProgressIndicator(modifier=Modifier.fillMaxWidth())
-                    Text("Другие сборки заблокированы до завершения. Индикатор не показывает проценты Gradle.",
-                        style=MaterialTheme.typography.bodySmall)
-                }
-            }
+            Text("Очередь занята: "+busyOwner+" · "+when {
+                releaseBusy->"Release AAB"
+                record.optString("action")=="TEST"->"Unit-тесты"
+                record.optString("action")=="TEST_DEVICE"->"Тесты на устройстве"
+                else->"Debug APK"
+            },style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if(!permitted)item {Button(onClick={grant.launch(TermuxGateway.PERMISSION)}){Text("Разрешить Termux")}}
         if(!record.optBoolean("ready"))item {Card {Column(Modifier.padding(16.dp)) {
             Text("Локальный помощник необходимо обновить")
             ActionButton(onClick={gateway.install()},enabled=permitted && termuxVersion!=null && !blocked && !record.optBoolean("pending")){Text("Обновить помощник")}
         }}}
-        item {OutlinedCard(shape=RoundedCornerShape(22.dp),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
+        if(buildTab==0)item {OutlinedCard(shape=RoundedCornerShape(22.dp),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
             Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),verticalArrangement=Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     Icon(AppIcons.Build,null,tint=MaterialTheme.colorScheme.primary)
@@ -139,7 +127,16 @@ import com.animacode.animadev.termux.TermuxGateway
                 }
             }
         }}
-        item {
+        if(buildTab==0 && belongs && record.optString("action")=="BUILD_DEBUG" &&
+            record.optString("job_id").isNotBlank())item {
+            JobMonitor(context,record,permitted,onJournal)
+        }
+        val debugJob=if(belongs)record.optJSONObject("build_job") else null
+        if(buildTab==0 && debugJob?.optString("state")=="SUCCEEDED" &&
+            debugJob.optString("project_id",project.id)==project.id)item {
+            debugJob.optJSONObject("artifact")?.let {BuildArtifactCard(context,it)}
+        }
+        if(buildTab==1)item {
             OutlinedCard(shape=RoundedCornerShape(22.dp),
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),
@@ -246,7 +243,7 @@ import com.animacode.animadev.termux.TermuxGateway
                 }
             }
         }
-        if(releaseForProject)item {
+        if(buildTab==1 && releaseForProject)item {
             val state=releaseState.optString("state")
             OutlinedCard(shape=RoundedCornerShape(22.dp),
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
@@ -283,28 +280,12 @@ import com.animacode.animadev.termux.TermuxGateway
                         style=MaterialTheme.typography.bodySmall)
                     releaseState.optJSONObject("artifact")?.let {artifact->
                         HorizontalDivider()
-                        Text(artifact.optString("path"),style=MaterialTheme.typography.bodyMedium)
-                        Text("SHA-256: "+artifact.optString("sha256"),
-                            style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        if(state=="SUCCEEDED")BuildArtifactCard(context,artifact)
                     }
                 }
             }
         }
-        if(belongs && record.optString("action")=="BUILD_DEBUG" && record.optString("job_id").isNotEmpty())item {
-            JobMonitor(context,record,permitted,onJournal)
-        }
-        val job=if(belongs)record.optJSONObject("job") else null
-        if(job?.optString("action")=="BUILD_DEBUG" && record.optString("state") in RepoPolicy.terminalStates)item {
-            Text("Задание: "+MonitorPolicy.label(job.optString("state"),false,false),style=MaterialTheme.typography.titleSmall)
-            Text(job.optString("message"),style=MaterialTheme.typography.bodySmall)
-            job.optJSONObject("artifact")?.let {a->Card {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                Text("Debug APK в Загрузках",style=MaterialTheme.typography.titleMedium)
-                Text(a.optString("path"),style=MaterialTheme.typography.bodySmall)
-                Text("SHA-256: "+a.optString("sha256"),style=MaterialTheme.typography.bodySmall)
-                Text("Размер: "+a.optLong("size")+" байт · Git "+a.optString("commit").take(12),style=MaterialTheme.typography.bodySmall)
-            }}}
-            com.animacode.animadev.projects.ActionButton(onClick={onJournal(job.optString("job_id"))}){Text("Журнал задания")}
-        }
+
     }
     if(confirmReleaseStop)AlertDialog(
         onDismissRequest={confirmReleaseStop=false},

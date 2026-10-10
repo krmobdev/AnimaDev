@@ -60,7 +60,12 @@ object ReleaseNotifications {
             .setOngoing(busy).setAutoCancel(!busy).setProgress(0,0,busy)
         val start=record.optLong("started_at")
         if(start>0 && busy)notification.setWhen(start).setUsesChronometer(true)
-        notification.addAction(android.R.drawable.ic_menu_view,"Открыть",open)
+        val artifact=record.optJSONObject("artifact")
+        val artifactOpen=if(status=="SUCCEEDED" && artifact!=null &&
+            ArtifactPolicy.valid(artifact.optString("path"),artifact.optString("sha256"),artifact.optLong("size")))
+            PendingIntent.getBroadcast(context,id.hashCode(),ArtifactGateway.intent(context,artifact),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE) else null
+        notification.addAction(android.R.drawable.ic_menu_view,"Открыть",artifactOpen ?: open)
         if(status=="REQUESTED" && !record.optBoolean("cancel_requested")) {
             val action=PendingIntent.getBroadcast(context,id.hashCode(),
                 Intent(context,ReleaseCancelActionReceiver::class.java).apply {

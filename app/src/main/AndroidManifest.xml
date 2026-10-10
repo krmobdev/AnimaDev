@@ -5,6 +5,8 @@
     <queries><package android:name="com.termux" /></queries>
     <application android:label="AnimaDev" android:icon="@drawable/ic_launcher"
         android:allowBackup="false" android:supportsRtl="true" android:theme="@style/AppTheme">
+        <receiver android:name=".projects.ArtifactOpenReceiver" android:exported="false" />
+        <receiver android:name=".projects.ArtifactResultReceiver" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
