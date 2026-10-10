@@ -1,5 +1,17 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-11 00:19 GMT+03:00 · 0.4.0-beta.10-dev.35 (49)
+- RU: Emerald Glass: переработаны монитор задания, живой журнал и журнал Release AAB с реальными статусами, этапами, временем, фильтрами и экспортом. Секреты не сохраняются в журнале.
+- EN: Emerald Glass adds a redesigned live job monitor, streaming journal and sanitized Release AAB timeline with real statuses, stages, elapsed time, filters and export.
+- RU: Вложенные настройки переведены на стеклянные карточки без изменения механизмов сохранения параметров.
+- EN: Nested settings now use Emerald cards while preserving existing preference storage and controls.
+- RU: Добавлены точные русские подписи для Emerald Glass; SHA, пути, Job ID и сырой вывод Gradle/Git не переводятся.
+- EN: Added exact Russian Emerald captions while leaving SHA, paths, job IDs and raw Gradle/Git output unchanged.
+- RU: Добавлены проверки локализации и обратной навигации из журнала в Tests, Build или проект.
+- EN: Added regression tests for safe translation and journal back navigation.
+- RU: Визуальная приёмка на устройстве и запуск instrumentation-тестов остаются обязательными.
+- EN: Device visual acceptance and running instrumentation tests remain outstanding.
+
 ## 2026-10-11 00:07 GMT+03:00 · 0.4.0-beta.10-dev.34 (48)
 - RU: Продолжен скин Emerald Glass: экраны Tests (Unit / On device), History с фильтрами, Branches с активной веткой и Termux с реальными версиями инструментов.
 - EN: Continued Emerald Glass across Unit/Device tests, filtered History, active Branches and the real Termux tool inventory.
