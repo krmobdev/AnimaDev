@@ -142,7 +142,7 @@ object OperationResultPolicy {
                     val direct=destination.artifactUri(artifact.optString("path"))
                         ?: ArtifactGateway.rememberedUri(context,artifact)
                     if(direct!=null)scope.launch {ArtifactGateway.install(context,artifact,direct)}
-                    else picker.launch(arrayOf("application/vnd.android.package-archive","application/octet-stream"))
+                    else picker.launch(arrayOf("*/*"))
                 } else ArtifactGateway.openFolder(context,artifact)
             }) {
                 Text(if(apk)"Установить APK" else "Открыть папку")
