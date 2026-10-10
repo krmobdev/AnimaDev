@@ -29,6 +29,10 @@ import androidx.compose.ui.unit.dp
         val version=remember(context.packageName) {
             runCatching {context.packageManager.getPackageInfo(context.packageName,0).versionName}.getOrNull().orEmpty()
         }
+        if(LocalNeonSkin.current) {
+            NeonAboutScreen(context,version,english)
+            return
+        }
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             item {Text("AnimaDev",style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Bold)}
             item {Text(if(english)"Local Git and Android builds with Termux" else "Локальный Git и Android-сборки через Termux")}
