@@ -57,6 +57,34 @@ import com.animacode.animadev.repos.*
             Text(if(blocked)"Сначала уточните прежнее задание по Job ID. Обновление сейчас заблокировано." else "Результаты и история сохранятся. После подключения обновите состояние Git.",style=MaterialTheme.typography.bodySmall)
             FilledTonalButton(onClick={gateway.install()},enabled=HelperPolicy.mayConnect(permitted,termuxVersion!=null,pending,blocked)){Text(if(pending)"Подключаем…" else HelperPolicy.label(installed))}
         }} }
+        if((blocked || r.optString("state")=="UNKNOWN") && r.optString("job_id").isNotBlank()) item {
+            OutlinedCard(modifier=Modifier.fillMaxWidth(),
+                colors=CardDefaults.outlinedCardColors(containerColor=MaterialTheme.colorScheme.errorContainer.copy(alpha=0.27f))) {
+                Column(Modifier.fillMaxWidth().padding(20.dp),
+                    verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Text("Восстановить состояние задания",style=MaterialTheme.typography.titleMedium)
+                    Text("Операция: "+r.optString("action")+
+                        " · "+r.optString("state")+
+                        "\\nJob ID: "+r.optString("job_id").take(12),
+                        style=MaterialTheme.typography.bodySmall)
+                    Text("Termux может уже завершить задачу, пока Android показывает старый статус. "+
+                        "Проверка читает сохранённый результат по ID и не запускает Gradle повторно.",
+                        style=MaterialTheme.typography.bodyMedium)
+                    val queryAllowed=RepoPolicy.canRecoverJob(pending,
+                        r.optString("job_id"),r.optString("job_runner_sha"),
+                        r.optString("installed_sha"))
+                    Button(onClick={gateway.query(true)},enabled=queryAllowed && permitted &&
+                        termuxVersion!=null,modifier=Modifier.fillMaxWidth()) {
+                        Text("Проверить статус в Termux")
+                    }
+                    if(pending)Text("Ожидаем предыдущий ответ Termux. Если он потерялся, "+
+                        "через 15 секунд станет доступен повторный запрос.",
+                        style=MaterialTheme.typography.bodySmall)
+                    if(r.optString("query_result").isNotBlank())
+                        Text(r.optString("query_result"),style=MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
         if(tool=="git") {
             item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 val state=when {snap==null->"Состояние не проверено";!snap.optBoolean("remote_ok") || !snap.optBoolean("branch_allowed")->"Требуется проверка профиля";snap.optBoolean("dirty")->"Есть локальные изменения";snap.optInt("ahead")>0->"Есть локальные коммиты";snap.optInt("behind")>0->"Есть обновления";else->"Рабочее дерево чистое"}
@@ -168,7 +196,11 @@ import com.animacode.animadev.repos.*
                 }
             }
         }
-        if(belongs && r.optString("job_id").isNotEmpty() && (blocked || (tool=="git" && r.optString("action")!="TEST")))item {JobMonitor(context,r,permitted,onJournal)}
+        if(belongs && r.optString("job_id").isNotEmpty() &&
+            (blocked || r.optString("state")=="UNKNOWN" ||
+             (tool=="git" && r.optString("action") !in setOf("TEST","TEST_DEVICE"))))item {
+            JobMonitor(context,r,permitted,onJournal)
+        }
     }
     if(confirmSync)AlertDialog(onDismissRequest={confirmSync=false},title={Text("Получить изменения?")},text={Text("${project.name}: ветка, origin и чистота проверятся повторно. Только fast-forward, без отправки на GitHub.")},confirmButton={TextButton(onClick={confirmSync=false;gateway.start("SYNC",project.id,project.path)}){Text("Получить")}},dismissButton={TextButton(onClick={confirmSync=false}){Text("Отложить")}})
     if(changedFiles)AlertDialog(onDismissRequest={changedFiles=false},title={Text("Изменённые файлы")},text={Column {Text(snap?.optJSONArray("changed_files")?.let {a->(0 until a.length()).joinToString("\n"){a.optString(it)}} ?: "Список недоступен");Text("Просмотр содержимого diff пока не подключён.",style=MaterialTheme.typography.bodySmall)}},confirmButton={TextButton(onClick={changedFiles=false}){Text("Закрыть")}})
