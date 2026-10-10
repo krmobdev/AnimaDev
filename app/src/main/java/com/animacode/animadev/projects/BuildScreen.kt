@@ -23,6 +23,7 @@ import com.animacode.animadev.termux.TermuxGateway
     val blocked=RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
     val ready=HelperPolicy.mayRun(permitted,termuxVersion!=null,record.optBoolean("ready"),record.optBoolean("pending"),blocked)
     val canDebug=project.supported && ready && gateway.mayBuild(record,project.id)
+    val canCheck=project.supported && ready && !com.animacode.animadev.projects.ReleaseStore(context).busy()
     val signing=remember {SigningStore(context)}
     val hasSigningKey=signing.hasDocument(project.id)
     val releaseStore=remember {ReleaseStore(context)}
@@ -53,9 +54,23 @@ import com.animacode.animadev.termux.TermuxGateway
                 Text("Офлайн Gradle; перед запуском повторно сверяем GitHub SHA",style=MaterialTheme.typography.bodySmall)
                 Button(onClick={gateway.start("BUILD_DEBUG",project.id,project.path)},enabled=canDebug,
                     modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Build,null);Spacer(Modifier.width(8.dp));Text("Собрать Debug APK")}
-                if(!canDebug)Text(if(blocked)"Завершите или уточните предыдущее задание."
-                    else "Сначала выполните в разделе Git проверку GitHub. Нужны чистое дерево и совпадающие SHA.",
-                    style=MaterialTheme.typography.bodySmall)
+                if(!canDebug) {
+                    Text(when {
+                        blocked -> "Предыдущее задание ещё активно или его результат неизвестен. Сначала уточните статус."
+                        !ready -> "Termux или локальный помощник не готов. Проверьте подключение."
+                        snapshot==null || !snapshot.optBoolean("checked") -> "Не выполнена актуальная проверка GitHub."
+                        snapshot.optBoolean("dirty") -> "Есть локальные изменения. Сборка заблокирована."
+                        !snapshot.optBoolean("remote_ok") -> "GitHub origin не подтверждён."
+                        snapshot.optInt("ahead",-1)!=0 || snapshot.optInt("behind",-1)!=0 -> "Коммиты GitHub и Termux различаются. Нужна безопасная синхронизация в Git."
+                        else -> "Ветка или SHA не соответствует разрешённому профилю сборки."
+                    },style=MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick={gateway.start("CHECK",project.id,project.path)},
+                        enabled=canCheck,modifier=Modifier.fillMaxWidth()) {
+                        Text("Проверить GitHub SHA")
+                    }
+                    Text("Проверка не меняет исходники. После успешной проверки кнопка сборки станет доступна; при расхождении откройте Git и выполните разрешённый fast-forward.",
+                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }}
         item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
