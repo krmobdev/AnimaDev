@@ -38,6 +38,7 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
     val quiet=progress>0 && now-progress>60_000L
     val manual=MonitorPolicy.manualVisible(state,record.optLong("last_confirmed",record.optLong("sent_at")),now)
     var details by remember { mutableStateOf(false) }
+    var confirmCancel by remember(jid) { mutableStateOf(false) }
     val terminal=state in RepoPolicy.terminalStates
     Card {
         Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -50,6 +51,9 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
             if(details)Text("Job ID: $jid",style=MaterialTheme.typography.bodySmall)
             if(details)Text("Начало: ${if(start>0)SimpleDateFormat("dd.MM HH:mm:ss",Locale.getDefault()).format(Date(start)) else "не подтверждено"}")
             Text("Прошло: ${maxOf(0,elapsed)/60_000} мин ${maxOf(0,elapsed)/1000%60} с")
+            if(job?.optBoolean("cancel_requested")==true)
+                Text("Отмена запрошена · ожидаем остановку Gradle",color=MaterialTheme.colorScheme.error,
+                    style=MaterialTheme.typography.titleSmall)
             if(!terminal)Text("Последний прогресс: ${if(progress>0)"${maxOf(0,now-progress)/1000} с назад" else "пока не подтверждён"}",style=MaterialTheme.typography.bodySmall)
             if(!terminal)Text(job?.optString("stage")?.ifEmpty { "Ожидаем подтверждение этапа" } ?: "Ожидаем подтверждение этапа",maxLines=2)
             val alive=job?.let { if(it.isNull("process_alive") || !it.has("process_alive"))null else it.optBoolean("process_alive") }
@@ -72,6 +76,15 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
             if(job!=null && !job.isNull("exit_code"))Text("Exit code: ${job.optInt("exit_code")}")
             Text(record.optString("message"),style=MaterialTheme.typography.bodySmall)
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                if(record.optString("action") in setOf("TEST","BUILD_DEBUG") &&
+                    state in setOf("REQUESTED","QUEUED","RUNNING") &&
+                    job?.optBoolean("cancel_requested")!=true) {
+                    OutlinedButton(onClick={confirmCancel=true},
+                        enabled=permitted && !record.optBoolean("pending"),modifier=Modifier.fillMaxWidth(),
+                        colors=ButtonDefaults.outlinedButtonColors(contentColor=MaterialTheme.colorScheme.error)) {
+                        Text("Остановить · Ctrl+C")
+                    }
+                }
                 OutlinedButton(onClick={openJournal(jid)},modifier=Modifier.fillMaxWidth()) { Text("Открыть журнал") }
                 if(manual) OutlinedButton(onClick={gateway.query(true)},enabled=permitted && !record.optBoolean("pending")) {
                     Text(if(record.optBoolean("pending") && record.optBoolean("manual_query"))"Проверяем…" else "Проверить состояние задания")
@@ -81,6 +94,13 @@ fun JobMonitor(context: Context, record: JSONObject, permitted: Boolean, openJou
             if(record.optString("query_result").isNotEmpty())Text(record.optString("query_result"),style=MaterialTheme.typography.bodySmall)
         }
     }
+    if(confirmCancel)AlertDialog(
+        onDismissRequest={confirmCancel=false},
+        title={Text("Остановить задачу?")},
+        text={Text("Отправить Ctrl+C процессу Gradle в Termux? Отмена не удаляет исходники и не изменяет Git. Пока завершение не подтверждено, другая сборка заблокирована.")},
+        confirmButton={TextButton(onClick={confirmCancel=false;gateway.cancel()}){Text("Остановить")}},
+        dismissButton={TextButton(onClick={confirmCancel=false}){Text("Продолжить")}}
+    )
     if(warning) AlertDialog(onDismissRequest={settings.edit().putLong("snooze_$jid",MonitorPolicy.snooze(now,minutes)).apply();snoozeGeneration++},title={Text("Давно нет подтверждённого прогресса")},
         text={Text("Задание выполняется ${maxOf(0,elapsed)/60_000} минут. Последняя подтверждённая активность — ${maxOf(0,now-maxOf(progress,start))/60_000} минут назад. Процесс может продолжать вычисления.")},
         confirmButton={TextButton(onClick={settings.edit().putLong("snooze_$jid",MonitorPolicy.snooze(now,minutes)).apply();snoozeGeneration++}) { Text("Продолжить ждать") }},
