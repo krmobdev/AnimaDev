@@ -16,7 +16,7 @@ import time
 
 VERSION = '0.4.0'
 MONITOR_SHA = 'f95d91e7170ab96df4ad9731e48e3f8bae77a23055424ed834d4a0299c55e5e5'
-GRADLE_SHA = 'e0b9f95bb70530ce5f32d28eb7959bf2efdbcdbefa2ccb82d47ac61aee3a0c91'
+GRADLE_SHA = '16d5b9aba32f828e7473f4f793fc5970ebfd6a3930d46427def768a8b29df874'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
 STATE_ROOT = HOME / '.local/share/animadev'
@@ -392,7 +392,7 @@ class Engine:
         if action=='BUILD_DEBUG':
             if (type(output_dir) is not str or not output_dir.startswith('/storage/emulated/0/')
                     or len(output_dir)>520
-                    or not all(re.fullmatch(r'[\\w ().&-]{1,80}',s) and s not in ('.','..')
+                    or not all(re.fullmatch(r'[\w ().&-]{1,80}',s) and s not in ('.','..')
                                for s in output_dir[len('/storage/emulated/0/'):].split('/'))):
                 raise Denied('DOWNLOADS_UNAVAILABLE')
         else:
