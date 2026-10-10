@@ -124,3 +124,23 @@ import androidx.compose.ui.unit.dp
         }
     }
 }
+
+@Composable fun NeonSettingsRow(title:String,subtitle:String,icon:ImageVector,
+                                onClick:()->Unit) {
+    Surface(onClick=onClick,modifier=Modifier.fillMaxWidth(),
+        shape=RoundedCornerShape(19.dp),color=NeonGlass.surface,
+        border=BorderStroke(1.dp,NeonGlass.outline)) {
+        Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            NeonIconTile(icon,Modifier.size(53.dp))
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                Text(title,style=MaterialTheme.typography.titleMedium,
+                    fontWeight=FontWeight.Bold,color=NeonGlass.white,
+                    maxLines=2,overflow=TextOverflow.Ellipsis)
+                Text(subtitle,style=MaterialTheme.typography.bodySmall,color=NeonGlass.muted,
+                    maxLines=2,overflow=TextOverflow.Ellipsis)
+            }
+            Icon(AppIcons.Chevron,null,tint=NeonGlass.muted)
+        }
+    }
+}
