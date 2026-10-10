@@ -22,8 +22,8 @@ class ReleaseHistoryCache(context:Context) {
         val key="events_"+jobId
         val events=runCatching {JSONArray(prefs.getString(key,"[]"))}.getOrDefault(JSONArray())
         val last=events.optJSONObject(events.length()-1)
-        if(last?.optString("state")!=status || last.optString("phase")!=phase ||
-            last.optString("message")!=message) {
+        if(last?.optString("state")!=status || last?.optString("phase")!=phase ||
+            last?.optString("message")!=message) {
             val added=JSONArray()
             for(i in maxOf(0,events.length()-63) until events.length())added.put(events.optJSONObject(i))
             added.put(JSONObject().put("at",System.currentTimeMillis())
