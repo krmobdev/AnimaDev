@@ -21,13 +21,19 @@ import com.animacode.animadev.repos.*
     }
     val gateway=remember {RepoGateway(context)};val r=rememberRepoRecord(context);val store=remember {RepoStore(context)}
     val belongs=r.optString("project_id","animaquiz")==project.id
-    val snap=if(belongs)r.optJSONObject("snapshot") else null
+    val snap=if(belongs)r.optJSONObject("snapshot")?.takeIf {
+        it.optString("branch")==project.branch && it.optString("local_commit")==project.commit
+    } else null
     val pending=r.optBoolean("pending");val blocked=store.blocked();val ready=r.optBoolean("ready")
     val available=HelperPolicy.mayRun(permitted,termuxVersion!=null,ready,pending,blocked)
     var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)}
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item {Text(project.name,style=MaterialTheme.typography.titleMedium);Text(snap?.optString("branch")?.ifEmpty {"Ветка не проверена"} ?: "Ветка не проверена",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        item {
+            Text(project.name,style=MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.height(12.dp))
+            ActiveBranchHero(project.branch,project.commit,project.dirty)
+        }
         if(!permitted)item {Button(onClick={grant.launch(com.animacode.animadev.termux.TermuxGateway.PERMISSION)}){Text("Разрешить Termux")} }
         if(termuxVersion==null)item {Text("Termux не найден. Действия недоступны.",color=MaterialTheme.colorScheme.error)}
         if(!ready)item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
