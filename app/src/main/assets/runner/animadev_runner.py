@@ -16,7 +16,7 @@ import time
 
 VERSION = '0.4.0'
 MONITOR_SHA = 'f95d91e7170ab96df4ad9731e48e3f8bae77a23055424ed834d4a0299c55e5e5'
-GRADLE_SHA = '60523c1cd6d4973213487d5feae33c94a6fd86c4f1b29a76035e5481bdcee453'
+GRADLE_SHA = 'e0b9f95bb70530ce5f32d28eb7959bf2efdbcdbefa2ccb82d47ac61aee3a0c91'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
 STATE_ROOT = HOME / '.local/share/animadev'
@@ -92,7 +92,7 @@ MESSAGES = {
  'BUILD_PATH_DENIED': 'Небезопасный путь APK.',
  'BUILD_ARTIFACT_MISSING': 'Gradle не создал APK.',
  'BUILD_ARTIFACT_INVALID': 'Новый APK не подтверждён.',
- 'DOWNLOADS_UNAVAILABLE': 'Загрузки недоступны из Termux.',
+ 'DOWNLOADS_UNAVAILABLE': 'Выбранная папка сохранения недоступна из Termux.',
  'ARTIFACT_EXPORT_FAILED': 'Не удалось скопировать APK в Загрузки.',
  'CANCELLED': 'Сборка или тесты остановлены по команде Ctrl+C. Результат не опубликован.',
 }
@@ -385,16 +385,24 @@ class Engine:
                 self.register_profile(project, old['profile'])
         if project not in self.registry: raise Denied('PROJECT_NOT_FOUND')
         if action not in ACTIONS: raise Denied('ACTION_DENIED')
-    def reserve(self, jid, project, action, reconcile=False, adb_endpoint=''):
+    def reserve(self, jid, project, action, reconcile=False, adb_endpoint='', output_dir='/storage/emulated/0/Download'):
         self.validate(jid, project, action)
         if adb_endpoint and (action!='TEST_DEVICE' or not valid_adb_endpoint(adb_endpoint)):
             raise Denied('RESULT_MALFORMED')
+        if action=='BUILD_DEBUG':
+            if (type(output_dir) is not str or not output_dir.startswith('/storage/emulated/0/')
+                    or len(output_dir)>520
+                    or not all(re.fullmatch(r'[\\w ().&-]{1,80}',s) and s not in ('.','..')
+                               for s in output_dir[len('/storage/emulated/0/'):].split('/'))):
+                raise Denied('DOWNLOADS_UNAVAILABLE')
+        else:
+            output_dir=''
         fp = fingerprint(project, action)
         with self.store.transaction() as c:
             self.store.reconcile(c)
             prior = self.store.get(c, jid)
             if prior:
-                if prior['fingerprint'] != fp or (not reconcile and prior.get('adb_endpoint','') != adb_endpoint): raise Denied('REPLAY_CONFLICT')
+                if prior['fingerprint'] != fp or (not reconcile and (prior.get('adb_endpoint','') != adb_endpoint or prior.get('output_dir','') != output_dir)): raise Denied('REPLAY_CONFLICT')
                 return prior, False
             if not reconcile:
                 active = [json.loads(x[0]) for x in c.execute('SELECT data FROM jobs WHERE project=?', (project,))]
@@ -409,6 +417,7 @@ class Engine:
                 raise Denied('HISTORY_FULL')
             j = {'job_id': jid, 'project_id': project, 'action': action, 'fingerprint': fp,
                 'adb_endpoint': adb_endpoint if action=='TEST_DEVICE' else '',
+                'output_dir': output_dir,
                 'profile': {'id':project,'name':self.registry[project]['name'],
                    'root':self.registry[project]['root'],'remote':self.registry[project]['origin'],
                    'branch':self.registry[project]['branch']}
@@ -421,10 +430,10 @@ class Engine:
             self.store.save(c, j)
             c.execute('INSERT OR IGNORE INTO journal_meta(job) VALUES(?)',(jid,))
             return j, not reconcile
-    def start(self, jid, project, action, spawn=True, adb_endpoint=''):
+    def start(self, jid, project, action, spawn=True, adb_endpoint='', output_dir='/storage/emulated/0/Download'):
         self.validate(jid, project, action)
         if identity(os.getpid()) in (None, '__UNKNOWN__'): raise Denied('PROCESS_IDENTITY_UNAVAILABLE')
-        j, new = self.reserve(jid, project, action, adb_endpoint=adb_endpoint)
+        j, new = self.reserve(jid, project, action, adb_endpoint=adb_endpoint, output_dir=output_dir)
         if new and spawn:
             try:
                 worker_path = str(pathlib.Path(__file__).resolve())
@@ -526,7 +535,7 @@ class Engine:
                     lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid=jid,
                     adb_endpoint=j.get('adb_endpoint',''))
                     if j['action']=='TEST_DEVICE' else module['execute_debug'](guard,log,
-                    lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid))
+                    lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid,output_dir=j.get('output_dir') or '/storage/emulated/0/Download'))
                 code = result.get('error_code','')
                 result['message'] = MESSAGES.get(code,module['result_message'](j['action'],code) or ('Debug APK готов.' if j['action']=='BUILD_DEBUG' else 'Инструментальные тесты завершены.' if j['action']=='TEST_DEVICE' else 'Unit-тесты завершены.'))
                 with self.store.transaction() as c: latest=self.store.get(c,jid)
@@ -590,6 +599,7 @@ def main():
         if p.get('mode') in ('LOG','HISTORY'): keys |= {'offset','view'}
         if p.get('mode')=='START' and 'profile' in p: keys.add('profile')
         if p.get('mode')=='START' and p.get('action')=='TEST_DEVICE' and 'adb_endpoint' in p: keys.add('adb_endpoint')
+        if p.get('mode')=='START' and p.get('action')=='BUILD_DEBUG' and 'output_dir' in p: keys.add('output_dir')
         if set(p) != keys: raise Denied('RESULT_MALFORMED')
         request_id=p['request_id']
         if not isinstance(request_id,str) or not HEX_ID.fullmatch(request_id): raise Denied('RESULT_MALFORMED')
@@ -605,7 +615,7 @@ def main():
                 result=engine.journal.page(existing,p['offset'],p['view'])
             print(json.dumps({'protocol_version':PROTOCOL,'runner_version':VERSION,'request_id':request_id,'ok':True,'page':result},ensure_ascii=False))
             return 0
-        if p['mode']=='START': job=engine.start(p['job_id'],p['project_id'],p['action'],adb_endpoint=p.get('adb_endpoint',''))
+        if p['mode']=='START': job=engine.start(p['job_id'],p['project_id'],p['action'],adb_endpoint=p.get('adb_endpoint',''),output_dir=p.get('output_dir','/storage/emulated/0/Download'))
         elif p['mode']=='QUERY': job=engine.query(p['job_id'],p['project_id'],p['action'])
         elif p['mode']=='CANCEL': job=engine.cancel(p['job_id'],p['project_id'],p['action'])
         else: raise Denied('ACTION_DENIED')
