@@ -105,6 +105,17 @@ class Fixture(unittest.TestCase):
         self.engine.start(uuid.uuid4().hex,'animaquiz','CHECK',spawn=False)
         with self.assertRaises(Denied) as cm:self.engine.start(uuid.uuid4().hex,'animaquiz','STATUS',spawn=False)
         self.assertEqual(cm.exception.code,'JOB_BUSY')
+    def test_global_build_reservation_rejects_second_project(self):
+        # A second independent project must not start another Gradle job.
+        self.engine.registry['second']=dict(self.project)
+        self.engine.start(uuid.uuid4().hex,'animaquiz','BUILD_DEBUG',spawn=False)
+        with self.assertRaises(Denied) as cm:
+            self.engine.start(uuid.uuid4().hex,'second','BUILD_DEBUG',spawn=False)
+        self.assertEqual(cm.exception.code,'JOB_BUSY')
+        with self.assertRaises(Denied) as cm:
+            self.engine.start(uuid.uuid4().hex,'second','TEST',spawn=False)
+        self.assertEqual(cm.exception.code,'JOB_BUSY')
+        self.assertEqual(git(self.repo,'rev-parse','HEAD'),self.before)
     def test_missing_query_tombstones_late_start(self):
         jid=uuid.uuid4().hex;a=self.engine.query(jid,'animaquiz','SYNC');self.assertEqual(a['state'],'NOT_STARTED');b=self.engine.start(jid,'animaquiz','SYNC',spawn=False);self.assertEqual(b['state'],'NOT_STARTED');self.engine.run_job(jid);self.assertEqual(git(self.repo,'rev-parse','HEAD'),self.before)
     def test_reopen_store_keeps_result(self):
