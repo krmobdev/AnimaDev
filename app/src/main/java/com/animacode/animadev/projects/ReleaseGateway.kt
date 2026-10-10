@@ -28,7 +28,7 @@ class ReleaseStore(private val context:Context) {
         val state=JSONObject(prefs.getString("job","{}") ?: "{}")
         if(state.optString("state")=="REQUESTED" && state.optString("phase")=="ENROLLING"
             && System.currentTimeMillis()-state.optLong("started_at")>180_000L) {
-            state.put("state","FAILED").put("message",
+            state.put("state","FAILED").put("ended_at",System.currentTimeMillis()).put("message",
                 "Согласование шифрования не завершилось. JKS не передавался; можно повторить.")
             prefs.edit().putString("job",state.toString()).commit()
         }
@@ -40,6 +40,7 @@ class ReleaseStore(private val context:Context) {
     fun write(record:JSONObject):Boolean {
         val ok=prefs.edit().putString("job",record.toString()).commit()
         if(ok) {
+            ReleaseHistoryCache(context).observe(record)
             generation.intValue++
             ReleaseNotifications.publish(context,record)
         }
@@ -55,12 +56,12 @@ class ReleaseStore(private val context:Context) {
     fun failedWithoutTransfer(id:String,message:String) {
         val old=read()
         if(old.optString("id")==id && old.optString("state")=="REQUESTED")
-            write(old.put("state","FAILED").put("message",message))
+            write(old.put("state","FAILED").put("ended_at",System.currentTimeMillis()).put("message",message))
     }
     fun failed(id:String,message:String) {
         val old=read()
         if(old.optString("id")==id && old.optString("state")=="REQUESTED")
-            write(old.put("state","UNKNOWN").put("message",message))
+            write(old.put("state","UNKNOWN").put("ended_at",System.currentTimeMillis()).put("message",message))
     }
 }
 
@@ -226,7 +227,7 @@ class ReleaseResultReceiver:BroadcastReceiver() {
                 val code=payload.optString("error_code","RESULT_UNCONFIRMED")
                 if(!code.matches(Regex("[A-Z_]{3,50}")))error("Malformed code")
                 // No secrets, stderr or raw command output are stored or displayed.
-                record.put("state",when {
+                record.put("error_code",code).put("state",when {
                     code=="CANCELLED"->"CANCELLED"
                     code.endsWith("_UNKNOWN") || code=="RESULT_UNCONFIRMED"->"UNKNOWN"
                     else->"FAILED"
