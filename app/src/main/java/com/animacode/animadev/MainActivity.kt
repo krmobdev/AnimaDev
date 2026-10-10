@@ -70,6 +70,10 @@ class MainActivity:ComponentActivity() {
             var route by rememberSaveable { mutableStateOf(NavigationState.freshLaunch(projects.selected()).route) }
             var journalJob by rememberSaveable { mutableStateOf("") }
             var journalParent by rememberSaveable { mutableStateOf("history") }
+            // Keep the active subtab outside disposable tool screens.
+            // Navigating to Journal removes those screens from composition.
+            var selectedTestTab by rememberSaveable(selected) { mutableIntStateOf(0) }
+            var selectedBuildTab by rememberSaveable(selected) { mutableIntStateOf(0) }
             var settingsSection by rememberSaveable { mutableStateOf("") }
             var settingsParent by rememberSaveable { mutableStateOf("list") };var menu by remember { mutableStateOf(false) }
             var confirmExit by rememberSaveable { mutableStateOf(false) }
@@ -187,8 +191,10 @@ class MainActivity:ComponentActivity() {
                     route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->clickFeedback();projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
                     route=="branches"->BranchesScreen(context,current,permitted)
                     route=="workspace"->ProjectWorkspace(context,current,onTool={clickFeedback();route=it})
-                    route=="build"->BuildScreen(context,current,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent="build";route="journal"})
-                    route=="git" || route=="tests"->ProjectTools(context,current,route,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent=route;route="journal"},{route="wait"})
+                    route=="build"->BuildScreen(context,current,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent="build";route="journal"},
+                        selectedBuildTab,{selectedBuildTab=it})
+                    route=="git" || route=="tests"->ProjectTools(context,current,route,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent=route;route="journal"},{route="wait"},
+                        selectedTestTab,{selectedTestTab=it})
                     route=="history"->if(current.supported)HistoryScreen(context,current,{id->journalJob=id;journalParent="history";route="journal"}) else UnavailableTool("История", "У этого проекта пока нет заданий AnimaDev.")
                     route=="journal"->if(current.supported)JournalScreen(context,journalJob) else UnavailableTool("Журнал","Нет безопасного профиля этого проекта.")
                     route=="wait"->MonitorSettings(context)
