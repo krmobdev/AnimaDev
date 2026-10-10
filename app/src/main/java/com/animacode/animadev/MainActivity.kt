@@ -190,7 +190,18 @@ class MainActivity:ComponentActivity() {
                     top=="termux"->TermuxOverview(context,permitted,version) { permitted=termux.permitted() }
                     route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->clickFeedback();projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
                     route=="branches"->BranchesScreen(context,current,permitted)
-                    route=="workspace"->ProjectWorkspace(context,current,onTool={clickFeedback();route=it})
+                    route=="workspace"->ProjectWorkspace(context,current,
+                        onTool={ id->
+                            clickFeedback()
+                            when(id) {
+                                "tests_device"->{selectedTestTab=1;route="tests"}
+                                "tests_unit"->{selectedTestTab=0;route="tests"}
+                                "build_debug"->{selectedBuildTab=0;route="build"}
+                                "build_release"->{selectedBuildTab=1;route="build"}
+                                else->route=id
+                            }
+                        },permitted=permitted,
+                        onJournal={id->journalJob=id;journalParent="workspace";route="journal"})
                     route=="build"->BuildScreen(context,current,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent="build";route="journal"},
                         selectedBuildTab,{selectedBuildTab=it})
                     route=="git" || route=="tests"->ProjectTools(context,current,route,permitted,version,{permitted=termux.permitted()},{id->journalJob=id;journalParent=route;route="journal"},{route="wait"},
