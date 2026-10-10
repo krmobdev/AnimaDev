@@ -9,7 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -40,10 +40,13 @@ class EmeraldGlassUiTest {
                 }
             }
         }
+        compose.waitForIdle()
         compose.onNodeWithText("AnimaQuiz").assertIsDisplayed().performClick()
         compose.waitForIdle()
         assertTrue(opened)
+        compose.waitForIdle()
         compose.onNodeWithText("Clean").assertIsDisplayed()
+        compose.waitForIdle()
         compose.onNodeWithText("main").assertIsDisplayed()
     }
 
@@ -59,6 +62,7 @@ class EmeraldGlassUiTest {
                 }
             }
         }
+        compose.waitForIdle()
         compose.onNodeWithText("Tests").assertIsDisplayed().performClick()
         compose.waitForIdle()
         org.junit.Assert.assertEquals(1,chosen)
@@ -74,6 +78,7 @@ class EmeraldGlassUiTest {
                 }
             }
         }
+        compose.waitForIdle()
         compose.onNodeWithText("Termux").assertIsDisplayed().performClick()
         compose.waitForIdle()
         assertTrue(termux)
@@ -87,6 +92,7 @@ class EmeraldGlassUiTest {
                     onClick={opened=true})
             }
         }
+        compose.waitForIdle()
         compose.onNodeWithText("Build Now").assertIsDisplayed().performClick()
         compose.waitForIdle()
         assertTrue(opened)
