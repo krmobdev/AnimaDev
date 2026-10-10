@@ -54,6 +54,46 @@ class Reports(unittest.TestCase):
     def test_stack_frames_omitted(self):
         self.assertEqual(gt.diagnostic('failure\n  at example.Run(Test.java:1)\nreason',runner.redact),'failure\nreason')
 
+class DeviceDiscovery(unittest.TestCase):
+    def test_paired_but_not_connected_is_not_a_device(self):
+        p=subprocess.CompletedProcess(['adb','devices','-l'],0,b'List of devices attached\\n\\n',b'')
+        self.assertEqual(gt.adb_devices(run=lambda *a,**kw:p),[])
+
+    def test_exactly_one_authorized_hardware_device(self):
+        p=subprocess.CompletedProcess(['adb','devices','-l'],0,
+            b'List of devices attached\\n192.168.1.132:39721 device product:husky model:Pixel_8\\n',b'')
+        self.assertEqual(gt.adb_devices(run=lambda *a,**kw:p),['192.168.1.132:39721'])
+
+    def test_unauthorized_devices_are_excluded(self):
+        p=subprocess.CompletedProcess(['adb','devices','-l'],0,
+            b'List of devices attached\\nA123 unauthorized\\nemulator-5554 device\\nADB1234 device model:Pixel\\n',b'')
+        self.assertEqual(gt.adb_devices(run=lambda *a,**kw:p),['ADB1234'])
+
+    def test_adb_errors_are_not_treated_as_connected(self):
+        p=subprocess.CompletedProcess(['adb','devices','-l'],1,
+            b'List of devices attached\\nADB1234 device\\n',b'error')
+        self.assertEqual(gt.adb_devices(run=lambda *a,**kw:p),[])
+
+    def test_device_reports_require_fresh_xml(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base=pathlib.Path(tmp);folder=base/gt.DEVICE_RESULTS/'Pixel'
+            folder.mkdir(parents=True)
+            report=folder/'TEST-sample.xml'
+            report.write_text(OK)
+            first=gt.device_reports(base)
+            self.assertEqual(gt.summary({},first)['passed'],1)
+            with self.assertRaises(gt.ReportError) as error:gt.summary(first,first)
+            self.assertEqual(error.exception.code,'REPORTS_MISSING')
+
+    def test_device_reports_reject_symlinks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base=pathlib.Path(tmp);folder=base/gt.DEVICE_RESULTS
+            folder.mkdir(parents=True)
+            report=base/'outside.xml';report.write_text(OK)
+            (folder/'TEST-link.xml').symlink_to(report)
+            with self.assertRaises(gt.ReportError):gt.device_reports(base)
+
+
 class GradleFixture(unittest.TestCase):
     setUp=base.Fixture.setUp
     tearDown=base.Fixture.tearDown
