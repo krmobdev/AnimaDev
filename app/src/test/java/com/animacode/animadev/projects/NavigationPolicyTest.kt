@@ -2,6 +2,13 @@ package com.animacode.animadev.projects
 import org.junit.Assert.*
 import org.junit.Test
 class NavigationPolicyTest {
+    @Test fun buildBackReturnsToProjectNotExit() {
+        val previous=NavigationState().openProject("animaquiz").tool("build").back()
+        assertNotNull(previous)
+        assertEquals("workspace",previous!!.route)
+        assertEquals("animaquiz",previous.project)
+        assertEquals("projects",previous.section)
+    }
     @Test fun toolBackKeepsProject() { val n=NavigationState().openProject("one").tool("tests").back()!!;assertEquals("workspace",n.route);assertEquals("one",n.project) }
     @Test fun rootSwitchClearsTool() { val n=NavigationState().openProject("one").tool("git").switchRoot("termux").back()!!;assertEquals("list",n.route);assertEquals("projects",n.section);assertEquals("one",n.project) }
     @Test fun journalFromTestsReturnsToTests() { val n=NavigationState().openProject("one").tool("tests").journal("owned").back()!!;assertEquals("tests",n.route);assertEquals("one",n.project);assertEquals("",n.job) }
