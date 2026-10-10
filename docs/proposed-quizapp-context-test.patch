@@ -1,0 +1,17 @@
+diff --git a/app/src/androidTest/java/com/animacode/quizapp/ExampleInstrumentedTest.kt b/app/src/androidTest/java/com/animacode/quizapp/ExampleInstrumentedTest.kt
+--- a/app/src/androidTest/java/com/animacode/quizapp/ExampleInstrumentedTest.kt
++++ b/app/src/androidTest/java/com/animacode/quizapp/ExampleInstrumentedTest.kt
+@@ -22,10 +22,10 @@ class ExampleInstrumentedTest {
+     fun useAppContext() {
+         // Context of the app under test (debug builds use applicationIdSuffix ".debug").
+         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
+-        assertTrue(
++        assertEquals(
+             "Unexpected package: ${appContext.packageName}",
+-            appContext.packageName == "com.animacode.quizapp" ||
+-                appContext.packageName == "com.animacode.quizapp.debug"
++            BuildConfig.APPLICATION_ID,
++            appContext.packageName
+         )
+     }
+ }
