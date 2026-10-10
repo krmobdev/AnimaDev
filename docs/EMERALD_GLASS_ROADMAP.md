@@ -29,7 +29,8 @@ repository, job, Git, signing and storage state remain unchanged. No invented da
 - [x] Small-screen tabs, bottom navigation, project tile grid, SHA layout and long labels adapt to width/font scale
 - [x] Lightweight selection transitions and cached ambient glow (no heavy blur)
 - [ ] Validate 60 fps frame pacing, insets, TalkBack, screenshot reference matching on device
-- [ ] RU / EN accessibility and screenshots / device instrumentation verification (new RU caption and navigation regression tests added)
+- [ ] Run Emerald Compose instrumentation on an **awake, unlocked Pixel 7** (4 tests executed in isolated devicefixture on 2026-10-11; 4 failed to find a Compose hierarchy while screen was Dozing/locked)
+- [ ] RU / EN TalkBack, screenshot comparison and frame-pacing on device (RU caption and back-navigation unit regression tests added)
 
 ## Non-negotiable correctness
 - Never display reference/mock data as real Git, Gradle, SDK or test results
