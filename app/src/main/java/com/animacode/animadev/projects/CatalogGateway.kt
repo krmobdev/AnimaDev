@@ -69,6 +69,21 @@ class CatalogReceiver:BroadcastReceiver() {
                 val projects=buildList { for(i in 0 until a.length())add(LocalProject.parse(a.getJSONObject(i))) }
                 if(j.getString("mode")=="PATH")require(projects.all {it.path==prefs.getString("path","")})
                 ProjectStore(context).update(projects)
+                // A catalog PATH read reports the real local HEAD, not a historical
+                // build snapshot. Never let an old checked SHA masquerade as current.
+                val repo=com.animacode.animadev.repos.RepoStore(context)
+                val existing=repo.read()
+                val active=projects.firstOrNull {it.id==existing.optString("project_id","animaquiz")}
+                val saved=existing.optJSONObject("snapshot")
+                if(active!=null && saved!=null &&
+                    (saved.optString("branch")!=active.branch ||
+                     saved.optString("local_commit")!=active.commit)) {
+                    repo.edit {
+                        it.remove("snapshot")
+                        it.put("message","Ветка изменилась: "+active.branch+
+                            ". Старый GitHub SHA сброшен; выполните проверку перед сборкой.")
+                    }
+                }
                 editor.putString("catalog",data.toString())
             } else editor.putString("environment",data.toString())
             editor.commit()
