@@ -3,7 +3,9 @@ package com.animacode.animadev.projects
 import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,7 +30,8 @@ import org.json.JSONObject
 @Composable fun OperationTabs(labels:List<String>,selected:Int,onSelect:(Int)->Unit) {
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         labels.forEachIndexed {index,label->
-            OutlinedButton(onClick={onSelect(index)},modifier=Modifier.weight(1f).heightIn(min=48.dp),
+            val isSelected=selected==index
+            OutlinedButton(onClick={onSelect(index)},modifier=Modifier.weight(1f).heightIn(min=48.dp).semantics {this.selected=isSelected},
                 colors=ButtonDefaults.outlinedButtonColors(
                     containerColor=if(selected==index)MaterialTheme.colorScheme.secondaryContainer
                         else MaterialTheme.colorScheme.surface,
@@ -85,7 +88,37 @@ object OperationResultPolicy {
     }
 }
 
+@Composable fun DebugBuildResult(context:Context,record:JSONObject,project:LocalProject,
+    permitted:Boolean,onJournal:(String)->Unit) {
+    if(record.optString("project_id",RepoGateway.PROJECT)!=project.id)return
+    val current=record.optString("action")=="BUILD_DEBUG" && record.optString("job_id").isNotBlank()
+    if(current && record.optString("state") !in RepoPolicy.terminalStates) {
+        JobMonitor(context,record,permitted,onJournal)
+        return
+    }
+    val job=(if(current)record.optJSONObject("job") else null) ?: record.optJSONObject("build_job") ?: return
+    if(!OperationResultPolicy.matches(project.id,job.optString("project_id",project.id),
+            "BUILD_DEBUG",job.optString("action")) || job.optString("state") !in RepoPolicy.terminalStates)return
+    val success=job.optString("state")=="SUCCEEDED"
+    Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        OutlinedCard(Modifier.fillMaxWidth().testTag("result-BUILD_DEBUG")) {
+            Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text("Последняя Debug-сборка",style=MaterialTheme.typography.titleMedium)
+                Text(MonitorPolicy.label(job.optString("state"),false,false),
+                    color=if(success)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                Text(job.optString("message"),style=MaterialTheme.typography.bodySmall)
+                if(!success)job.optString("error_code").takeIf {it.isNotBlank()}?.let {
+                    Text("Код: "+it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
+                }
+                ActionButton(onClick={onJournal(job.optString("job_id"))}) {Text("Открыть журнал сборки")}
+            }
+        }
+        if(success)job.optJSONObject("artifact")?.let {BuildArtifactCard(context,it)}
+    }
+}
+
 @Composable fun BuildArtifactCard(context:Context,artifact:JSONObject) {
+    var details by remember(artifact.optString("sha256")) {mutableStateOf(false)}
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             val apk=artifact.optString("path").endsWith(".apk")
@@ -96,6 +129,11 @@ object OperationResultPolicy {
                 style=MaterialTheme.typography.bodySmall)
             ActionButton(onClick={ArtifactGateway.open(context,artifact)}) {
                 Text(if(apk)"Открыть · установить приложение" else "Открыть AAB")
+            }
+            ActionButton(onClick={details=!details}) {Text(if(details)"Скрыть сведения о файле" else "Сведения о файле")}
+            if(details) {
+                Text(artifact.optString("path"),style=MaterialTheme.typography.bodySmall)
+                Text("SHA-256: "+artifact.optString("sha256"),style=MaterialTheme.typography.bodySmall)
             }
             if(!apk)Text("AAB предназначен для публикации. Для установки на телефон соберите Debug APK.",
                 style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)

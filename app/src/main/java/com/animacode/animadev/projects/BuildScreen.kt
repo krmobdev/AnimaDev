@@ -127,15 +127,7 @@ import com.animacode.animadev.termux.TermuxGateway
                 }
             }
         }}
-        if(buildTab==0 && belongs && record.optString("action")=="BUILD_DEBUG" &&
-            record.optString("job_id").isNotBlank())item {
-            JobMonitor(context,record,permitted,onJournal)
-        }
-        val debugJob=if(belongs)record.optJSONObject("build_job") else null
-        if(buildTab==0 && debugJob?.optString("state")=="SUCCEEDED" &&
-            debugJob.optString("project_id",project.id)==project.id)item {
-            debugJob.optJSONObject("artifact")?.let {BuildArtifactCard(context,it)}
-        }
+        if(buildTab==0)item {DebugBuildResult(context,record,project,permitted,onJournal)}
         if(buildTab==1)item {
             OutlinedCard(shape=RoundedCornerShape(22.dp),
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {

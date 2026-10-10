@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import com.animacode.animadev.repos.*
 
 @Composable fun ProjectTools(context:Context,project:LocalProject,tool:String,permitted:Boolean,termuxVersion:String?,onPermissionUpdated:()->Unit,onJournal:(String)->Unit,onWait:()->Unit) {
+    val locale=androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     if(!project.supported) {
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             item {Text(project.name,style=MaterialTheme.typography.titleMedium);Text(if(project.worktree)"Worktree · только просмотр" else "Только просмотр",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary)}
@@ -228,7 +229,7 @@ import com.animacode.animadev.repos.*
                                 if(exit!=null && !exit.isNull("exit_code"))Text("Exit code: "+exit.optInt("exit_code"))
                                 val checkedAt=r.optLong("last_confirmed")
                                 if(checkedAt>0L)Text("Ответ Termux: "+
-                                    java.text.SimpleDateFormat("dd.MM HH:mm:ss",java.util.Locale.getDefault())
+                                    java.text.SimpleDateFormat("dd.MM HH:mm:ss",locale)
                                         .format(java.util.Date(checkedAt)),style=MaterialTheme.typography.bodySmall)
                                 com.animacode.animadev.projects.ActionButton(onClick={onJournal(r.optString("job_id"))}) {
                                     Text("Открыть подробный журнал")
