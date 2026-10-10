@@ -25,6 +25,7 @@ import com.animacode.animadev.termux.TermuxGateway
 @Composable fun BuildScreen(context:Context,project:LocalProject,permitted:Boolean,termuxVersion:String?,
                            onPermissionUpdated:()->Unit,onJournal:(String)->Unit,
                            selectedBuildTab:Int?=null,onBuildTabChange:((Int)->Unit)?=null) {
+    val neon=LocalNeonSkin.current
     val feedback=remember {UiFeedback(context)}
     val view=LocalView.current
     fun tap(){feedback.tap(view)}
@@ -98,7 +99,34 @@ import com.animacode.animadev.termux.TermuxGateway
     val buildTab=selectedBuildTab ?: fallbackBuildTab
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
-        item {OperationProjectHeader(project)}
+        item {
+            if(neon) NeonPanel(Modifier.fillMaxWidth(),glowing=true) {
+                Text(if(buildTab==0)"Debug APK Build" else "Release AAB Build",
+                    style=MaterialTheme.typography.headlineSmall,
+                    fontWeight=androidx.compose.ui.text.font.FontWeight.ExtraBold)
+                Text(project.name+" · "+project.branch.ifBlank {"Branch not verified"},
+                    style=MaterialTheme.typography.bodyMedium,color=NeonGlass.muted)
+                Text("Git "+project.commit.take(12).ifBlank {"SHA unknown"},
+                    style=MaterialTheme.typography.bodySmall,color=NeonGlass.softGreen)
+            } else OperationProjectHeader(project)
+        }
+        if(neon && buildTab==0)item {
+            NeonPanel(Modifier.fillMaxWidth()) {
+                Text("Build Options",style=MaterialTheme.typography.titleLarge,
+                    fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
+                Text("Verified configuration for the current project",
+                    style=MaterialTheme.typography.bodySmall,color=NeonGlass.muted)
+                Text("Variant · debug",style=MaterialTheme.typography.bodyMedium)
+                HorizontalDivider(color=NeonGlass.outline)
+                Text("Type · Debug APK",style=MaterialTheme.typography.bodyMedium)
+                HorizontalDivider(color=NeonGlass.outline)
+                Text("Git reference · "+project.branch.ifBlank {"Not verified"},
+                    style=MaterialTheme.typography.bodyMedium)
+                HorizontalDivider(color=NeonGlass.outline)
+                Text("Mode · Gradle --rerun-tasks (offline)",style=MaterialTheme.typography.bodyMedium)
+                if(!canDebug) NeonStatus("Build blocked until verified",false)
+            }
+        }
         item {OperationTabs(listOf("Debug APK","Release AAB"),buildTab) {
             if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
         }}
@@ -126,7 +154,11 @@ import com.animacode.animadev.termux.TermuxGateway
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Button(onClick={tap();gateway.start("BUILD_DEBUG",project.id,project.path)},enabled=canDebug,
+                if(neon) NeonPrimaryAction("Собрать Debug APK · полная пересборка",
+                    "Generate verified Debug APK",AppIcons.Build,
+                    enabled=canDebug,modifier=Modifier.fillMaxWidth(),
+                    onClick={tap();gateway.start("BUILD_DEBUG",project.id,project.path)})
+                else Button(onClick={tap();gateway.start("BUILD_DEBUG",project.id,project.path)},enabled=canDebug,
                     modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Build,null);Spacer(Modifier.width(8.dp));Text("Собрать Debug APK · полная пересборка")}
                 Text("Gradle выполняется с --rerun-tasks: старые результаты задач не используются. Кэш зависимостей и файлы проектов не удаляются.",
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
