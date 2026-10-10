@@ -55,14 +55,17 @@ import com.animacode.animadev.termux.TermuxGateway
     val catalogRefresh=rememberCatalogRecord(context).optBoolean("pending")
     val snapshotMatches=snapshot!=null && snapshot.optString("branch")==project.branch &&
         snapshot.optString("local_commit")==project.commit
+    val destination=remember {ExportDestination(context)}
+    val outputReady=destination.artifactDirectory()!=null
     val canDebug=project.supported && ready && !releaseBusy && !catalogRefresh &&
-        snapshotMatches && gateway.mayBuild(record,project.id)
+        snapshotMatches && outputReady && gateway.mayBuild(record,project.id)
     val canCheck=project.supported && ready && !releaseBusy
     var now by remember {mutableLongStateOf(System.currentTimeMillis())}
     LaunchedEffect(releaseOrDebugBusy) {
         if(releaseOrDebugBusy)while(true) { delay(1000);now=System.currentTimeMillis() }
     }
     val blockReason=when {
+        !outputReady -> "Выбранная папка недоступна для Termux. В настройках выберите папку в основной памяти телефона или обычные Загрузки."
         busyOwner!=null -> BuildConcurrencyPolicy.waitingMessage(busyOwner,project.name)
         catalogRefresh -> "Проверяем фактическую активную ветку в Termux. Дождитесь ответа."
         !snapshotMatches -> "Ветка или SHA изменились после последней проверки. Обновите GitHub SHA."
@@ -84,6 +87,7 @@ import com.animacode.animadev.termux.TermuxGateway
     var showPasswordFields by remember(project.id){mutableStateOf(false)}
     var showSecurityDetails by remember(project.id){mutableStateOf(false)}
     var confirmReleaseStop by remember(project.id){mutableStateOf(false)}
+    var showReleaseJournal by remember(project.id){mutableStateOf(false)}
     val releaseScope=rememberCoroutineScope()
     val canRelease=canDebug && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseOrDebugBusy
     val effectivePasswordPresent=releasePassword.isNotEmpty() || storedCredentials?.storePassword?.isNotEmpty()==true
@@ -209,6 +213,10 @@ import com.animacode.animadev.termux.TermuxGateway
                         modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)) {
                         Text("Собрать Release AAB")
                     }
+                    OutlinedButton(onClick={tap();gateway.start("CHECK",project.id,project.path)},
+                        enabled=canCheck,modifier=Modifier.fillMaxWidth()) {
+                        Text("Проверить GitHub SHA")
+                    }
                     if(!canRelease || !effectivePasswordPresent)Text(when {
                         !canDebug -> blockReason
                         !hasSigningKey -> "Выберите файл JKS в настройках."
@@ -242,6 +250,32 @@ import com.animacode.animadev.termux.TermuxGateway
                 Column(Modifier.fillMaxWidth().padding(20.dp),
                     verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     Text("Последняя Release-сборка",style=MaterialTheme.typography.titleMedium)
+                    Text("Job ID: "+releaseState.optString("id"),
+                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Git SHA: "+releaseState.optString("sha").ifBlank {"Не определён"},
+                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    val phase=releaseState.optString("phase")
+                    if(phase.isNotBlank())Text("Этап: "+when(phase) {
+                        "ENROLLING"->"Подготовка безопасной подписи"
+                        "DISPATCHING"->"Передача защищённого задания"
+                        "EXPORTING"->"Проверка и перенос файла"
+                        else->phase
+                    },style=MaterialTheme.typography.bodySmall)
+                    val startedAt=releaseState.optLong("started_at")
+                    val endedAt=releaseState.optLong("ended_at")
+                    val format=java.text.SimpleDateFormat("dd.MM.yyyy HH:mm:ss",java.util.Locale.getDefault())
+                    if(startedAt>0)Text("Начало: "+format.format(java.util.Date(startedAt)),
+                        style=MaterialTheme.typography.bodySmall)
+                    if(endedAt>startedAt && startedAt>0) {
+                        Text("Окончание: "+format.format(java.util.Date(endedAt)),
+                            style=MaterialTheme.typography.bodySmall)
+                        Text("Длительность: "+((endedAt-startedAt)/60000)+" мин "+((endedAt-startedAt)/1000%60)+" с",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
+                    releaseState.optString("error_code").takeIf {it.isNotBlank()}?.let {
+                        Text("Ошибка: "+it,color=MaterialTheme.colorScheme.error,
+                            style=MaterialTheme.typography.bodySmall)
+                    }
                     Text(when(state) {
                         "SUCCEEDED"->"Готово к отправке"
                         "FAILED"->"Не удалось собрать"
@@ -258,7 +292,10 @@ import com.animacode.animadev.termux.TermuxGateway
                             " мин "+(maxOf(0L,now-started)/1000%60)+" с")
                         Text("Другие сборки заблокированы до подтверждения результата.",
                             style=MaterialTheme.typography.bodySmall)
-                        if(releaseState.optBoolean("cancel_requested"))
+                        if(releaseState.optString("phase")=="EXPORTING")
+                            Text("Сборка завершена. Выполняется проверка и перенос AAB.",
+                                style=MaterialTheme.typography.bodySmall)
+                        else if(releaseState.optBoolean("cancel_requested"))
                             Text("Отправлен Ctrl+C · ожидаем подтверждение остановки",color=MaterialTheme.colorScheme.error,
                                 style=MaterialTheme.typography.bodySmall)
                         else OutlinedButton(onClick={confirmReleaseStop=true},
@@ -270,6 +307,13 @@ import com.animacode.animadev.termux.TermuxGateway
                     Text(releaseState.optString("message"),style=MaterialTheme.typography.bodyMedium)
                     if(releaseMessage.isNotBlank())Text(releaseMessage,
                         style=MaterialTheme.typography.bodySmall)
+                    releaseState.optString("output_dir").takeIf {it.isNotBlank()}?.let {
+                        Text("Папка сохранения: "+it,style=MaterialTheme.typography.bodySmall)
+                    }
+                    if(releaseState.optString("id").isNotBlank())
+                        ActionButton(onClick={tap();showReleaseJournal=true}) {
+                            Text("Открыть журнал сборки")
+                        }
                     releaseState.optJSONObject("artifact")?.let {artifact->
                         HorizontalDivider()
                         if(state=="SUCCEEDED")BuildArtifactCard(context,artifact)
@@ -279,6 +323,8 @@ import com.animacode.animadev.termux.TermuxGateway
         }
 
     }
+    if(showReleaseJournal && releaseState.optString("id").isNotBlank())
+        ReleaseJournalDialog(context,releaseState.optString("id")) {showReleaseJournal=false}
     if(confirmReleaseStop)AlertDialog(
         onDismissRequest={confirmReleaseStop=false},
         title={Text("Остановить Release AAB?")},
