@@ -19,7 +19,7 @@ android {
         versionCode = 20
         versionName = "0.4.0-beta.8-dev.6"
     }
-    sourceSets.getByName("main").assets.srcDir(releaseAssetRoot)
+    sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
     buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
