@@ -51,7 +51,7 @@ class RepoResultReceiver : BroadcastReceiver() {
                 val active = j.optJSONObject("active_job")
                 if (code == "JOB_BUSY" && active != null) {
                     check(active.getString("project_id") == record.optString("project_id",RepoGateway.PROJECT))
-                    check(active.getString("action") in setOf("STATUS", "CHECK", "SYNC", "TEST", "BUILD_DEBUG"))
+                    check(active.getString("action") in setOf("STATUS", "CHECK", "SYNC", "TEST", "TEST_DEVICE", "BUILD_DEBUG"))
                     check(active.getString("job_id").matches(Regex("[a-f0-9]{32}")))
                     record.put("job_id", active.getString("job_id")).put("action", active.getString("action"))
                 }
@@ -68,12 +68,12 @@ class RepoResultReceiver : BroadcastReceiver() {
                     check(artifact.getString("commit") == job.getJSONObject("snapshot").getString("local_commit"))
                     record.put("build_job", job)
                 }
-                if (job.getString("action") == "TEST") {
+                if (job.getString("action") in setOf("TEST","TEST_DEVICE")) {
                     val tests = job.optJSONObject("tests")
                     if (tests != null) check(RepoPolicy.validCounts(tests.getLong("total"), tests.getLong("passed"),
                         tests.getLong("failed"), tests.getLong("skipped"), tests.getLong("duration_ms")))
                     if (job.getString("state") == "SUCCEEDED") check(tests != null && tests.getLong("failed") == 0L)
-                    record.put("test_job", job)
+                    record.put(if(job.getString("action")=="TEST_DEVICE")"device_test_job" else "test_job", job)
                 }
                 if(record.optBoolean("manual_query")) record.put("query_result","Состояние задания проверено: ${MonitorPolicy.label(job.getString("state"),false,false)}")
                 record.put("state", job.getString("state")).put("job", job)
