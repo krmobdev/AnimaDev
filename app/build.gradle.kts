@@ -1,3 +1,10 @@
+val releaseAssetRoot = layout.buildDirectory.dir("generated/animadev-release-assets")
+val prepareReleaseScripts by tasks.registering(Copy::class) {
+    from(rootProject.file("runner/release_signer.py"))
+    from(rootProject.file("runner/release_worker.py"))
+    into(releaseAssetRoot.map { it.dir("release") })
+}
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -12,6 +19,7 @@ android {
         versionCode = 19
         versionName = "0.4.0-beta.8-dev.5"
     }
+    sourceSets.getByName("main").assets.srcDir(releaseAssetRoot)
     buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -30,3 +38,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     testImplementation("junit:junit:4.13.2")
 }
+
+tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }
+    .configureEach { dependsOn(prepareReleaseScripts) }
