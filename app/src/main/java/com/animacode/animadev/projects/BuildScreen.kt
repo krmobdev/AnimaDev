@@ -10,6 +10,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.launch
@@ -70,17 +74,26 @@ import com.animacode.animadev.termux.TermuxGateway
     var releasePassword by remember(project.id){mutableStateOf("")}
     var releaseKeyPassword by remember(project.id){mutableStateOf("")}
     var releaseMessage by remember(project.id){mutableStateOf("")}
+    var showPasswordFields by remember(project.id){mutableStateOf(false)}
+    var showSecurityDetails by remember(project.id){mutableStateOf(false)}
     val releaseScope=rememberCoroutineScope()
     val canRelease=canDebug && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseOrDebugBusy
     val effectivePasswordPresent=releasePassword.isNotEmpty() || storedCredentials?.storePassword?.isNotEmpty()==true
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
-        item {Text(project.name,style=MaterialTheme.typography.titleMedium)
-            Text("Ветка: "+(snapshot?.optString("branch") ?: "не проверена")+" · "+(snapshot?.optString("local_commit")?.take(12) ?: "SHA неизвестен"),
-                style=MaterialTheme.typography.bodySmall)
+        item {
+            Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                Text("Центр сборок",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary)
+                Text(project.name,style=MaterialTheme.typography.headlineMedium)
+                Text((snapshot?.optString("branch") ?: "Ветка не проверена")+"  ·  "+
+                    (snapshot?.optString("local_commit")?.take(9) ?: "SHA неизвестен"),
+                    style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if(busyOwner==null)"Готово к локальной сборке" else "Задание выполняется в Termux",
+                    style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
+            }
         }
         if(busyOwner!=null)item {
-            Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
+            Card(shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                     Text("Сборочный слот занят",style=MaterialTheme.typography.titleMedium)
                     Text("Проект: "+busyOwner+" · "+(if(releaseBusy)"Release AAB" else if(record.optString("action")=="TEST")"Unit-тесты" else "Debug APK"))
@@ -89,7 +102,7 @@ import com.animacode.animadev.termux.TermuxGateway
                         ((record.optJSONObject("job")?.optDouble("started_at",0.0) ?: 0.0)*1000).toLong()
                     if(start>0)Text("Выполняется: "+(maxOf(0L,now-start)/60_000)+" мин "+(maxOf(0L,now-start)/1000%60)+" с")
                     LinearProgressIndicator(modifier=Modifier.fillMaxWidth())
-                    Text("Другая сборка пока недоступна. Этот индикатор показывает выполнение, а не проценты Gradle.",
+                    Text("Другие сборки заблокированы до завершения. Индикатор не показывает проценты Gradle.",
                         style=MaterialTheme.typography.bodySmall)
                 }
             }
@@ -99,10 +112,16 @@ import com.animacode.animadev.termux.TermuxGateway
             Text("Локальный помощник необходимо обновить")
             Button(onClick={gateway.install()},enabled=permitted && termuxVersion!=null && !blocked && !record.optBoolean("pending")){Text("Обновить помощник")}
         }}}
-        item {Card(shape=MaterialTheme.shapes.extraLarge,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
+        item {OutlinedCard(shape=RoundedCornerShape(22.dp),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
             Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-                Text("Debug APK",style=MaterialTheme.typography.titleMedium)
-                Text("Офлайн Gradle; перед запуском повторно сверяем GitHub SHA",style=MaterialTheme.typography.bodySmall)
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    Icon(AppIcons.Build,null,tint=MaterialTheme.colorScheme.primary)
+                    Column {
+                        Text("Debug APK",style=MaterialTheme.typography.titleLarge)
+                        Text("Для установки и тестирования",style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 Button(onClick={tap();gateway.start("BUILD_DEBUG",project.id,project.path)},enabled=canDebug,
                     modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Build,null);Spacer(Modifier.width(8.dp));Text("Собрать Debug APK")}
                 if(!canDebug) {
@@ -111,88 +130,151 @@ import com.animacode.animadev.termux.TermuxGateway
                         enabled=canCheck,modifier=Modifier.fillMaxWidth()) {
                         Text("Проверить GitHub SHA")
                     }
-                    Text("Проверка не меняет исходники. После успешной проверки кнопка сборки станет доступна; при расхождении откройте Git и выполните разрешённый fast-forward.",
-                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }}
-        item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Text("Release AAB",style=MaterialTheme.typography.titleMedium)
-                Text(if(hasSigningKey)"Файл: "+signing.fileLabel(project.id)+" · alias: "+signing.alias(project.id)
-                     else "Выберите JKS и alias в настройках подписи.",
-                    style=MaterialTheme.typography.bodySmall)
-                OutlinedTextField(releasePassword,{releasePassword=it},
-                    label={Text("Пароль хранилища JKS")},
-                    visualTransformation=PasswordVisualTransformation(),singleLine=true,
-                    enabled=!releaseOrDebugBusy,modifier=Modifier.fillMaxWidth())
-                OutlinedTextField(releaseKeyPassword,{releaseKeyPassword=it},
-                    label={Text("Пароль ключа, если отличается")},
-                    visualTransformation=PasswordVisualTransformation(),singleLine=true,
-                    enabled=!releaseOrDebugBusy,modifier=Modifier.fillMaxWidth())
-                if(vaultSaved) {
-                    Text(if(storedCredentials!=null)"Пароли сохранены в Android Keystore для этого JKS и alias. Вводить заново не требуется."
-                         else "Сохранённые секреты не подходят к выбранному JKS/alias или недоступны. Удалите их и сохраните заново.",
-                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(onClick={tap();vaultMessage=if(vault.forget(project.id))"Сохранённые пароли удалены с устройства." else "Не удалось удалить секреты.";vaultGeneration++},
-                        enabled=!releaseOrDebugBusy,modifier=Modifier.fillMaxWidth()){Text("Удалить сохранённые пароли")}
-                } else {
-                    OutlinedButton(onClick={
-                        tap()
-                        val ok=vault.save(project.id,signing.documentUri(project.id),signing.alias(project.id),
-                            releasePassword,releaseKeyPassword)
-                        vaultMessage=if(ok)"Пароли зашифрованы Android Keystore и сохранены только на этом устройстве."
-                            else "Не удалось защитить пароль. Проверьте JKS, alias и введённый пароль."
-                        if(ok){releasePassword="";releaseKeyPassword="";vaultGeneration++}
-                    },enabled=!releaseOrDebugBusy && hasSigningKey && signing.alias(project.id).isNotBlank() && releasePassword.isNotEmpty(),
-                        modifier=Modifier.fillMaxWidth()){Text("Сохранить пароли в защищённом хранилище")}
-                }
-                if(vaultMessage.isNotBlank())Text(vaultMessage,style=MaterialTheme.typography.bodySmall)
-                Button(onClick={
-                    tap()
-                    val saved=storedCredentials
-                    val storePass=releasePassword.ifEmpty {saved?.storePassword.orEmpty()}
-                    val keyPass=if(releasePassword.isNotEmpty())releaseKeyPassword else
-                        releaseKeyPassword.ifEmpty {saved?.keyPassword.orEmpty()}
-                    releasePassword=""
-                    releaseKeyPassword=""
-                    releaseMessage="Подготавливаю защищённое задание…"
-                    releaseScope.launch {
-                        releaseMessage=releaseGateway.launch(project,storePass,keyPass)
+        item {
+            OutlinedCard(shape=RoundedCornerShape(22.dp),
+                border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
+                Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),
+                    verticalArrangement=Arrangement.spacedBy(14.dp)) {
+                    Row(verticalAlignment=Alignment.CenterVertically,
+                        horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Icon(AppIcons.Build,null,tint=MaterialTheme.colorScheme.primary)
+                        Column {
+                            Text("Release AAB",style=MaterialTheme.typography.titleLarge)
+                            Text("Подписанный пакет для публикации",
+                                style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
-                },enabled=canRelease && effectivePasswordPresent,
-                  modifier=Modifier.fillMaxWidth()) {Text("Собрать подписанный Release AAB")}
-                if(!canRelease || !effectivePasswordPresent)Text(when {
-                    !canDebug -> blockReason
-                    !hasSigningKey -> "Сначала выберите файл JKS в настройках подписи."
-                    signing.alias(project.id).isBlank() -> "Укажите и сохраните alias закрытого ключа."
-                    !effectivePasswordPresent -> "Введите пароль JKS или сохраните его в защищённом хранилище."
-                    else -> "Запуск заблокирован текущим заданием."
-                },style=MaterialTheme.typography.bodySmall)
-                Text("Сохранение пароля необязательно. Секреты шифруются ключом Android Keystore и привязаны к выбранному JKS/alias. При сборке они передаются только по локальному Unix-сокету с проверкой UID, без GitHub и журналов.",
-                    style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-
-                if(releaseMessage.isNotBlank())Text(releaseMessage,style=MaterialTheme.typography.bodySmall)
-                if(releaseForProject) {
-                    Text("Release AAB · "+releaseState.optString("state"),style=MaterialTheme.typography.titleSmall)
+                    if(hasSigningKey) {
+                        Surface(color=MaterialTheme.colorScheme.surfaceContainerLow,
+                            shape=RoundedCornerShape(14.dp)) {
+                            Column(Modifier.fillMaxWidth().padding(14.dp),
+                                verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                                Text(signing.fileLabel(project.id),style=MaterialTheme.typography.titleSmall)
+                                Text("Ключ: "+signing.alias(project.id)+
+                                    if(storedCredentials!=null)"   ·   Пароль защищён" else "   ·   Пароль не сохранён",
+                                    style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    } else {
+                        Text("Сначала выберите JKS и alias в настройках подписи.",
+                            style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
+                    }
+                    if(storedCredentials!=null && !showPasswordFields) {
+                        Text("Пароль готов к использованию",style=MaterialTheme.typography.bodyMedium,
+                            color=MaterialTheme.colorScheme.primary)
+                        TextButton(onClick={tap();showPasswordFields=true},
+                            enabled=!releaseOrDebugBusy) {Text("Использовать другой пароль")}
+                    }
+                    AnimatedVisibility(storedCredentials==null || showPasswordFields) {
+                        Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(releasePassword,{releasePassword=it},
+                                label={Text("Пароль хранилища JKS")},
+                                visualTransformation=PasswordVisualTransformation(),singleLine=true,
+                                enabled=!releaseOrDebugBusy,modifier=Modifier.fillMaxWidth())
+                            OutlinedTextField(releaseKeyPassword,{releaseKeyPassword=it},
+                                label={Text("Пароль ключа, если отличается")},
+                                visualTransformation=PasswordVisualTransformation(),singleLine=true,
+                                enabled=!releaseOrDebugBusy,modifier=Modifier.fillMaxWidth())
+                            if(storedCredentials==null) {
+                                TextButton(onClick={
+                                    tap()
+                                    val ok=vault.save(project.id,signing.documentUri(project.id),signing.alias(project.id),
+                                        releasePassword,releaseKeyPassword)
+                                    vaultMessage=if(ok)"Пароль зашифрован и сохранён только на телефоне."
+                                        else "Не удалось сохранить секрет. Проверьте JKS и alias."
+                                    if(ok) {
+                                        releasePassword="";releaseKeyPassword=""
+                                        showPasswordFields=false;vaultGeneration++
+                                    }
+                                },enabled=!releaseOrDebugBusy && hasSigningKey &&
+                                    signing.alias(project.id).isNotBlank() && releasePassword.isNotEmpty()) {
+                                    Text("Сохранить пароль защищённо")
+                                }
+                            } else {
+                                TextButton(onClick={tap();showPasswordFields=false;releasePassword="";releaseKeyPassword=""}) {
+                                    Text("Отмена")
+                                }
+                            }
+                        }
+                    }
+                    if(vaultMessage.isNotBlank())Text(vaultMessage,style=MaterialTheme.typography.bodySmall)
+                    Button(onClick={
+                        tap()
+                        val saved=storedCredentials
+                        val storePass=releasePassword.ifEmpty {saved?.storePassword.orEmpty()}
+                        val keyPass=if(releasePassword.isNotEmpty())releaseKeyPassword else
+                            releaseKeyPassword.ifEmpty {saved?.keyPassword.orEmpty()}
+                        releasePassword="";releaseKeyPassword=""
+                        releaseMessage="Подготавливаю защищённую сборку…"
+                        releaseScope.launch {releaseMessage=releaseGateway.launch(project,storePass,keyPass)}
+                    },enabled=canRelease && effectivePasswordPresent,
+                        modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)) {
+                        Text("Собрать Release AAB")
+                    }
+                    if(!canRelease || !effectivePasswordPresent)Text(when {
+                        !canDebug -> blockReason
+                        !hasSigningKey -> "Выберите файл JKS в настройках."
+                        signing.alias(project.id).isBlank() -> "Укажите alias ключа."
+                        else -> "Введите пароль JKS или сохраните его на телефоне."
+                    },style=MaterialTheme.typography.bodySmall,
+                        color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick={tap();showSecurityDetails=!showSecurityDetails}) {
+                        Text(if(showSecurityDetails)"Скрыть настройки безопасности" else "Безопасность и управление паролем")
+                    }
+                    AnimatedVisibility(showSecurityDetails) {
+                        Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                            Text("JKS и пароль шифруются для Termux одноразовым RSA-ключом и AES-GCM. "+
+                                "В GitHub, логах и командных аргументах нет открытых паролей.",
+                                style=MaterialTheme.typography.bodySmall,
+                                color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            if(vaultSaved) OutlinedButton(onClick={
+                                tap()
+                                vaultMessage=if(vault.forget(project.id))"Сохранённые пароли удалены." else "Удаление не подтверждено."
+                                showPasswordFields=true;vaultGeneration++
+                            },enabled=!releaseOrDebugBusy) {Text("Удалить сохранённый пароль")}
+                        }
+                    }
+                }
+            }
+        }
+        if(releaseForProject)item {
+            val state=releaseState.optString("state")
+            OutlinedCard(shape=RoundedCornerShape(22.dp),
+                border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
+                Column(Modifier.fillMaxWidth().padding(20.dp),
+                    verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Text("Последняя Release-сборка",style=MaterialTheme.typography.titleMedium)
+                    Text(when(state) {
+                        "SUCCEEDED"->"Готово к отправке"
+                        "FAILED"->"Не удалось собрать"
+                        "UNKNOWN"->"Результат требует проверки"
+                        "REQUESTED"->"Выполняется в Termux"
+                        else->state
+                    },style=MaterialTheme.typography.titleSmall,
+                        color=if(state=="FAILED")MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
                     if(releaseBusy) {
                         LinearProgressIndicator(Modifier.fillMaxWidth())
-                        Text("Termux выполняет локальную сборку и подпись. Этапы Gradle пока недоступны.",
-                            style=MaterialTheme.typography.bodySmall)
                         val started=releaseState.optLong("started_at")
-                        if(started>0)Text("Время с начала: "+(maxOf(0L,now-started)/60_000)+" мин "+(maxOf(0L,now-started)/1000%60)+" с",
-                            style=MaterialTheme.typography.bodySmall)
-                        Text("Дождитесь подтверждения результата. Другая Debug/Release сборка не запускается.",
+                        if(started>0)Text("Прошло: "+(maxOf(0L,now-started)/60_000)+
+                            " мин "+(maxOf(0L,now-started)/1000%60)+" с")
+                        Text("Другие сборки заблокированы до подтверждения результата.",
                             style=MaterialTheme.typography.bodySmall)
                     }
-                    Text(releaseState.optString("message"),style=MaterialTheme.typography.bodySmall)
+                    Text(releaseState.optString("message"),style=MaterialTheme.typography.bodyMedium)
+                    if(releaseMessage.isNotBlank())Text(releaseMessage,
+                        style=MaterialTheme.typography.bodySmall)
                     releaseState.optJSONObject("artifact")?.let {artifact->
-                        Text("Файл: "+artifact.optString("path"),style=MaterialTheme.typography.bodySmall)
-                        Text("SHA-256: "+artifact.optString("sha256"),style=MaterialTheme.typography.bodySmall)
+                        HorizontalDivider()
+                        Text(artifact.optString("path"),style=MaterialTheme.typography.bodyMedium)
+                        Text("SHA-256: "+artifact.optString("sha256"),
+                            style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
-        }}
+        }
         if(belongs && record.optString("action")=="BUILD_DEBUG" && record.optString("job_id").isNotEmpty())item {
             JobMonitor(context,record,permitted,onJournal)
         }
