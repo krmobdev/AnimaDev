@@ -14,6 +14,7 @@ import re
 import subprocess
 import sys
 import time
+import signal
 
 HOME=pathlib.Path("/data/data/com.termux/files/home")
 STATE=HOME/".local/share/animadev"
@@ -171,6 +172,14 @@ def run(payload):
             except BlockingIOError:raise ReleaseFailure("JOB_BUSY")
             try: fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
             except BlockingIOError:raise ReleaseFailure("JOB_BUSY")
+            active_path=STATE/(".release-active-"+request)
+            cancel_path=STATE/(".release-cancel-"+request)
+            if active_path.is_symlink() or cancel_path.is_symlink():
+                raise ReleaseFailure("STATE_UNAVAILABLE")
+            if active_path.exists() or cancel_path.exists():
+                raise ReleaseFailure("STATE_UNAVAILABLE")
+            marker_fd=os.open(active_path,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
+            os.close(marker_fd)
             sha=_git_clean(root,project,fetch=True)
             gradlew=root/"gradlew"
             if not gradlew.is_file() or gradlew.is_symlink():
@@ -184,16 +193,42 @@ def run(payload):
             env=dict(os.environ)
             for key in ("JAVA_TOOL_OPTIONS","JDK_JAVA_OPTIONS","_JAVA_OPTIONS","GRADLE_OPTS","JAVA_OPTS"):
                 env.pop(key,None)
+            if cancel_path.is_file():raise ReleaseFailure("CANCELLED")
             try:
-                completed=subprocess.run(["/data/data/com.termux/files/usr/bin/bash",
+                proc=subprocess.Popen(["/data/data/com.termux/files/usr/bin/bash",
                     "./gradlew",":app:bundleRelease","--offline","--no-daemon","--rerun-tasks","--console=plain"],
                     cwd=root,env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,timeout=GRADLE_TIMEOUT,check=False)
-            except subprocess.TimeoutExpired:
-                raise ReleaseFailure("BUILD_TIMEOUT_UNKNOWN")
+                    stderr=subprocess.DEVNULL,start_new_session=True)
             except OSError:
                 raise ReleaseFailure("GRADLE_MISSING")
-            if completed.returncode!=0:
+            interrupted=False
+            sigint_at=None
+            deadline=time.monotonic()+GRADLE_TIMEOUT
+            try:
+                while proc.poll() is None:
+                    if cancel_path.is_file() and not interrupted:
+                        try:os.killpg(proc.pid,signal.SIGINT)
+                        except ProcessLookupError:pass
+                        interrupted=True;sigint_at=time.monotonic()
+                    if interrupted and sigint_at is not None and time.monotonic()-sigint_at>35:
+                        # A stuck Gradle daemon cannot hold the exclusive build slot forever.
+                        try:os.killpg(proc.pid,signal.SIGKILL)
+                        except ProcessLookupError:pass
+                    if time.monotonic()>=deadline:
+                        try:os.killpg(proc.pid,signal.SIGKILL)
+                        except ProcessLookupError:pass
+                        proc.wait()
+                        raise ReleaseFailure("BUILD_TIMEOUT_UNKNOWN")
+                    time.sleep(.3)
+                proc.wait()
+            finally:
+                if proc.poll() is None:
+                    try:os.killpg(proc.pid,signal.SIGKILL)
+                    except ProcessLookupError:pass
+                    proc.wait()
+            if interrupted or cancel_path.is_file():
+                raise ReleaseFailure("CANCELLED")
+            if proc.returncode!=0:
                 raise ReleaseFailure("GRADLE_FAILED")
             if _git_clean(root,project)!=sha:
                 raise ReleaseFailure("BUILD_OUTDATED")
@@ -214,6 +249,14 @@ def run(payload):
                 except OSError:pass
             return artifact
         finally:
+            # Cancellation markers never contain a signing secret.
+            # Delete them only if this request created the active marker.
+            if 'active_path' in locals() and active_path.exists():
+                try:active_path.unlink()
+                except OSError:pass
+                if 'cancel_path' in locals():
+                    try:cancel_path.unlink()
+                    except OSError:pass
             os.close(fd)
             if global_fd is not None:os.close(global_fd)
     finally:
