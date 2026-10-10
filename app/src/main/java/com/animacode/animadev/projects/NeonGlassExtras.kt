@@ -144,3 +144,62 @@ import androidx.compose.ui.unit.dp
         }
     }
 }
+
+@Composable fun NeonAboutScreen(context:android.content.Context,version:String,english:Boolean) {
+    androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize(),
+        contentPadding=PaddingValues(start=22.dp,end=22.dp,top=24.dp,bottom=40.dp),
+        verticalArrangement=Arrangement.spacedBy(20.dp)) {
+        item {
+            Text(if(english)"About" else "О программе",
+                style=MaterialTheme.typography.headlineLarge,
+                fontWeight=FontWeight.Bold,color=NeonGlass.white)
+        }
+        item {
+            Column(Modifier.fillMaxWidth().padding(top=30.dp,bottom=20.dp),
+                horizontalAlignment=Alignment.CenterHorizontally,
+                verticalArrangement=Arrangement.spacedBy(15.dp)) {
+                Text("</>",style=MaterialTheme.typography.displayLarge,
+                    color=NeonGlass.green)
+                Row(verticalAlignment=Alignment.Bottom,
+                    horizontalArrangement=Arrangement.Center) {
+                    Text("Anima",style=MaterialTheme.typography.displayMedium,
+                        fontFamily=androidx.compose.ui.text.font.FontFamily.Serif,
+                        color=NeonGlass.white)
+                    Text("Dev",style=MaterialTheme.typography.displayMedium,
+                        fontFamily=androidx.compose.ui.text.font.FontFamily.Serif,
+                        color=NeonGlass.green)
+                }
+                Text(if(english)"Local Git and Android builds with Termux"
+                    else "Локальный Git и Android-сборки через Termux",
+                    style=MaterialTheme.typography.bodyLarge,color=NeonGlass.muted)
+                NeonStatus("v"+version,true)
+                Text("Android ${android.os.Build.VERSION.RELEASE} · API ${android.os.Build.VERSION.SDK_INT}",
+                    color=NeonGlass.muted,style=MaterialTheme.typography.bodyMedium)
+            }
+        }
+        item {HorizontalDivider(color=NeonGlass.outline)}
+        item {
+            Text(if(english)
+                "AnimaDev brings verified Git operations, Android tests, signed releases and local builds to your phone. Commands run through a restricted Termux integration; results and logs stay available in your project history."
+                else "AnimaDev объединяет проверенные операции Git, тесты Android, подписанные релизы и локальные сборки на телефоне. Команды выполняются через ограниченную интеграцию Termux, а результаты и журналы доступны в истории.",
+                color=NeonGlass.muted,style=MaterialTheme.typography.bodyLarge)
+        }
+        item {
+            Surface(onClick={
+                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse("https://github.com/krmobdev/AnimaDev")))
+            },shape=RoundedCornerShape(19.dp),color=NeonGlass.surface,
+                border=BorderStroke(1.dp,NeonGlass.green)) {
+                Row(Modifier.fillMaxWidth().padding(19.dp),
+                    verticalAlignment=Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.SpaceBetween) {
+                    Icon(AppIcons.Git,null,tint=NeonGlass.green)
+                    Text(if(english)"GitHub repository" else "Репозиторий GitHub",
+                        style=MaterialTheme.typography.titleMedium,
+                        color=NeonGlass.softGreen,fontWeight=FontWeight.Bold)
+                    Icon(AppIcons.Chevron,null,tint=NeonGlass.green)
+                }
+            }
+        }
+    }
+}
