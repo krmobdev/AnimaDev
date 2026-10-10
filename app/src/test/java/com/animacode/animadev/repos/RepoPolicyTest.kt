@@ -43,6 +43,11 @@ class RepoPolicyTest {
     @Test fun legacyQueryPreservesRunner() { assertEquals("legacy", RepoPolicy.runnerForQuery("QUERY","new","","","legacy")) }
     @Test fun newStartAlwaysUsesCurrentRunner() { assertEquals("new", RepoPolicy.runnerForQuery("START","new","old","old","legacy")) }
     @Test fun failedNetworkCheckAllowsExplicitRetry() { assertFalse(RepoPolicy.blocked("id","FAILED")); assertFalse(sync(checked=false)) }
+    @Test fun instrumentationDoesNotDependOnStaleUiSnapshot() {
+        assertTrue(RepoPolicy.requiresPreparedSnapshot("TEST"))
+        assertFalse(RepoPolicy.requiresPreparedSnapshot("TEST_DEVICE"))
+        assertFalse(RepoPolicy.requiresPreparedSnapshot("STATUS"))
+    }
     @Test fun testsAllowedWithConfirmedProfile() { assertTrue(RepoPolicy.mayTest("test/decomposition-v1",true,true,false)) }
     @Test fun testsMainAllowedWithVerifiedOrigin() { assertTrue(RepoPolicy.mayTest("main",true,true,false));assertFalse(RepoPolicy.mayTest("main",false,true,false)) }
     @Test fun testsWrongRemoteBlocked() { assertFalse(RepoPolicy.mayTest("test/decomposition-v1",false,true,false)) }
