@@ -8,13 +8,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /** Uses the tracked documentation included at build time — no live network required. */
 @Composable fun SupportScreen(context:Context,screen:String) {
-    val english=AppLanguage.english(LocalAppLanguage.current)
+    val english=AppLanguage.english(LocalAppLanguage.current,LocalConfiguration.current.locales[0].language)
     val filename=when(screen) {
         "changelog"->"CHANGELOG.md"
         "termux_setup"->if(english)"TERMUX_SETUP_EN.md" else "TERMUX_SETUP.md"
