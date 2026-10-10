@@ -82,9 +82,9 @@ import com.animacode.animadev.repos.*
             else OperationProjectHeader(project)
         }
         if(tool!="git")item {
-            if(neon)NeonTabs(listOf("Unit tests","On device"),testTab) {
+            if(neon)NeonTabs(listOf("Unit tests","On device"),testTab,onSelect={
                 if(onTestTabChange!=null)onTestTabChange(it) else fallbackTestTab=it
-            } else OperationTabs(listOf("Unit-тесты","На устройстве"),testTab) {
+            }) else OperationTabs(listOf("Unit-тесты","На устройстве"),testTab) {
                 if(onTestTabChange!=null)onTestTabChange(it) else fallbackTestTab=it
             }
         }
