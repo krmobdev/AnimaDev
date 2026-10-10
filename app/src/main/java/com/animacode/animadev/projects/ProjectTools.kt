@@ -52,10 +52,14 @@ import com.animacode.animadev.repos.*
     val releaseBusy=remember(releaseGeneration) { ReleaseStore(context).busy() }
     val available=HelperPolicy.mayRun(permitted,termuxVersion!=null,ready,pending,blocked)
     // Recovery is safe even when a previous job is UNKNOWN: QUERY never starts Gradle.
-    val canRecover=RepoPolicy.canRecoverJob(pending,r.optString("job_id"),
-        r.optString("job_runner_sha"),r.optString("installed_sha")) &&
-        permitted && termuxVersion!=null
     val activeOrUnknown=blocked || r.optString("state")=="UNKNOWN"
+    // A queued request is only a receipt. Once it is running, the monitor owns
+    // progress feedback; never leave a stale "request recorded" success banner.
+    LaunchedEffect(belongs,r.optString("job_id"),r.optString("state")) {
+        if(belongs && r.optString("state") in setOf("QUEUED","RUNNING","SUCCEEDED",
+                "FAILED","INTERRUPTED","TIMED_OUT") &&
+            deviceActionMessage.startsWith("Запрос записан")) deviceActionMessage=""
+    }
     var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)}
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -63,6 +67,12 @@ import com.animacode.animadev.repos.*
             Text(project.name,style=MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(12.dp))
             ActiveBranchHero(project.branch,project.commit,project.dirty)
+        }
+        // Show the actual live job FIRST, not buried after two test cards.
+        if(tool!="git" && belongs && r.optString("action")=="TEST_DEVICE" &&
+            r.optString("job_id").isNotBlank() &&
+            TestScreenStatusPolicy.active(r.optString("state"))) item {
+            JobMonitor(context,r,permitted,onJournal)
         }
         if(!permitted)item {Button(onClick={grant.launch(com.animacode.animadev.termux.TermuxGateway.PERMISSION)}){Text("Разрешить Termux")} }
         if(termuxVersion==null)item {Text("Termux не найден. Действия недоступны.",color=MaterialTheme.colorScheme.error)}
@@ -72,7 +82,8 @@ import com.animacode.animadev.repos.*
             Text(if(blocked)"Сначала уточните прежнее задание по Job ID. Обновление сейчас заблокировано." else "Результаты и история сохранятся. После подключения обновите состояние Git.",style=MaterialTheme.typography.bodySmall)
             FilledTonalButton(onClick={gateway.install()},enabled=HelperPolicy.mayConnect(permitted,termuxVersion!=null,pending,blocked)){Text(if(pending)"Подключаем…" else HelperPolicy.label(installed))}
         }} }
-        if((blocked || r.optString("state")=="UNKNOWN") && r.optString("job_id").isNotBlank()) item {
+        if(TestScreenStatusPolicy.needsRecovery(r.optString("state")) &&
+            r.optString("job_id").isNotBlank()) item {
             OutlinedCard(modifier=Modifier.fillMaxWidth(),
                 colors=CardDefaults.outlinedCardColors(containerColor=MaterialTheme.colorScheme.errorContainer.copy(alpha=0.27f))) {
                 Column(Modifier.fillMaxWidth().padding(20.dp),
@@ -130,8 +141,14 @@ import com.animacode.animadev.repos.*
                         if(!ready) {
                             Text("Сначала обновите локальный помощник Termux (кнопка выше).",
                                 color=MaterialTheme.colorScheme.error)
+                        } else if(blocked && belongs) {
+                            Text(TestScreenStatusPolicy.unitBlockedMessage(
+                                r.optString("action"),r.optString("state")),
+                                style=MaterialTheme.typography.bodyMedium,
+                                color=MaterialTheme.colorScheme.onSurfaceVariant)
                         } else if(needStatus) {
-                            Text("Для этого проекта ещё нет свежей проверки ветки и origin.",
+                            Text("Для unit-тестов сначала проверьте ветку и origin. " +
+                                "Инструментальные тесты проверяют Git автоматически.",
                                 style=MaterialTheme.typography.bodyMedium)
                         } else if(!prepared) {
                             Text(when {
@@ -140,21 +157,7 @@ import com.animacode.animadev.repos.*
                                 else->"Состояние проекта изменилось. Обновите локальный снимок."
                             },style=MaterialTheme.typography.bodyMedium)
                         }
-                        if(activeOrUnknown && r.optString("job_id").isNotBlank()) {
-                            Text("Сборочный слот занят: "+r.optString("action")+" · "+
-                                r.optString("state")+" · "+r.optString("job_id").take(12),
-                                style=MaterialTheme.typography.bodySmall,
-                                color=MaterialTheme.colorScheme.error)
-                            OutlinedButton(onClick={gateway.query(true)},
-                                enabled=canRecover,modifier=Modifier.fillMaxWidth()) {
-                                Icon(AppIcons.Refresh,null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Уточнить старое задание по ID")
-                            }
-                            Text("Чтение статуса не запускает тесты повторно и не изменяет Git.",
-                                style=MaterialTheme.typography.bodySmall)
-                        }
-                        if(!prepared || needStatus) {
+                        if((!prepared || needStatus) && !blocked) {
                             OutlinedButton(onClick={gateway.start("STATUS",project.id,project.path)},
                                 enabled=available,modifier=Modifier.fillMaxWidth()) {
                                 Icon(AppIcons.Refresh,null)
@@ -166,7 +169,8 @@ import com.animacode.animadev.repos.*
                             enabled=canRun,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
                             Icon(AppIcons.Tests,null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Запустить unit-тесты")
+                            Text(if(blocked) "Unit-тесты ожидают свободный слот"
+                                 else "Запустить unit-тесты")
                         }
                     }
                 }
@@ -227,16 +231,15 @@ import com.animacode.animadev.repos.*
                             modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
                             Icon(AppIcons.Tests,null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Запустить инструментальные тесты")
+                            Text(if(belongs && TestScreenStatusPolicy.active(r.optString("state")) &&
+                                r.optString("action")=="TEST_DEVICE") "Тесты уже выполняются"
+                                 else if(blocked) "Ожидаем свободный слот"
+                                 else "Запустить инструментальные тесты")
                         }
                         if(deviceActionMessage.isNotBlank()) {
                             Text(deviceActionMessage,style=MaterialTheme.typography.bodyMedium,
                                 color=if(deviceActionMessage.startsWith("Запрос записан"))
                                     MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                        }
-                        if(belongs && r.optString("action")=="TEST_DEVICE" &&
-                            r.optString("job_id").isNotBlank()) {
-                            JobMonitor(context,r,permitted,onJournal)
                         }
                         Text(if(deviceReady)
                             "ADB подтвердил Pixel. Перед запуском Gradle устройство будет проверено ещё раз."
@@ -257,12 +260,6 @@ import com.animacode.animadev.repos.*
                                 else -> "Сейчас выполняется другое задание. Дождись завершения."
                             },style=MaterialTheme.typography.bodySmall,
                                 color=MaterialTheme.colorScheme.error)
-                        }
-                        if(activeOrUnknown && r.optString("job_id").isNotBlank()) {
-                            OutlinedButton(onClick={gateway.query(true)},enabled=canRecover,
-                                modifier=Modifier.fillMaxWidth()) {
-                                Text("Уточнить статус предыдущего задания")
-                            }
                         }
                     }
                 }

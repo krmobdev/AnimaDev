@@ -2,6 +2,29 @@ package com.animacode.animadev.projects
 import org.junit.Assert.*
 import org.junit.Test
 class HelperPolicyTest {
+    @Test fun healthyRunningJobIsNotARecoveryError() {
+        listOf("REQUESTED", "QUEUED", "RUNNING").forEach { state ->
+            assertTrue(TestScreenStatusPolicy.active(state))
+            assertFalse(TestScreenStatusPolicy.needsRecovery(state))
+        }
+    }
+    @Test fun onlyUnknownJobNeedsRecoveryCard() {
+        assertTrue(TestScreenStatusPolicy.needsRecovery("UNKNOWN"))
+        listOf("SUCCEEDED", "FAILED", "INTERRUPTED", "NOT_STARTED").forEach {
+            assertFalse(TestScreenStatusPolicy.needsRecovery(it))
+            assertFalse(TestScreenStatusPolicy.active(it))
+        }
+    }
+    @Test fun deviceTestOccupiesSingleGradleSlotWithoutErrorLanguage() {
+        val text = TestScreenStatusPolicy.unitBlockedMessage("TEST_DEVICE", "RUNNING")
+        assertTrue(text.contains("инструментальные тесты"))
+        assertTrue(text.contains("после их завершения"))
+        assertFalse(text.contains("ошиб"))
+    }
+    @Test fun unknownJobHasActionableRecoveryMessage() {
+        assertTrue(TestScreenStatusPolicy.unitBlockedMessage("TEST_DEVICE","UNKNOWN")
+            .contains("Проверь состояние"))
+    }
     @Test fun oldHelperLabel() {assertEquals("Обновить помощник",HelperPolicy.label(true))}
     @Test fun noPermissionNoExecution() {assertFalse(HelperPolicy.mayRun(false,true,true,false,false))}
     @Test fun oldResultIsNotReady() {assertFalse(HelperPolicy.mayRun(true,true,false,false,false))}
