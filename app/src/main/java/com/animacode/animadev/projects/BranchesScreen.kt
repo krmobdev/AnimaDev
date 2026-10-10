@@ -21,6 +21,7 @@ import org.json.JSONObject
 
 @Composable fun BranchesScreen(context:Context,project:LocalProject,permitted:Boolean) {
     val locale=androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val neon=LocalNeonSkin.current
     val feedback=remember {UiFeedback(context)}
     val feedbackView=LocalView.current
     val gateway=remember {CatalogGateway(context)}
@@ -47,30 +48,56 @@ import org.json.JSONObject
     val gold=if(light)Color(0xFF775A00) else Color(0xFFFFD977)
     LazyColumn(Modifier.fillMaxSize().imePadding(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=20.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {
-            Text(project.name,style=MaterialTheme.typography.titleMedium)
+            if(neon)NeonSection("Branches",AppIcons.Git,project.name)
+            else Text(project.name,style=MaterialTheme.typography.titleMedium)
             Text("Выберите строку, чтобы посмотреть коммиты и при необходимости явно переключиться. Переключение допустимо только для чистого AnimaQuiz с совпадающим SHA на GitHub.",
                 style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             if(switcher.message().isNotBlank())Text(switcher.message(),style=MaterialTheme.typography.bodySmall)
             if(switcher.pending())LinearProgressIndicator(Modifier.fillMaxWidth())
         }
         item {OutlinedButton(onClick={feedback.tap(feedbackView);gateway.read("BRANCHES",project.path)},enabled=permitted && !pending){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Обновить список")};if(pending)LinearProgressIndicator(Modifier.fillMaxWidth());Text(gateway.prefs.getString("message","") ?: "",style=MaterialTheme.typography.bodySmall)}
-        item {OutlinedTextField(search,{search=it},label={Text("Поиск по загруженным веткам")},leadingIcon={Icon(AppIcons.Search,null)},singleLine=true,modifier=Modifier.fillMaxWidth())}
+        item {
+            if(neon) NeonPanel(Modifier.fillMaxWidth()) {
+                OutlinedTextField(search,{search=it},label={Text("Search branches")},
+                    leadingIcon={Icon(AppIcons.Search,null)},singleLine=true,
+                    shape=RoundedCornerShape(19.dp),modifier=Modifier.fillMaxWidth())
+            } else OutlinedTextField(search,{search=it},label={Text("Поиск по загруженным веткам")},
+                leadingIcon={Icon(AppIcons.Search,null)},singleLine=true,modifier=Modifier.fillMaxWidth())
+        }
         if(metadata!=null) {
-            item {Text("Рабочее дерево: "+BranchPolicy.workingTree(metadata.opt("dirty") as? Boolean,metadata.optString("error").isNotBlank()),style=MaterialTheme.typography.bodyMedium)}
+            item {
+                val workTree=BranchPolicy.workingTree(metadata.opt("dirty") as? Boolean,
+                    metadata.optString("error").isNotBlank())
+                if(neon) NeonPanel(Modifier.fillMaxWidth()) {
+                    NeonKeyValue("Working tree",workTree,AppIcons.Success)
+                    NeonStatus(if(metadata.optBoolean("dirty"))"Local changes" else
+                        if(metadata.isNull("dirty") || metadata.optString("error").isNotBlank())"Not verified" else "Clean",
+                        !metadata.isNull("dirty") && !metadata.optBoolean("dirty") &&
+                            metadata.optString("error").isBlank())
+                } else Text("Рабочее дерево: "+workTree,
+                    style=MaterialTheme.typography.bodyMedium)
+            }
             item {Text("Проверено: "+java.text.SimpleDateFormat("dd.MM.yyyy · HH:mm:ss",locale).format(java.util.Date((data.optDouble("scanned_at",0.0)*1000).toLong())),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 if(metadata.optBoolean("branches_limited"))Text("Старый снимок неполный. Обновите список для чтения всех страниц.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
                 Text("Загружено веток: ${BranchPolicy.merge(refs).size}"+(if(metadata.optBoolean("branches_more"))" · есть следующая страница" else ""),style=MaterialTheme.typography.bodySmall)
                 if(metadata.optString("default_branch").isEmpty())Text("Главная ветка не подтверждена: origin/HEAD отсутствует.",style=MaterialTheme.typography.bodySmall)
                 Text("Origin показывает последний локальный снимок, а не текущие данные GitHub. Для актуальности используйте проверку обновлений в Git.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
             items(rows,key={it.name}) {b->
-                OutlinedCard(modifier=Modifier.fillMaxWidth().clickable {feedback.tap(feedbackView);selectedBranch=b},
-                    shape=RoundedCornerShape(24.dp),
-                    colors=CardDefaults.outlinedCardColors(containerColor=if(b.active)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow),
+                Surface(onClick={feedback.tap(feedbackView);selectedBranch=b},
+                    modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),
+                    color=if(b.active)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
                     border=BorderStroke(if(b.active)2.dp else 1.dp,
                         if(b.active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
-                    Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),
+                    Column(Modifier.fillMaxWidth()
+                        .then(if(neon && b.active)Modifier.background(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                listOf(Color(0xFF145637),Color(0xFF09261C)))) else Modifier)
+                        .padding(20.dp).animateContentSize(),
                         verticalArrangement=Arrangement.spacedBy(11.dp)) {
-                Text(b.name,style=if(b.active)MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                if(neon && b.active)Icon(AppIcons.Git,null,tint=NeonGlass.green,
+                    modifier=Modifier.size(36.dp))
+                Text(b.name,style=if(b.active && neon)MaterialTheme.typography.headlineMedium else
+                    if(b.active)MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                     fontWeight=if(b.active)FontWeight.Black else FontWeight.Bold,
                     color=if(b.active)MaterialTheme.colorScheme.primary else if(b.default)gold else MaterialTheme.colorScheme.onSurface)
                 if(b.active)Surface(color=MaterialTheme.colorScheme.primary,shape=RoundedCornerShape(40.dp)) {
