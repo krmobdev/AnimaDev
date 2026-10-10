@@ -57,6 +57,15 @@ class Fixture(unittest.TestCase):
         (self.repo/'mine.txt').write_text('mine');self.assert_blocked('REPO_DIRTY');self.assertTrue((self.repo/'mine.txt').exists())
     def test_main_denied(self):
         git(self.repo,'checkout','-b','main');self.assert_blocked('BRANCH_DENIED')
+    def test_explicit_quiz_main_profile_allowed_without_mutating_git(self):
+        git(self.repo,'checkout','-b','main')
+        self.engine.registry['animaquiz']['allow_main']=True
+        job=self.run_action('STATUS')
+        self.assertEqual(job['state'],'SUCCEEDED')
+        self.assertEqual(job['snapshot']['branch'],'main')
+        self.assertTrue(job['snapshot']['branch_allowed'])
+        self.assertEqual(git(self.repo,'rev-parse','HEAD'),self.before)
+
     def test_master_denied(self):
         git(self.repo,'checkout','-b','master');self.assert_blocked('BRANCH_DENIED')
     def test_unexpected_branch_denied(self):
