@@ -16,8 +16,8 @@ android {
         applicationId = "com.animacode.animadev"
         minSdk = 33
         targetSdk = 35
-        versionCode = 20
-        versionName = "0.4.0-beta.8-dev.6"
+        versionCode = 21
+        versionName = "0.4.0-beta.8-dev.7"
     }
     sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
     buildFeatures { compose = true }
@@ -40,4 +40,9 @@ dependencies {
 }
 
 tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }
+    .configureEach { dependsOn(prepareReleaseScripts) }
+
+// Release Lint reads generated assets as model inputs; Gradle 9 requires
+// an explicit dependency in addition to mergeReleaseAssets.
+tasks.matching { it.name == "generateReleaseLintVitalReportModel" }
     .configureEach { dependsOn(prepareReleaseScripts) }
