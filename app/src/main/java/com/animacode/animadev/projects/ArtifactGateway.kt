@@ -81,7 +81,10 @@ object ArtifactGateway {
             message(context,"Нет проверенного файла сборки.");return
         }
         val destination=ExportDestination(context)
-        val folder=destination.folderUri()
+        val parent=path.substringBeforeLast('/')
+        val folder=if(parent==destination.artifactDirectory())destination.folderUri()
+            else DocumentsContract.buildTreeDocumentUri("com.android.externalstorage.documents",
+                "primary:"+parent.removePrefix("/storage/emulated/0/"))
         try {
             context.startActivity(Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(folder,DocumentsContract.Document.MIME_TYPE_DIR)
