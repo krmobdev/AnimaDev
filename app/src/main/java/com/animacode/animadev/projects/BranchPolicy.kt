@@ -9,6 +9,7 @@ data class BranchRef(val name:String,val sha:String,val date:String,val local:Bo
 data class BranchRow(val name:String,val local:BranchRef?,val remote:BranchRef?) {
     val active get()=local?.active==true
     val default get()=local?.default==true || remote?.default==true
+    val lastCommit get()=local?.takeIf {it.date.isNotBlank()} ?: remote
     val comparison get()=when {local==null->"Только origin";remote==null->"Только локальная";local.sha==remote.sha->"SHA совпадают в локальном снимке";else->"SHA различаются · требуется проверка обновлений"}
 }
 object BranchPolicy {
@@ -18,5 +19,5 @@ object BranchPolicy {
         else->"Чисто"
     }
     fun merge(refs:List<BranchRef>,query:String=""):List<BranchRow> = refs.groupBy {it.name}.map {(name,values)->BranchRow(name,values.lastOrNull {it.local},values.lastOrNull {!it.local})}.filter {it.name.contains(query.trim(),true)}.sortedWith(compareBy<BranchRow> {!it.default}.thenBy {!it.active}.thenBy {it.name})
-    fun date(value:String,zone:ZoneId=ZoneId.systemDefault()):String=try {OffsetDateTime.parse(value).atZoneSameInstant(zone).format(DateTimeFormatter.ofPattern("dd.MM.yyyy · HH:mm",Locale.getDefault()))} catch(_:Exception){"Дата не подтверждена"}
+    fun date(value:String,zone:ZoneId=ZoneId.systemDefault()):String=try {OffsetDateTime.parse(value).atZoneSameInstant(zone).format(DateTimeFormatter.ofPattern("dd.MM.yyyy · HH:mm:ss",Locale.getDefault()))} catch(_:Exception){"Дата не подтверждена"}
 }
