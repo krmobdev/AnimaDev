@@ -253,6 +253,15 @@ import com.animacode.animadev.repos.*
                                 Text("Ошибок ${counts.optLong("failed")} · пропущено ${counts.optLong("skipped")}",
                                     style=MaterialTheme.typography.bodySmall)
                             }
+                            if(test.optString("state") != "SUCCEEDED") {
+                                val reason=test.optString("message").ifBlank { "Тесты не завершились успешно." }
+                                Text(reason,style=MaterialTheme.typography.bodyMedium,
+                                    color=MaterialTheme.colorScheme.error)
+                                test.optString("error_code").takeIf { it.isNotBlank() }?.let { code ->
+                                    Text("Код: $code",style=MaterialTheme.typography.bodySmall,
+                                        color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
                             OutlinedButton(onClick={onJournal(test.optString("job_id"))},
                                 modifier=Modifier.fillMaxWidth()) {Text("Открыть журнал")}
                         }
