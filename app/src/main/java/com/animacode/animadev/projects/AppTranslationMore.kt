@@ -112,6 +112,12 @@ internal object AppTranslationMore {
         "Доступ к файлу утрачен. Выберите его повторно." to "File access expired. Select it again.",
         "Версия недоступна" to "Version unavailable",
         "Ожидаем подтверждение этапа" to "Waiting for stage confirmation",
-        "Тесты не завершились успешно." to "The tests did not complete successfully."
+        "Тесты не завершились успешно." to "The tests did not complete successfully.",
+        "Ключ: " to "Key: ",
+        "SHA не проверен" to "SHA not checked",
+        "Не подтверждён" to "Not verified",
+        "AnimaDev сохранит встроенный проверенный runner в ~/.local/share/animadev. Настройки Termux и файлы QuizApp не меняются." to "AnimaDev will install the verified bundled runner in ~/.local/share/animadev. Termux settings and QuizApp files will not be changed.",
+        "Нет задания" to "No job",
+        "Статус: " to "Status: "
     )
 }
