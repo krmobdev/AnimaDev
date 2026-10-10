@@ -197,18 +197,33 @@ import org.json.JSONObject
                 if(neon) {
                     Text("Project",style=MaterialTheme.typography.labelLarge,color=NeonGlass.muted)
                     Text(project.name,style=MaterialTheme.typography.displaySmall,
-                        fontWeight=FontWeight.ExtraBold,color=NeonGlass.white)
-                    Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,
-                        horizontalArrangement=Arrangement.spacedBy(9.dp)) {
-                        NeonStatus(branch.ifBlank {"Not verified"},dirty==false)
-                        Text(sha.take(12).ifBlank {"SHA not checked"},
-                            style=MaterialTheme.typography.bodyMedium,color=NeonGlass.muted)
-                        IconButton(onClick={
-                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as
-                                android.content.ClipboardManager).setPrimaryClip(
-                                android.content.ClipData.newPlainText("Commit SHA",sha))
-                        },enabled=sha.isNotBlank(),modifier=Modifier.size(38.dp)) {
-                            Icon(AppIcons.Copy,"Copy SHA",tint=NeonGlass.muted)
+                        fontWeight=FontWeight.ExtraBold,color=NeonGlass.white,
+                        maxLines=2,overflow=TextOverflow.Ellipsis)
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val compact=maxWidth<340.dp ||
+                            androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.35f
+                        val shaCopy:@Composable ()->Unit={
+                            Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,
+                                horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                                Text(sha.take(12).ifBlank {"SHA not checked"},
+                                    style=MaterialTheme.typography.bodyMedium,
+                                    color=NeonGlass.muted)
+                                IconButton(onClick={
+                                    (context.getSystemService(Context.CLIPBOARD_SERVICE) as
+                                        android.content.ClipboardManager).setPrimaryClip(
+                                        android.content.ClipData.newPlainText("Commit SHA",sha))
+                                },enabled=sha.isNotBlank(),modifier=Modifier.size(48.dp)) {
+                                    Icon(AppIcons.Copy,"Copy SHA",tint=NeonGlass.muted)
+                                }
+                            }
+                        }
+                        if(compact)Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            NeonStatus(branch.ifBlank {"Not verified"},dirty==false)
+                            shaCopy()
+                        } else Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,
+                            horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                            NeonStatus(branch.ifBlank {"Not verified"},dirty==false)
+                            shaCopy()
                         }
                     }
                 } else Text(project.name,style=MaterialTheme.typography.headlineLarge,
@@ -266,13 +281,24 @@ import org.json.JSONObject
                 }
                 Text("Git, tests, builds and project history",
                     style=MaterialTheme.typography.bodySmall,color=NeonGlass.muted)
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                    NeonToolCard("Git","Branches & SHA",AppIcons.Git,Modifier.weight(1f)){open("git")}
-                    NeonToolCard("Tests","Gradle & reports",AppIcons.Tests,Modifier.weight(1f)){open("tests")}
-                }
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                    NeonToolCard("Build","Debug & Release",AppIcons.Build,Modifier.weight(1f)){open("build")}
-                    NeonToolCard("History","Jobs & results",AppIcons.History,Modifier.weight(1f)){open("history")}
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val compact=maxWidth<265.dp ||
+                        androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.45f
+                    if(compact)Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                        NeonToolCard("Git","Branches & SHA",AppIcons.Git,Modifier.fillMaxWidth()){open("git")}
+                        NeonToolCard("Tests","Gradle & reports",AppIcons.Tests,Modifier.fillMaxWidth()){open("tests")}
+                        NeonToolCard("Build","Debug & Release",AppIcons.Build,Modifier.fillMaxWidth()){open("build")}
+                        NeonToolCard("History","Jobs & results",AppIcons.History,Modifier.fillMaxWidth()){open("history")}
+                    } else Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                            NeonToolCard("Git","Branches & SHA",AppIcons.Git,Modifier.weight(1f)){open("git")}
+                            NeonToolCard("Tests","Gradle & reports",AppIcons.Tests,Modifier.weight(1f)){open("tests")}
+                        }
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                            NeonToolCard("Build","Debug & Release",AppIcons.Build,Modifier.weight(1f)){open("build")}
+                            NeonToolCard("History","Jobs & results",AppIcons.History,Modifier.weight(1f)){open("history")}
+                        }
+                    }
                 }
                 NeonPrimaryAction("Build Now","Latest commit · "+sha.take(8).ifBlank {"not verified"},
                     AppIcons.Build,onClick={open("build")})
