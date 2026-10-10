@@ -57,7 +57,7 @@ class ReleaseSignerTests(unittest.TestCase):
                 bytearray(b"a"),bytearray(b"b"),"fixture")
 
     def test_does_not_write_signing_secret_to_disk(self):
-        with mock.patch.object(signer.os,"memfd_create",side_effect=OSError("no memfd")):
+        with mock.patch.object(signer,"_create_memfd",side_effect=OSError("no memfd")):
             with self.assertRaises(OSError):
                 signer.sign_bundle(self.bundle,self.signed,self.contents,
                     bytearray(b"fixture-store"),bytearray(b"fixture-key"),"fixture")
