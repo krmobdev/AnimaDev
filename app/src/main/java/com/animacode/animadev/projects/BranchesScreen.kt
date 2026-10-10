@@ -9,12 +9,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import org.json.JSONObject
 
 @Composable fun BranchesScreen(context:Context,project:LocalProject,permitted:Boolean) {
+    val feedback=remember {UiFeedback(context)}
+    val feedbackView=LocalView.current
     val gateway=remember {CatalogGateway(context)}
     val switcher=remember {BranchSwitchGateway(context)}
     var selectedBranch by remember {mutableStateOf<BranchRow?>(null)}
@@ -45,7 +49,7 @@ import org.json.JSONObject
             if(switcher.message().isNotBlank())Text(switcher.message(),style=MaterialTheme.typography.bodySmall)
             if(switcher.pending())LinearProgressIndicator(Modifier.fillMaxWidth())
         }
-        item {OutlinedButton(onClick={gateway.read("BRANCHES",project.path)},enabled=permitted && !pending){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Обновить список")};if(pending)LinearProgressIndicator(Modifier.fillMaxWidth());Text(gateway.prefs.getString("message","") ?: "",style=MaterialTheme.typography.bodySmall)}
+        item {OutlinedButton(onClick={feedback.tap(feedbackView);gateway.read("BRANCHES",project.path)},enabled=permitted && !pending){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Обновить список")};if(pending)LinearProgressIndicator(Modifier.fillMaxWidth());Text(gateway.prefs.getString("message","") ?: "",style=MaterialTheme.typography.bodySmall)}
         item {OutlinedTextField(search,{search=it},label={Text("Поиск по загруженным веткам")},leadingIcon={Icon(AppIcons.Search,null)},singleLine=true,modifier=Modifier.fillMaxWidth())}
         if(metadata!=null) {
             item {Text("Рабочее дерево: "+BranchPolicy.workingTree(metadata.opt("dirty") as? Boolean,metadata.optString("error").isNotBlank()),style=MaterialTheme.typography.bodyMedium)}
@@ -54,7 +58,7 @@ import org.json.JSONObject
                 Text("Загружено веток: ${BranchPolicy.merge(refs).size}"+(if(metadata.optBoolean("branches_more"))" · есть следующая страница" else ""),style=MaterialTheme.typography.bodySmall)
                 if(metadata.optString("default_branch").isEmpty())Text("Главная ветка не подтверждена: origin/HEAD отсутствует.",style=MaterialTheme.typography.bodySmall)
                 Text("Origin показывает последний локальный снимок, а не текущие данные GitHub. Для актуальности используйте проверку обновлений в Git.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-            items(rows,key={it.name}) {b->OutlinedCard(modifier=Modifier.fillMaxWidth().clickable {selectedBranch=b},shape=MaterialTheme.shapes.large) {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
+            items(rows,key={it.name}) {b->OutlinedCard(modifier=Modifier.fillMaxWidth().clickable {feedback.tap(feedbackView);selectedBranch=b},shape=MaterialTheme.shapes.large) {Column(Modifier.fillMaxWidth().padding(18.dp).animateContentSize(),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                 Text(b.name,style=MaterialTheme.typography.titleMedium,color=if(b.default)gold else MaterialTheme.colorScheme.onSurface)
                 Text(listOfNotNull(if(b.default)"Главная" else null,if(b.active)"Активная" else null,if(b.local!=null && b.remote!=null)"Локальная + origin" else if(b.local!=null)"Локальная" else "origin").joinToString(" · "),style=MaterialTheme.typography.labelMedium,color=if(b.active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Последний коммит: "+BranchPolicy.date(b.lastCommit?.date.orEmpty()),
@@ -66,7 +70,7 @@ import org.json.JSONObject
                 Text(if(b.active)"Текущая рабочая ветка" else "Нажмите для выбора ветки",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
             }}}
             if(rows.isEmpty())item {Text(if(search.isNotBlank())"В загруженных страницах совпадений нет" else "Ветки пока не получены")}
-            if(metadata.optBoolean("branches_more"))item {FilledTonalButton(onClick={gateway.read("BRANCHES",project.path,metadata.optLong("branches_next"))},enabled=permitted && !pending,modifier=Modifier.fillMaxWidth()){Text("Загрузить следующие ветки")};Text("Страницы ограничены временем и размером ответа. Изменения refs во время чтения требуют обновить список.",style=MaterialTheme.typography.bodySmall)}
+            if(metadata.optBoolean("branches_more"))item {FilledTonalButton(onClick={feedback.tap(feedbackView);gateway.read("BRANCHES",project.path,metadata.optLong("branches_next"))},enabled=permitted && !pending,modifier=Modifier.fillMaxWidth()){Text("Загрузить следующие ветки")};Text("Страницы ограничены временем и размером ответа. Изменения refs во время чтения требуют обновить список.",style=MaterialTheme.typography.bodySmall)}
         } else item {Text("Обновите список. Результаты другого проекта здесь не показываются.",style=MaterialTheme.typography.bodyMedium)}
     }
     selectedBranch?.let {row->
@@ -89,6 +93,7 @@ import org.json.JSONObject
             }},
             confirmButton={
                 Button(onClick={
+                    feedback.tap(feedbackView)
                     switcher.request(project,row,metadata?.optString("commit").orEmpty())
                     selectedBranch=null
                 },enabled=eligible) {Text("Переключить ветку")}
