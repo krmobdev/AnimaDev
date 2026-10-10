@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AnimaDev</string>
+    <string name="menu_settings">Настройки</string>
+    <string name="menu_about">О программе</string>
+    <string name="menu_changelog">Список изменений</string>
+    <string name="menu_help">Документация</string>
+    <string name="termux_build_setup">Подготовка сборки</string>
+</resources>
