@@ -67,8 +67,10 @@ import com.animacode.animadev.repos.*
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
             Text(project.name,style=MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(12.dp))
-            ActiveBranchHero(project.branch,project.commit,project.dirty)
+            if(tool!="git") {
+                Spacer(Modifier.height(12.dp))
+                ActiveBranchHero(project.branch,project.commit,project.dirty)
+            }
         }
         // Show the actual live job FIRST, not buried after two test cards.
         if(tool!="git" && belongs && r.optString("action")=="TEST_DEVICE" &&
