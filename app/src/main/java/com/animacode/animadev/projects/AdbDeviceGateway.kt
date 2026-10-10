@@ -47,43 +47,59 @@ class AdbDeviceGateway(private val context:Context) {
     }
     fun refresh(endpoint:String="") {
         if(prefs.getBoolean("pending",false) &&
-            System.currentTimeMillis()-prefs.getLong("sent_at",0)<30_000)return
+            System.currentTimeMillis()-prefs.getLong("sent_at",0)<45_000)return
         val request=UUID.randomUUID().toString().replace("-","")
         val code="""
 import json,re,subprocess,sys
 req=sys.argv[1]
 endpoint=sys.argv[2] if len(sys.argv)>2 else ''
+ADB='/data/data/com.termux/files/usr/bin/adb'
+def scan():
+    p=subprocess.run([ADB,'devices','-l'],stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=9,check=False)
+    if p.returncode!=0 or len(p.stdout)>16000:
+        raise RuntimeError('adb devices failed')
+    connected=[]
+    offline=0
+    unauthorized=0
+    for line in p.stdout.decode('utf-8','replace').splitlines()[1:]:
+        fields=line.split()
+        if len(fields)<2 or not re.fullmatch(r'[A-Za-z0-9._:-]{4,128}',fields[0]) or fields[0].startswith('emulator-'):
+            continue
+        if fields[1]=='device':connected.append(fields[0])
+        elif fields[1]=='offline':offline+=1
+        elif fields[1]=='unauthorized':unauthorized+=1
+    return connected,offline,unauthorized
 try:
+    devices_before,_,_=scan()
     if endpoint:
         import ipaddress
         host,port=endpoint.rsplit(':',1)
         ip=ipaddress.ip_address(host)
         if ip.version!=4 or not ip.is_private or not 1024<=int(port)<=65535:
             raise ValueError('endpoint')
-        connection=subprocess.run(['/data/data/com.termux/files/usr/bin/adb','connect',endpoint],
-            stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,timeout=18,check=False)
-        response=(connection.stdout+connection.stderr).decode('utf-8','replace').lower()
-        connect_status=('CONNECTED' if connection.returncode==0 and 'connected' in response and 'failed' not in response
-                        else 'CONNECT_REFUSED' if 'refused' in response else 'CONNECT_FAILED')
+        if len(devices_before)==1:
+            # Reuse the established ADB server/transport. Re-connecting to
+            # a stale port would needlessly disturb a working Termux session.
+            connect_status='ALREADY_CONNECTED'
+        else:
+            connection=subprocess.run([ADB,'connect',endpoint],
+                stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,timeout=12,check=False)
+            response=(connection.stdout+connection.stderr).decode('utf-8','replace').lower()
+            connect_status=('CONNECTED' if connection.returncode==0 and
+                            'connected' in response and 'failed' not in response
+                            else 'CONNECT_REFUSED' if 'refused' in response else 'CONNECT_FAILED')
     else:
         connect_status='NOT_ATTEMPTED'
-    p=subprocess.run(['/data/data/com.termux/files/usr/bin/adb','devices','-l'],
-       stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
-       timeout=18,check=False)
-    lines=p.stdout.decode('utf-8','replace').splitlines()
-    devices=[]
-    if p.returncode==0 and len(p.stdout)<16000:
-        for line in lines[1:]:
-            fields=line.split()
-            if len(fields)>1 and fields[1]=='device' and re.fullmatch(r'[A-Za-z0-9._:-]{4,128}',fields[0]) and not fields[0].startswith('emulator-'):
-                devices.append(fields[0])
-    print(json.dumps({'request_id':req,'ok':p.returncode==0,'count':len(devices),
-       'device':devices[0] if len(devices)==1 else '',
-       'connect_status':connect_status}))
+    devices,offline,unauthorized=scan()
+    print(json.dumps({'request_id':req,'ok':True,'count':len(devices),
+        'device':devices[0] if len(devices)==1 else '',
+        'offline':offline,'unauthorized':unauthorized,
+        'connect_status':connect_status}))
 except Exception:
     print(json.dumps({'request_id':req,'ok':False,'count':0,'device':'',
-       'connect_status':'TRANSPORT_ERROR'}))
+        'offline':0,'unauthorized':0,'connect_status':'TRANSPORT_ERROR'}))
 """.trimIndent()
         if(!prefs.edit().putString("request",request).putLong("sent_at",System.currentTimeMillis())
             .putBoolean("pending",true).putString("message",if(endpoint.isBlank())"Проверяем adb devices -l в Termux…" else "Подключаем Pixel и проверяем ADB…").commit())return
@@ -110,7 +126,7 @@ except Exception:
         }
     }
     fun expire() {
-        if(prefs.getBoolean("pending",false) && System.currentTimeMillis()-prefs.getLong("sent_at",0)>30_000)
+        if(prefs.getBoolean("pending",false) && System.currentTimeMillis()-prefs.getLong("sent_at",0)>45_000)
             prefs.edit().putBoolean("pending",false).putInt("count",0)
                 .putString("message","ADB не ответил вовремя. Повторите проверку.").commit()
     }
@@ -125,6 +141,7 @@ class AdbDeviceReceiver:BroadcastReceiver() {
         val gateway=AdbDeviceGateway(context)
         if(gateway.prefs.getString("request","")!=id)return
         var count=0;var serial="";var connection="NOT_ATTEMPTED"
+        var offline=0;var unauthorized=0
         try {
             val bundle=intent.getBundleExtra("result") ?:error("No reply")
             val out=bundle.getString("stdout","") ?: ""
@@ -133,12 +150,15 @@ class AdbDeviceReceiver:BroadcastReceiver() {
             check(result.getString("request_id")==id && result.getBoolean("ok"))
             count=result.getInt("count")
             check(count in 0..32)
+            offline=result.optInt("offline",0)
+            unauthorized=result.optInt("unauthorized",0)
+            check(offline in 0..32 && unauthorized in 0..32)
             serial=result.optString("device").take(128)
             connection=result.optString("connect_status","NOT_ATTEMPTED").takeIf {
-                it in setOf("CONNECTED","CONNECT_REFUSED","CONNECT_FAILED","NOT_ATTEMPTED","TRANSPORT_ERROR")
+                it in setOf("CONNECTED","ALREADY_CONNECTED","CONNECT_REFUSED","CONNECT_FAILED","NOT_ATTEMPTED","TRANSPORT_ERROR")
             } ?: "TRANSPORT_ERROR"
             if(count==1)check(serial.matches(Regex("[A-Za-z0-9._:-]{4,128}")))
-        } catch(_:Exception) {count=0;serial="";connection="TRANSPORT_ERROR"}
+        } catch(_:Exception) {count=0;serial="";offline=0;unauthorized=0;connection="TRANSPORT_ERROR"}
         gateway.prefs.edit().putBoolean("pending",false).remove("request")
             .putInt("count",count).putLong("verified_at",System.currentTimeMillis())
             .putString("message",when(count) {
@@ -146,8 +166,12 @@ class AdbDeviceReceiver:BroadcastReceiver() {
                 0->when(connection) {
                     "CONNECT_REFUSED"->"Pixel отклонил ADB-соединение: Connection refused. Проверь актуальный порт беспроводной отладки — он мог измениться."
                     "CONNECT_FAILED"->"ADB не смог подключиться к Pixel. Проверь актуальный IP:порт на основном экране беспроводной отладки и доступ к локальной сети (в том числе через VPN)."
-                    "TRANSPORT_ERROR"->"Не удалось получить ответ ADB в Termux. Проверьте доступ Termux и повторите."
-                    else->"ADB не видит подключённых устройств. После сопряжения нужен adb connect с портом основного экрана беспроводной отладки Pixel."
+                    "TRANSPORT_ERROR"->"Нет подтверждённого ответа ADB из Termux. Проверьте разрешение RUN_COMMAND."
+                    else->when {
+                        offline>0 -> "Pixel обнаружен, но ADB показывает offline ($offline). Соединение потеряно: проверь актуальный порт и нажми «Подключить Pixel»."
+                        unauthorized>0 -> "ADB видит устройство без разрешения (unauthorized). Подтверди отладку на Pixel."
+                        else -> "ADB не видит подключённых устройств. Для беспроводной отладки нужен актуальный порт подключения Pixel."
+                    }
                 }
                 else->"Обнаружено $count устройств. Отключите лишние: разрешено одно физическое устройство."
             }).commit()
