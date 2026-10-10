@@ -11,7 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.animacode.animadev.repos.*
 
-@Composable fun ProjectTools(context:Context,project:LocalProject,tool:String,permitted:Boolean,termuxVersion:String?,onPermissionUpdated:()->Unit,onJournal:(String)->Unit,onWait:()->Unit) {
+@Composable fun ProjectTools(context:Context,project:LocalProject,tool:String,permitted:Boolean,termuxVersion:String?,onPermissionUpdated:()->Unit,onJournal:(String)->Unit,onWait:()->Unit,
+    selectedTestTab:Int?=null,onTestTabChange:((Int)->Unit)?=null) {
     val locale=androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     if(!project.supported) {
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -63,7 +64,8 @@ import com.animacode.animadev.repos.*
             deviceActionMessage.startsWith("Запрос записан")) deviceActionMessage=""
     }
     var adbDetails by rememberSaveable(project.id) {mutableStateOf(!deviceReady)}
-    var testTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
+    var fallbackTestTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
+    val testTab=selectedTestTab ?: fallbackTestTab
     var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)}
     var gitDetails by rememberSaveable(project.id) {mutableStateOf(false)}
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
@@ -73,7 +75,9 @@ import com.animacode.animadev.repos.*
             else OperationProjectHeader(project)
         }
         if(tool!="git")item {
-            OperationTabs(listOf("Unit-тесты","На устройстве"),testTab) {testTab=it}
+            OperationTabs(listOf("Unit-тесты","На устройстве"),testTab) {
+                if(onTestTabChange!=null)onTestTabChange(it) else fallbackTestTab=it
+            }
         }
         if(!permitted)item {Button(onClick={grant.launch(com.animacode.animadev.termux.TermuxGateway.PERMISSION)}){Text("Разрешить Termux")} }
         if(termuxVersion==null)item {Text("Termux не найден. Действия недоступны.",color=MaterialTheme.colorScheme.error)}
