@@ -61,6 +61,7 @@ import com.animacode.animadev.repos.*
             deviceActionMessage.startsWith("Запрос записан")) deviceActionMessage=""
     }
     var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)}
+    var gitDetails by rememberSaveable(project.id) {mutableStateOf(false)}
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
@@ -112,17 +113,145 @@ import com.animacode.animadev.repos.*
             }
         }
         if(tool=="git") {
-            item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                val state=when {snap==null->"Состояние не проверено";!snap.optBoolean("remote_ok") || !snap.optBoolean("branch_allowed")->"Требуется проверка профиля";snap.optBoolean("dirty")->"Есть локальные изменения";snap.optInt("ahead")>0->"Есть локальные коммиты";snap.optInt("behind")>0->"Есть обновления";else->"Рабочее дерево чистое"}
-                Text(state,style=MaterialTheme.typography.titleMedium)
-                Text("${snap?.optString("local_commit")?.take(8)?.ifEmpty {"—"} ?: "—"} · ${if(snap?.optBoolean("remote_ok")==true)"origin подтверждён" else "origin не проверен"}",style=MaterialTheme.typography.bodyMedium)
-                if(snap?.optBoolean("checked")==true)Text("GitHub: +${snap.optInt("behind")} · локально: +${snap.optInt("ahead")}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            }} }
-            item {Button(onClick={gateway.start("CHECK",project.id,project.path)},enabled=available && (snap==null || (snap.optBoolean("remote_ok") && snap.optBoolean("branch_allowed"))),modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Проверить GitHub")} }
-            item {OutlinedButton(onClick={gateway.start("STATUS",project.id,project.path)},enabled=available,modifier=Modifier.fillMaxWidth()){Text("Обновить локальное состояние")} }
-            item {com.animacode.animadev.projects.ActionButton(onClick={confirmSync=true},enabled=permitted && termuxVersion!=null && gateway.maySync(r,project.id),modifier=Modifier.fillMaxWidth()){Text("Получить изменения")} }
-            item {Text(when {blocked->"Новое действие заблокировано текущим заданием.";!ready->"Операции доступны после подключения помощника.";snap==null->"Обновите локальное состояние.";!snap.optBoolean("branch_allowed")->"Ветка не разрешена профилем. Переключение не выполняется.";!snap.optBoolean("remote_ok")->"Origin не соответствует профилю проекта.";snap.optBoolean("dirty")->"Получение изменений заблокировано: есть локальные правки.";snap.optInt("ahead")>0->"Есть локальные коммиты. Объединение запрещено.";snap.optInt("behind")==0->"Проверка GitHub не изменяет исходники.";else->"Обновление — только fast-forward после подтверждения."},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-            if(snap?.optBoolean("dirty")==true)item {com.animacode.animadev.projects.ActionButton(onClick={changedFiles=true}){Text("Посмотреть изменённые файлы")}}
+            item {
+                val gitSnap=if(belongs)r.optJSONObject("snapshot") else null
+                val checked=gitSnap?.optBoolean("checked")==true
+                val localSha=gitSnap?.optString("local_commit").orEmpty()
+                val remoteSha=gitSnap?.optString("remote_commit").orEmpty()
+                val branch=gitSnap?.optString("branch").orEmpty()
+                val dirty=gitSnap?.optBoolean("dirty")==true
+                val remoteOk=gitSnap?.optBoolean("remote_ok")==true
+                val branchOk=gitSnap?.optBoolean("branch_allowed")==true
+                val behind=gitSnap?.optInt("behind") ?: 0
+                val ahead=gitSnap?.optInt("ahead") ?: 0
+                val jobAction=if(belongs)r.optString("action") else ""
+                val jobState=if(belongs)r.optString("state") else ""
+                val gitJob=jobAction in setOf("STATUS","CHECK","SYNC") && r.optString("job_id").isNotEmpty()
+                val working=gitJob && jobState in RepoPolicy.activeStates
+                val justSynced=jobAction=="SYNC" && jobState=="SUCCEEDED"
+                val stale=gitSnap!=null && project.commit.isNotBlank() &&
+                    localSha.isNotBlank() && localSha!=project.commit && !justSynced
+                val canReceive=available && !stale && gateway.maySync(r,project.id)
+                val headline=when {
+                    working->"Git · операция выполняется"
+                    gitSnap==null->"Сначала проверьте Git"
+                    !branchOk->"Ветка не разрешена"
+                    !remoteOk->"Origin не подтверждён"
+                    dirty->"Есть локальные изменения"
+                    !checked->"GitHub ещё не проверен"
+                    ahead>0 && behind>0->"Ветки разошлись"
+                    ahead>0->"Есть локальные коммиты"
+                    behind>0->"Доступны обновления"
+                    justSynced->"Исходники обновлены"
+                    else->"Исходники актуальны"
+                }
+                Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
+                        Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                            Text("СИНХРОНИЗАЦИЯ С GITHUB",style=MaterialTheme.typography.labelMedium,
+                                color=MaterialTheme.colorScheme.primary,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
+                            Text(headline,style=MaterialTheme.typography.titleLarge,
+                                fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
+                            if(working)LinearProgressIndicator(Modifier.fillMaxWidth())
+                            HorizontalDivider()
+                            Text("Ветка: "+branch.ifBlank {project.branch.ifBlank {"Не проверена"}},
+                                style=MaterialTheme.typography.bodyMedium)
+                            Text("Локальный SHA: "+localSha.take(12).ifBlank {"Не проверен"},
+                                style=MaterialTheme.typography.bodyMedium)
+                            Text("GitHub SHA: "+(if(checked)remoteSha.take(12) else "Не проверен"),
+                                style=MaterialTheme.typography.bodyMedium)
+                            Text("Origin: "+when {gitSnap==null->"Не проверен";remoteOk->"Подтверждён";else->"Не совпадает"},
+                                style=MaterialTheme.typography.bodyMedium)
+                            Text("Файлы: "+when {gitSnap==null->"Не проверены";dirty->"Есть изменения";else->"Чисто"},
+                                style=MaterialTheme.typography.bodyMedium)
+                            Text(if(checked)"Коммитов на GitHub: +"+behind+" · локально: +"+ahead
+                                else "Для сравнения коммитов нужна проверка GitHub.",
+                                style=MaterialTheme.typography.bodyMedium)
+                            if(stale)Text("Каталог и ответ Termux расходятся по SHA. Повторите проверку.",
+                                color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    com.animacode.animadev.projects.ActionButton(
+                        onClick={gateway.start("CHECK",project.id,project.path)},
+                        enabled=available,
+                        colors=ButtonDefaults.outlinedButtonColors(
+                            containerColor=MaterialTheme.colorScheme.primary,
+                            contentColor=MaterialTheme.colorScheme.onPrimary),
+                        modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {
+                        Icon(AppIcons.Refresh,null);Spacer(Modifier.width(10.dp))
+                        Text(if(working)"Ожидаем ответ Termux…" else if(checked)"Повторить проверку" else "Проверить обновления")
+                    }
+                    Text("Порядок: 1. Проверка ветки, origin и файлов. 2. Получение SHA с GitHub. "+
+                        "3. Сравнение коммитов. Исходники на этом этапе не изменяются.",
+                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    if(checked && behind>0) {
+                        com.animacode.animadev.projects.ActionButton(onClick={confirmSync=true},
+                            enabled=canReceive,modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {
+                            Icon(AppIcons.Git,null);Spacer(Modifier.width(10.dp))
+                            Text("Получить "+behind+" коммитов")
+                        }
+                        Text(if(canReceive)"Получение только по подтверждению. Termux повторно проверит безопасность."
+                            else when {
+                                dirty->"Получение заблокировано: незакоммиченные файлы."
+                                ahead>0->"Получение заблокировано: есть локальные коммиты."
+                                !branchOk->"Ветка не разрешена профилем."
+                                !remoteOk->"Origin не соответствует профилю."
+                                stale->"Повторите проверку: SHA проекта изменился."
+                                else->"Fast-forward сейчас недоступен."
+                            },style=MaterialTheme.typography.bodySmall,
+                            color=if(canReceive)MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
+                    }
+                    if(gitJob) {
+                        OutlinedCard {
+                            Column(Modifier.fillMaxWidth().padding(16.dp),
+                                verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                                Text("РЕЗУЛЬТАТ ПОСЛЕДНЕЙ ОПЕРАЦИИ",
+                                    style=MaterialTheme.typography.labelLarge,
+                                    color=MaterialTheme.colorScheme.primary)
+                                Text("Действие: "+when(jobAction) {"CHECK"->"Проверка GitHub";"STATUS"->"Локальная диагностика";else->"Получение изменений"})
+                                Text("Состояние: "+when(jobState) {"SUCCEEDED"->"Успешно";"UNKNOWN"->"Неизвестно";"FAILED","TIMED_OUT","INTERRUPTED"->"Ошибка";else->"Выполняется"})
+                                if(r.optString("message").isNotEmpty())Text(r.optString("message"))
+                                val error=r.optJSONObject("job")?.optString("error_code").orEmpty()
+                                if(error.isNotBlank())Text("Код ошибки: "+error,color=MaterialTheme.colorScheme.error)
+                                val exit=r.optJSONObject("job")
+                                if(exit!=null && !exit.isNull("exit_code"))Text("Exit code: "+exit.optInt("exit_code"))
+                                val checkedAt=r.optLong("last_confirmed")
+                                if(checkedAt>0L)Text("Ответ Termux: "+
+                                    java.text.SimpleDateFormat("dd.MM HH:mm:ss",java.util.Locale.getDefault())
+                                        .format(java.util.Date(checkedAt)),style=MaterialTheme.typography.bodySmall)
+                                com.animacode.animadev.projects.ActionButton(onClick={onJournal(r.optString("job_id"))}) {
+                                    Text("Открыть подробный журнал")
+                                }
+                            }
+                        }
+                    }
+                    OutlinedCard {
+                        Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                            Row(Modifier.fillMaxWidth().clickable {gitDetails=!gitDetails},
+                                verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                                Text("Технические сведения",modifier=Modifier.weight(1f),
+                                    style=MaterialTheme.typography.titleSmall)
+                                Text(if(gitDetails)"Скрыть −" else "Показать +",
+                                    color=MaterialTheme.colorScheme.primary)
+                            }
+                            if(gitDetails) {
+                                Text("Путь: "+project.path)
+                                Text("Полная локальная SHA: "+localSha.ifBlank {"Не проверена"})
+                                Text("Полная GitHub SHA: "+(if(checked)remoteSha else "Не проверена"))
+                                if(gitJob)Text("Job ID: "+r.optString("job_id"))
+                                if(dirty)com.animacode.animadev.projects.ActionButton(onClick={changedFiles=true}) {
+                                    Text("Изменённые файлы")
+                                }
+                                Text("Локальная диагностика не обращается к GitHub и не изменяет исходники.",
+                                    style=MaterialTheme.typography.bodySmall)
+                                com.animacode.animadev.projects.ActionButton(
+                                    onClick={gateway.start("STATUS",project.id,project.path)},
+                                    enabled=available) {Text("Проверить только локальные файлы")}
+                            }
+                        }
+                    }
+                }
+            }
         } else {
             val prepared=belongs && snap!=null && gateway.mayTest(r,project.id)
             val canRun=available && prepared
@@ -311,5 +440,5 @@ import com.animacode.animadev.repos.*
         }
     }
     if(confirmSync)AlertDialog(onDismissRequest={confirmSync=false},title={Text("Получить изменения?")},text={Text("${project.name}: ветка, origin и чистота проверятся повторно. Только fast-forward, без отправки на GitHub.")},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmSync=false;gateway.start("SYNC",project.id,project.path)}){Text("Получить")}},dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmSync=false}){Text("Отложить")}})
-    if(changedFiles)AlertDialog(onDismissRequest={changedFiles=false},title={Text("Изменённые файлы")},text={Column {Text(snap?.optJSONArray("changed_files")?.let {a->(0 until a.length()).joinToString("\n"){a.optString(it)}} ?: "Список недоступен");Text("Просмотр содержимого diff пока не подключён.",style=MaterialTheme.typography.bodySmall)}},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={changedFiles=false}){Text("Закрыть")}})
+    if(changedFiles)AlertDialog(onDismissRequest={changedFiles=false},title={Text("Изменённые файлы")},text={Column {Text((if(belongs)r.optJSONObject("snapshot") else null)?.optJSONArray("changed_files")?.let {a->(0 until a.length()).joinToString("\n"){a.optString(it)}} ?: "Список недоступен");Text("Просмотр содержимого diff пока не подключён.",style=MaterialTheme.typography.bodySmall)}},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={changedFiles=false}){Text("Закрыть")}})
 }
