@@ -107,6 +107,14 @@ def sign_bundle(unsigned, signed, key_data, store_password, key_password, alias,
             os.close(fd)
     try:
         _verify_bundle(signed)
+        # jarsigner -verify can exit successfully for certain unsigned archives.
+        # Require both a manifest signature and a signature block explicitly.
+        with zipfile.ZipFile(signed) as zipfile_signed:
+            members={name.upper() for name in zipfile_signed.namelist()}
+            signature_files={n for n in members if n.startswith("META-INF/") and n.endswith(".SF")}
+            signature_blocks={n for n in members if n.startswith("META-INF/") and n.endswith((".RSA",".DSA",".EC"))}
+            if not signature_files or not signature_blocks:
+                raise SigningError("SIGNATURE_INVALID")
         result=subprocess.run([jarsigner,"-verify",str(signed)],
             stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
             timeout=60,check=False)
