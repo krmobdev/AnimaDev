@@ -94,6 +94,7 @@ MESSAGES = {
  'BUILD_ARTIFACT_INVALID': 'Новый APK не подтверждён.',
  'DOWNLOADS_UNAVAILABLE': 'Загрузки недоступны из Termux.',
  'ARTIFACT_EXPORT_FAILED': 'Не удалось скопировать APK в Загрузки.',
+ 'CANCELLED': 'Сборка или тесты остановлены по команде Ctrl+C. Результат не опубликован.',
 }
 
 class Denied(Exception):
@@ -430,6 +431,25 @@ class Engine:
     def query(self, jid, project, action):
         # Tombstone absent requests atomically. A delayed START can never execute afterwards.
         return self.reserve(jid, project, action, reconcile=True)[0]
+    def cancel(self, jid, project, action):
+        """Idempotent cancellation ONLY for the exact build/test job identity."""
+        self.validate(jid, project, action)
+        if action not in ('TEST','BUILD_DEBUG'): raise Denied('ACTION_DENIED')
+        with self.store.transaction() as c:
+            current=self.store.get(c,jid)
+            if (not current or current['project_id']!=project or
+                current['action']!=action): raise Denied('RESULT_MALFORMED')
+            if current['state'] in TERMINAL: return current
+            if current['state'] not in ('QUEUED','RUNNING'): raise Denied('ACTION_DENIED')
+            current['cancel_requested']=True
+            if current['state']=='QUEUED':
+                current.update(state='INTERRUPTED',error_code='CANCELLED',
+                    ended_at=time.time(),message=MESSAGES['CANCELLED'])
+            else:
+                current['message']='Отмена запрошена: Gradle получит Ctrl+C. Ожидаем завершения процесса.'
+            self.store.save(c,current)
+            return current
+
     def run_job(self, jid):
         with self.store.transaction() as c:
             j = self.store.get(c, jid)
@@ -468,7 +488,20 @@ class Engine:
             except BlockingIOError: raise Denied('JOB_BUSY')
             guard = GitGuard(self.registry[j['project_id']], log, self.git_executable,
                 lambda pid, token: self.store.update(jid, child_pid=pid, child_identity=token))
-            guard.observe = signals.tick
+            cancel_signaled=False
+            def observe():
+                nonlocal cancel_signaled
+                signals.tick()
+                with self.store.transaction() as c:
+                    current=self.store.get(c,jid)
+                if not current or current['state'] not in ('RUNNING','QUEUED'):
+                    return False
+                if current.get('cancel_requested') and not cancel_signaled:
+                    cancel_signaled=True
+                    self.store.update(jid,stage='Отмена: отправляем Gradle Ctrl+C')
+                    return True
+                return False
+            guard.observe = observe
             if j['action'] in ('TEST','BUILD_DEBUG'):
                 module_path = pathlib.Path(__file__).resolve().parent / 'gradle_tests.py'
                 data = module_path.read_bytes()
@@ -482,6 +515,10 @@ class Engine:
                     lambda pid, token:self.store.update(jid,child_pid=pid,child_identity=token),identity,redact,jid))
                 code = result.get('error_code','')
                 result['message'] = MESSAGES.get(code,module['MESSAGES'].get(code,'Debug APK готов.' if j['action']=='BUILD_DEBUG' else 'Unit-тесты завершены.'))
+                with self.store.transaction() as c: latest=self.store.get(c,jid)
+                if latest.get('cancel_requested') and result['state'] != 'SUCCEEDED':
+                    result.update(state='INTERRUPTED',error_code='CANCELLED',
+                        message=MESSAGES['CANCELLED'],unresolved=False)
                 self.store.update(jid,ended_at=time.time(),**result)
                 return
             snap = guard.execute(j['action'], jid)
@@ -555,6 +592,7 @@ def main():
             return 0
         if p['mode']=='START': job=engine.start(p['job_id'],p['project_id'],p['action'])
         elif p['mode']=='QUERY': job=engine.query(p['job_id'],p['project_id'],p['action'])
+        elif p['mode']=='CANCEL': job=engine.cancel(p['job_id'],p['project_id'],p['action'])
         else: raise Denied('ACTION_DENIED')
         print(json.dumps({'protocol_version':PROTOCOL,'runner_version':VERSION,'request_id':request_id,
             'ok':True,'job':wire_job(job)},ensure_ascii=False))
