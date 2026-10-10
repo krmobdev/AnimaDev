@@ -101,7 +101,7 @@ def process(root, env, log, on_process, identity, redact, timeout=TIMEOUT, obser
     fragments = {'stdout':bytearray(),'stderr':bytearray()}; tails={'stdout':'','stderr':''}
     dropping={'stdout':False,'stderr':False}
     filters={channel:SafeLines(redact) for channel in tails}
-    deadline=time.monotonic()+timeout; last_save=0.0
+    deadline=time.monotonic()+timeout; last_save=0.0; interrupt_sent=False
     def save(force=False):
         nonlocal last_save
         if force or time.monotonic()-last_save>.5:
@@ -119,9 +119,20 @@ def process(root, env, log, on_process, identity, redact, timeout=TIMEOUT, obser
                 if line.strip(): log(channel,line)
                 fragments[channel].clear();dropping[channel]=False
     try:
-        on_process(p.pid,identity(p.pid));p.stdin.write(b'1');p.stdin.flush();p.stdin.close()
+        initial_identity=identity(p.pid)
+        on_process(p.pid,initial_identity);p.stdin.write(b'1');p.stdin.flush();p.stdin.close()
         while selector.get_map():
-            observe()
+            # The controller checks a durable one-shot cancel flag. Gradle
+            # receives Ctrl+C via SIGINT, never a signal to an unchecked PID.
+            if observe() and not interrupt_sent:
+                if identity(p.pid)!=initial_identity:
+                    return None,True
+                try:
+                    os.killpg(p.pid,signal.SIGINT)
+                    interrupt_sent=True
+                    log('event','Отмена: Gradle получил Ctrl+C (SIGINT).')
+                except ProcessLookupError:
+                    interrupt_sent=True
             if time.monotonic()>=deadline:
                 try: os.killpg(p.pid,signal.SIGKILL)
                 except ProcessLookupError: pass
