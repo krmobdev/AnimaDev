@@ -1,5 +1,11 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-11 01:34 GMT+03:00 · 0.4.0-beta.10-dev.36 (50) · Device-test diagnostics
+- RU: Compose UI-тесты реально запускались на Pixel 7 в отдельном пакете devicefixture, не затрагивая рабочий AnimaDev. 4/4 теста не увидели иерархию, так как дисплей находился в режиме Dozing / lockscreen. Прогон нужен на разблокированном экране.
+- EN: Four isolated Emerald Compose tests were executed on Pixel 7. All were blocked by the phone being dozing/locked (no visible Compose hierarchy), not by asserted UI behavior. Repeat on an unlocked device.
+- RU: Миграция TestRule на Compose v2 сделана; экран телефона автоматически не разблокировался.
+- EN: Migrated the fixture to Compose TestRule v2; did not wake or bypass the device lock.
+
 ## 2026-10-11 01:25 GMT+03:00 · 0.4.0-beta.10-dev.36 (50)
 - RU: Emerald Glass: нижняя навигация автоматически адаптируется к экрану менее 360 dp и увеличенному шрифту; статусы могут переноситься на две строки.
 - EN: Emerald Glass bottom navigation adapts to screens below 360 dp and large font settings; status badges support wrapping.
