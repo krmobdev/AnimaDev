@@ -1,5 +1,7 @@
 package com.animacode.animadev.projects
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,6 +11,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -82,7 +86,7 @@ fun neonColorScheme():ColorScheme=darkColorScheme(
 }
 
 @Composable fun NeonStatus(label:String,positive:Boolean,modifier:Modifier=Modifier) {
-    Surface(modifier=modifier,shape=RoundedCornerShape(40.dp),
+    Surface(modifier=modifier,shape=RoundedCornerShape(20.dp),
         color=if(positive)Color(0xFF143025) else Color(0xFF39291E),
         border=BorderStroke(1.dp,if(positive)NeonGlass.green.copy(alpha=.32f) else NeonGlass.warning.copy(alpha=.45f))) {
         Row(Modifier.padding(horizontal=11.dp,vertical=7.dp),
@@ -90,7 +94,7 @@ fun neonColorScheme():ColorScheme=darkColorScheme(
             Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(
                 if(positive)NeonGlass.green else NeonGlass.warning))
             Text(label,color=if(positive)NeonGlass.softGreen else NeonGlass.warning,
-                style=MaterialTheme.typography.labelMedium,maxLines=1)
+                style=MaterialTheme.typography.labelMedium,maxLines=2)
         }
     }
 }
@@ -147,7 +151,7 @@ fun neonColorScheme():ColorScheme=darkColorScheme(
 @Composable fun NeonToolCard(
     title:String,subtitle:String,icon:ImageVector,modifier:Modifier=Modifier,onClick:()->Unit
 ) {
-    Surface(onClick=onClick,modifier=modifier.heightIn(min=166.dp),
+    Surface(onClick=onClick,modifier=modifier.heightIn(min=152.dp),
         color=NeonGlass.surface,shape=RoundedCornerShape(22.dp),
         border=BorderStroke(1.dp,NeonGlass.outline)) {
         Column(Modifier.fillMaxWidth().padding(15.dp),
@@ -177,36 +181,59 @@ fun neonColorScheme():ColorScheme=darkColorScheme(
                 Text(title,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold,
                     color=NeonGlass.white)
                 if(subtitle.isNotBlank()) Text(subtitle,style=MaterialTheme.typography.bodySmall,
-                    color=NeonGlass.white.copy(alpha=.78f),maxLines=1,overflow=TextOverflow.Ellipsis)
+                    color=NeonGlass.white.copy(alpha=.78f),maxLines=2,overflow=TextOverflow.Ellipsis)
             }
             Icon(AppIcons.Chevron,null,tint=NeonGlass.white)
         }
     }
 }
 
-/** Two-tab root navigation matching the supplied Projects/Termux reference. */
+/**
+ * Root navigation adapts when font scaling or the display width leaves too
+ * little room for icon+label. Color changes animate on the render thread;
+ * there is no blur, infinite transition or background polling.
+ */
 @Composable fun NeonBottomBar(onProjects:()->Unit,onTermux:()->Unit,projectsSelected:Boolean) {
+    val narrow=LocalConfiguration.current.screenWidthDp<360 ||
+        LocalDensity.current.fontScale>=1.25f
     Surface(color=NeonGlass.background,tonalElevation=0.dp) {
-        Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=10.dp),
-            horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp),
+            horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             listOf(
                 Triple("Projects",AppIcons.Folder,onProjects),
                 Triple("Termux",AppIcons.Terminal,onTermux)
             ).forEachIndexed {index,(title,icon,handler)->
                 val active=(index==0)==projectsSelected
-                Surface(onClick=handler,modifier=Modifier.weight(1f).height(60.dp),
-                    color=if(active)Color(0xFF143326) else NeonGlass.raised,
-                    shape=RoundedCornerShape(21.dp),
-                    border=BorderStroke(1.dp,if(active)NeonGlass.green.copy(alpha=.4f) else NeonGlass.outline)) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal=10.dp),
-                        verticalAlignment=Alignment.CenterVertically,
-                        horizontalArrangement=Arrangement.Center) {
-                        Icon(icon,null,tint=if(active)NeonGlass.green else NeonGlass.muted,
-                            modifier=Modifier.size(23.dp))
-                        Spacer(Modifier.width(9.dp))
-                        Text(title,color=if(active)NeonGlass.softGreen else NeonGlass.muted,
-                            style=MaterialTheme.typography.titleMedium,
-                            fontWeight=if(active)FontWeight.Bold else FontWeight.Normal)
+                val tile by animateColorAsState(
+                    targetValue=if(active)Color(0xFF143326) else NeonGlass.raised,
+                    animationSpec=tween(160),label="Emerald nav tile")
+                val labelColor by animateColorAsState(
+                    targetValue=if(active)NeonGlass.softGreen else NeonGlass.muted,
+                    animationSpec=tween(160),label="Emerald nav label")
+                Surface(onClick=handler,modifier=Modifier.weight(1f)
+                    .heightIn(min=if(narrow)68.dp else 62.dp),
+                    color=tile,shape=RoundedCornerShape(21.dp),
+                    border=BorderStroke(1.dp,
+                        if(active)NeonGlass.green.copy(alpha=.4f) else NeonGlass.outline)) {
+                    if(narrow) {
+                        Column(Modifier.fillMaxWidth().padding(vertical=7.dp,horizontal=4.dp),
+                            horizontalAlignment=Alignment.CenterHorizontally,
+                            verticalArrangement=Arrangement.Center) {
+                            Icon(icon,null,tint=labelColor,modifier=Modifier.size(22.dp))
+                            Text(title,color=labelColor,style=MaterialTheme.typography.labelMedium,
+                                maxLines=1,overflow=TextOverflow.Ellipsis,
+                                fontWeight=if(active)FontWeight.Bold else FontWeight.Medium)
+                        }
+                    } else {
+                        Row(Modifier.fillMaxWidth().padding(horizontal=8.dp),
+                            verticalAlignment=Alignment.CenterVertically,
+                            horizontalArrangement=Arrangement.Center) {
+                            Icon(icon,null,tint=labelColor,modifier=Modifier.size(23.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(title,color=labelColor,style=MaterialTheme.typography.titleMedium,
+                                maxLines=1,overflow=TextOverflow.Ellipsis,
+                                fontWeight=if(active)FontWeight.Bold else FontWeight.Normal)
+                        }
                     }
                 }
             }
