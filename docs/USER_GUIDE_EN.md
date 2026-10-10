@@ -26,6 +26,9 @@ Unit tests run local Gradle tasks; On device runs instrumentation tests using co
 ## Release AAB
 A signed AAB requires a JKS and alias. Passwords are transferred over a local protected channel and must not enter arguments, repositories or logs. AAB is for publishing, not direct installation. Open its folder and review the Release journal in History.
 
+## Language
+Open Settings → Appearance → Language to choose System default, Russian or English. User-facing labels, statuses and diagnostics follow the selected language. Raw Git/Gradle logs are left in their original language, and paths, hashes and job IDs are not rewritten.
+
 ## Troubleshooting
 - SHA mismatch: recheck Git; never bypass a dirty-worktree guard.
 - Missing dependencies: check JDK 21, Android SDK, Gradle wrapper and offline dependency caches.
