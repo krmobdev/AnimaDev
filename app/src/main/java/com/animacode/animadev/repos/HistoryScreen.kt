@@ -21,6 +21,7 @@ import java.util.Locale
 @OptIn(ExperimentalLayoutApi::class)
 @Composable fun HistoryScreen(context:Context,project:LocalProject,onOpen:(String)->Unit) {
     val locale=androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val neon=LocalNeonSkin.current
     val store=remember {RepoStore(context)};val gateway=remember {RepoGateway(context)};val cache=remember {JournalCache(context)}
     val record=rememberRepoRecord(context);var jobs by remember {mutableStateOf(emptyList<JSONObject>())};var filter by rememberSaveable {mutableStateOf("ALL")}
     val releaseHistory=remember {ReleaseHistoryCache(context)}
@@ -53,18 +54,49 @@ import java.util.Locale
         refreshing=false
     }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-        item {Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {Text("Задания "+project.name,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);IconButton(onClick={refreshing=true},enabled=!refreshing){Icon(AppIcons.Refresh,"Обновить историю")}} }
-        item {androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf("ALL" to "Все","TEST" to "Тесты","BUILD_DEBUG" to "Сборки","GIT" to "Git").forEach {(id,label)->FilterChip(filter==id,{filter=id},label={Text(label)})}} }
+        item {Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+            Text(if(neon)"History" else "Задания "+project.name,Modifier.weight(1f),
+                style=if(neon)MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleMedium,
+                color=MaterialTheme.colorScheme.onSurface)
+            IconButton(onClick={refreshing=true},enabled=!refreshing) {
+                Icon(AppIcons.Refresh,"Обновить историю",tint=MaterialTheme.colorScheme.primary)
+            }
+        }}
+        if(neon)item {Text(project.name+" · "+jobs.size+" jobs",
+            style=MaterialTheme.typography.bodyMedium,color=NeonGlass.muted)}
+        item {
+            if(neon) NeonTabs(listOf("All","Tests","Build jobs","Git"),
+                listOf("ALL","TEST","BUILD_DEBUG","GIT").indexOf(filter).coerceAtLeast(0),
+                {filter=listOf("ALL","TEST","BUILD_DEBUG","GIT")[it]})
+            else androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                listOf("ALL" to "Все","TEST" to "Тесты","BUILD_DEBUG" to "Сборки","GIT" to "Git").forEach {(id,label)->
+                    FilterChip(filter==id,{filter=id},label={Text(label)})
+                }
+            }
+        }
         if(refreshing)item {LinearProgressIndicator(Modifier.fillMaxWidth())}
         if(message.isNotEmpty())item {Text(message,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
         val visible=jobs.filter {filter=="ALL" || when(filter) {"TEST"->it.optString("action") in setOf("TEST","TEST_DEVICE");"BUILD_DEBUG"->it.optString("action") in setOf("BUILD_DEBUG","RELEASE_AAB");else->it.optString("action") !in setOf("TEST","TEST_DEVICE","BUILD_DEBUG","RELEASE_AAB")}}
         if(visible.isEmpty() && !refreshing)item {Text("Заданий в этом разделе пока нет.",style=MaterialTheme.typography.bodyMedium)}
         items(visible,key={it.optString("job_id")}) {job->
             val state=job.optString("state");val start=job.optDouble("started_at",job.optDouble("created_at",0.0));val end=job.optDouble("ended_at")
-            Card(onClick={
+            val title=when(job.optString("action")) {
+                "TEST"->"Unit-тесты";"TEST_DEVICE"->"Инструментальные тесты"
+                "BUILD_DEBUG"->"Debug APK";"RELEASE_AAB"->"Release AAB"
+                else->"Git · ${job.optString("action")}"
+            }
+            val openRecord={
                 if(job.optString("action")=="RELEASE_AAB")releaseJournalId=job.optString("job_id")
                 else onOpen(job.optString("job_id"))
-            },colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
+            }
+            val stamped=if(start>0)SimpleDateFormat("dd MMM, HH:mm",locale).format(Date((start*1000).toLong())) else "Время не сохранено"
+            val duration=if(end>start)" · ${((end-start)/60).toInt()} мин ${((end-start)%60).toInt()} с" else ""
+            if(neon) NeonHistoryEntry(title,MonitorPolicy.label(state,false,false),
+                stamped+duration,successful=state=="SUCCEEDED",
+                running=state in RepoPolicy.activeStates,onClick=openRecord)
+            else Card(onClick=openRecord,
+                colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
                 ListItem(headlineContent={Text(when(job.optString("action")) {"TEST"->"Unit-тесты";"TEST_DEVICE"->"Инструментальные тесты";"BUILD_DEBUG"->"Debug APK";"RELEASE_AAB"->"Release AAB";else->"Git · ${job.optString("action")}"},style=MaterialTheme.typography.titleMedium)},supportingContent={Column(verticalArrangement=Arrangement.spacedBy(3.dp)) {Text(MonitorPolicy.label(state,false,false));Text((if(start>0)SimpleDateFormat("dd MMM, HH:mm",locale).format(Date((start*1000).toLong())) else "Время не сохранено")+if(end>start)" · ${((end-start)/60).toInt()} мин ${((end-start)%60).toInt()} с" else "",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}},leadingContent={Icon(if(state=="SUCCEEDED")AppIcons.Success else if(state in RepoPolicy.terminalStates)AppIcons.Error else AppIcons.History,null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow))
             }
         }
