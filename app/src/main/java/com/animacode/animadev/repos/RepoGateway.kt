@@ -97,7 +97,9 @@ class RepoGateway(private val context: Context) {
         val r = store.read()
         if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST", "TEST_DEVICE", "BUILD_DEBUG") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked() || com.animacode.animadev.projects.ReleaseStore(context).busy()) return
         if (action == "SYNC" && !maySync(r,projectId)) return
-        if (action in setOf("TEST","TEST_DEVICE") && !mayTest(r,projectId)) return
+        // TEST_DEVICE performs fresh Git/ADB validation in the Termux runner.
+        // Requiring a cached UI snapshot silently prevented legitimate launches.
+        if (RepoPolicy.requiresPreparedSnapshot(action) && !mayTest(r,projectId)) return
         if (action == "BUILD_DEBUG" && !mayBuild(r,projectId)) return
         val previousProject = r.optString("project_id",PROJECT)
         if (previousProject != projectId) {
