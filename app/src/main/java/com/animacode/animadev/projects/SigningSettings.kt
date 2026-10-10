@@ -139,7 +139,7 @@ class SigningStore(private val context: Context) {
             enabled=currentId.isNotBlank() && hasAccess && alias.isNotBlank()
         ) {Text("Сохранить alias")}
         Text("Проверка ключа",style=MaterialTheme.typography.titleSmall)
-        Text("Пароли нужны только на время проверки, не сохраняются и не отправляются в Termux.",
+        Text("Эта проверка выполняется локально. Пароли для сборки можно отдельно и добровольно сохранить через Android Keystore на экране «Сборка».",
             style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(storePassword,{storePassword=it},label={Text("Пароль хранилища")},
             visualTransformation=PasswordVisualTransformation(),singleLine=true,
@@ -187,7 +187,7 @@ class SigningStore(private val context: Context) {
         if(!hasAccess || store.alias(currentId).isBlank())
             Text("Чтобы перейти к сборке, выберите JKS и сохраните alias.",
                 style=MaterialTheme.typography.bodySmall)
-        Text("Пароль закрытого ключа JKS проверяется при подписании в Termux. Секреты для сборки передаются по локальному каналу с проверкой UID. Проводник и настройки не хранят пароль.",
+        Text("Пароль закрытого ключа JKS проверяется при подписании в Termux. Секреты передаются по локальному каналу с проверкой UID, без GitHub. В разделе «Сборка» доступно необязательное защищённое сохранение паролей.",
             style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
