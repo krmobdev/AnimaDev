@@ -1,109 +1,65 @@
-# AnimaDev · 0.4.0-beta.2
+# AnimaDev · 0.4.0-beta.9-dev.31
 
-Самостоятельное Android-приложение Kotlin/Compose для локального Git через
-Termux RUN_COMMAND. Единственный профиль: AnimaQuiz, `~/quizapp`,
-`git@github.com:krmobdev/quizapp.git`, ветка `test/decomposition-v1`.
-APK не зависит от AnimaBridge, VPS, Auth0 или GitHub-токенов.
+Android 13+ companion for **local Git, tests and Android builds in Termux**. Written in Kotlin and Jetpack Compose (Material You / Pulse). No mandatory VPS, AnimaBridge or GitHub API token is needed to use the installed app.
 
-Этап 1 принят владельцем 09.10.2026: реальный Python RUN_COMMAND,
-callback с проверенным request_id, exit 0, Termux err -1, 215 мс.
-Этап 2 принят владельцем: STATUS, CHECK и восстановление после force-stop проверены.
-SYNC с новыми коммитами на устройстве ещё не испытывался. Этап 2.1 ждёт отдельной
-Android-приёмки; компиляция её не заменяет.
+**English:** Local Android Git/Gradle assistant with safe per-project operations and persistent history.
+**Русский:** Локальный Android-инструмент управления Git и сборками с журналами и безопасными ограничениями.
 
-## Приёмка через приложение
+## Функционал / Features
 
-1. Установить APK обновлением, открыть «Репозитории».
-2. При необходимости дать системное разрешение Termux. Существующее
-   `allow-external-apps = true` приложение не меняет.
-3. «Настроить локальный помощник» → «Настроить»: встроенный runner сохраняется
-   в `~/.local/share/animadev`, с проверкой SHA-256, вне QuizApp.
-4. «Обновить состояние»: проверить AnimaQuiz, ветку, SHA, чистоту и origin.
-5. «Проверить обновления»: дождаться результата настоящего fetch.
-6. При доступной кнопке «Синхронизировать» отдельно подтвердить fast-forward.
-   При отсутствии обновлений кнопка остаётся недоступной.
-7. «Технические подробности»: ID, состояние, журнал безопасных шагов и коды Termux;
-   журнал показывает код Git-операции и длительность отдельно.
-8. Во время fetch повернуть экран, закрыть и открыть приложение. ID задания
-   должен сохраниться. «Уточнить состояние» опрашивает тот же ID без повторного START.
+| Раздел / Area | Возможности / Capabilities |
+|---|---|
+| Projects / Проекты | Обнаружение существующих локальных Git-репозиториев и worktree, сохранение вкладок; просмотр ветки, SHA и состояния |
+| Git | Проверка origin / GitHub SHA, разрешённые операции и явная безопасная синхронизация fast-forward |
+| Tests / Тесты | Unit-тесты Gradle, Android instrumentation через разрешённый ADB, JUnit-отчёты |
+| Debug APK | Повторное выполнение Gradle задач с `--rerun-tasks`, проверка SHA-256 APK и установка через системный Android Package Installer / FileProvider |
+| Release AAB | Подпись через JKS с защищённой передачей, проверка артефакта, сохранение в выбранную папку |
+| Jobs / Задания | Время, этап, журнал, восстановление по ID, запрос статуса и поддерживаемая отмена Ctrl+C |
+| History / История | Старые задания и журнал отдельно от рабочего экрана |
+| Termux | Диагностика Git, Python, Java, SDK; встроенное руководство по установке компонентов |
+| Files / Файлы | Выбранная папка в основной памяти или стандартные Downloads; очистка только временного кэша AnimaDev |
+| Help / Справка | Локальная документация, история изменений и сведения о версии |
 
-## Границы безопасности
+## Быстрый старт / Quick start
 
-Только STATUS/CHECK/SYNC/TEST с фиксированными аргументами и каталогом. Нет push,
-переключения ветки, обновления main, stash/reset/clean/rebase или merge-коммитов.
-Перед записью повторно проверяются ветка, origin, SHA и чистота; только ff-only.
-Hooks/fsmonitor/внешние Git-фильтры не выполняются; README/AGENTS не исполняются.
-Существующие SSH-ключи и known_hosts использует SSH Termux; неизвестный хост
-или интерактивная авторизация дают ошибку, без ослабления проверки ключа.
+1. Install Termux from a trusted source, open it once and explicitly grant RUN_COMMAND integration. / Установите Termux, откройте и разрешите RUN_COMMAND.
+2. Open **Termux → Check environment**, read **Build setup guide** and verify Java, SDK and Git.
+3. Add an existing local Git repository under **Projects** (nothing is cloned automatically). / Добавьте локальный Git-репозиторий.
+4. In Git tools verify branch, origin and GitHub SHA before TEST/BUILD. / Сверьте GitHub SHA и чистоту дерева.
+5. Inspect Job ID and Journal during execution. **QUERY** does not start another job. / Проверяйте статус прежнего задания по ID.
+6. For Debug tap Build and open APK through the **native Android installer**. AAB is for publishing, not direct device installation.
 
-У каждого задания уникальный ID, SQLite-журнал, блокировка проекта и идентичности
-контроллера/дочернего Git. Потерянный callback даёт UNKNOWN, не успех.
-Отсутствующее задание QUERY закрывает tombstone от позднего START.
-Таймаут fetch 180 с, ff-only 60 с, короткого callback 15 с; это разные механизмы.
-Журнал ограничен, распознаваемые секреты маскируются. Хранятся максимум 100 заданий;
-после лимита новые операции блокируются без автоматического удаления истории.
-Блокировка координирует только AnimaDev: не выполнять параллельно внешний Git
-в этом репозитории. Перезагрузка/убийство Termux не обещают успешного завершения.
+## Documentation / Документация
 
-Расширение профилей требует изменения проверенного реестра и Android-профиля;
-пользовательские команды и произвольные пути не принимаются.
-В интерфейсе есть только unit-тесты QuizApp; его APK не собирается.
+- [Список изменений / Changelog](CHANGELOG.md) — newest entries at top, including date/time and version.
+- [Руководство пользователя / User guide (RU)](docs/USER_GUIDE.md)
+- [User Guide (EN)](docs/USER_GUIDE_EN.md)
+- [Подготовка Termux (RU)](docs/TERMUX_SETUP.md)
+- [Termux build setup (EN)](docs/TERMUX_SETUP_EN.md)
+- [Архитектура / Architecture](docs/architecture.md)
+- [План поставки / Delivery roadmap](docs/BUILD_DELIVERY_ROADMAP.md)
 
-## Разработка
+The guides and change log are bundled offline into the APK from these **same GitHub files**, so editing a document in GitHub and rebuilding updates in-app help automatically.
 
-Рабочая ветка приложения `feature/termux-probe`; push запрещён текущим этапом.
-Сборка локальная в существующем Termux, без Actions и переустановки окружения:
-AGP 9.3.1, Gradle 9.5.0, SDK 37, target 35, min 26, Java 21 / bytecode 17.
-`tools/package_runner.py` фиксирует точную копию runner и её хеш в assets.
-Python-тесты создают изолированные временные локальные bare/working репозитории.
-Производственный QuizApp не изменяется при тестировании.
+## Safety / Безопасность
 
-Отчёт и ограничения проверки: [docs/stage2-acceptance.md](docs/stage2-acceptance.md).
-История первого этапа: [docs/stage1-acceptance.md](docs/stage1-acceptance.md).
+- No automatic push, force updates, destructive clean/reset, or implicit Git branch switch.
+- Never expose signing secrets or SSH keys in logs, Git or command arguments.
+- Run one Gradle job per protected build slot. UNKNOWN requires confirmation, not a duplicate START.
+- Cache clearing deletes only app-owned temporary copies and exports, never Termux, SDK, Gradle dependency cache, job SQLite or projects.
+- Installation uses a checksum-verified copy and Android's system Package Installer.
+- Project execution requires an explicitly supported and verified profile. Additional worktrees may be read-only.
 
-## Источники протокола
+## Development / Разработка
 
-- https://github.com/termux/termux-app/wiki/RUN_COMMAND-Intent
-- https://git-scm.com/docs/git-fetch
-- https://git-scm.com/docs/git-merge
-- https://git-scm.com/docs/git-config
-- https://developer.android.com/reference/android/app/PendingIntent
+- Active integration branch: `feature/termux-probe`; do not merge to `main` without explicit owner review.
+- Kotlin, Compose, AGP 9.3.1, Gradle 9.5.0, compileSdk 37, minSdk 33, Java 21 toolchain (bytecode 17).
+- Gradle (on an already prepared Termux instance):
 
-Этап 2.1: системный «Назад» открывает диалог «Закрыть AnimaDev?»; «Отмена»
-остаётся в приложении, «Выйти» удаляет task из недавних. Termux не останавливается,
-данные заданий сохраняются. DNS/сеть/SSH ошибки объясняются без сырых диагностик.
-После сетевой ошибки CHECK повторяется отдельным нажатием. Обновление APK
-сохраняет прежние prefs/SQLite; завершите старое задание, затем обновите runner
-через «Настроить локальный помощник». Старые releases не удаляются.
-Будущие проекты: [docs/architecture.md](docs/architecture.md), только требования.
+```sh
+./gradlew :app:testDebugUnitTest :app:assembleDebug --offline --no-daemon --rerun-tasks --console=plain
+```
 
-Этап 3А: «Запустить тесты» запускает реальные :app:testDebugUnitTest в AnimaQuiz
-через существующий Gradle wrapper. Команда фиксирована, offline/no-daemon/
-rerun-tasks/console=plain. Требуются уже имеющиеся Java, Gradle и офлайн-кеш
-зависимостей Termux. Новый APK и помощник обновляются кнопками; сведения о
-предыдущих Git-заданиях и их release сохранены. Диагностику Termux не надо
-повторять перед каждым действием. После завершения CHECK и TEST можно повторить
-отдельной кнопкой. UNKNOWN блокирует новый запуск; «Уточнить состояние» только
-опрашивает сохранённый ID. Реальный запуск тестов QuizApp через Android UI
-остаётся приёмкой владельца. APK QuizApp и этап 3Б не реализованы.
+Real Android UI/device acceptance requires on-device tests, not just successful compilation.
 
-## Этап 3А.1
-
-Монитор задания, предупреждение без прогресса 5/10/15/20/30 минут,
-журнал «Важное» / «Всё» с историей, поиском, копированием и экспортом в Downloads.
-TEST имеет защитный предел 90 минут; предупреждение не останавливает задание.
-Потеря callback приводит к QUERY прежнего ID, никогда к повторному START.
-Отчёт и кнопочная приёмка: docs/stage3A.1-acceptance.md.
-Проект отмены для будущего отдельного этапа: docs/stage3A.2-cancellation-design.md.
-
-## 0.4.0 Beta
-
-Android 13+, Material You, динамические цвета и system/light/dark.
-Проекты → Git / Тесты / Сборка / История; Termux — отдельный обзор окружения.
-Локальные репозитории можно находить и добавлять без клонирования/удаления файлов.
-Исполнение пока только для AnimaQuiz; другие проекты доступны для просмотра.
-Сборка APK/AAB и обслуживание пакетов явно недоступны.
-Журнал: начало/конец, поиск, копирование, Downloads и Android Sharesheet.
-Отчёт о Beta и приёмка: docs/beta2-acceptance.md.
-
-Beta.2: [иерархия и поиск проектов](docs/beta2-architecture.md).
+For older stage reports and design notes, see the [docs/](docs/) directory. Old beta constraints are historical and superseded by the current `AGENTS.md` owner authorization.
