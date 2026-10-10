@@ -83,8 +83,8 @@ class ArtifactMoveReceiver:BroadcastReceiver() {
         val result=intent.getBundleExtra("result")
         val text=result?.getString("stdout","").orEmpty()
         val payload=runCatching {if(text.length>2048)null else JSONObject(text)}.getOrNull()
-        val verified=payload?.optString("request_id")==id && payload.optBoolean("ok") &&
-            result?.getInt("exitCode",-1)==0 && result.getInt("err",-2)==-1
+        val verified=payload?.optString("request_id")==id && payload?.optBoolean("ok")==true &&
+            result?.getInt("exitCode",-1)==0 && result?.getInt("err",-2)==-1
         ArtifactMoveGateway.result(context,record,verified,payload?.optString("path").orEmpty())
     }
 }
