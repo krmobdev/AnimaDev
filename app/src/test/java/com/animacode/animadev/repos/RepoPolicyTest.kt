@@ -3,6 +3,15 @@ import org.junit.Assert.*
 import org.junit.Test
 class RepoPolicyTest {
     private fun sync(branch:String="test/decomposition-v1", dirty:Boolean=false, remote:Boolean=true, ahead:Int=0, behind:Int=1, checked:Boolean=true, runner:Boolean=true, blocked:Boolean=false) = RepoPolicy.maySync(branch,dirty,remote,ahead,behind,checked,runner,blocked)
+    @Test fun staleJobCanBeQueriedAfterHelperUpdate() {
+        val id="a".repeat(32)
+        val original="b".repeat(64)
+        org.junit.Assert.assertTrue(RepoPolicy.canRecoverJob(false,id,original,"c".repeat(64)))
+        org.junit.Assert.assertTrue(RepoPolicy.canRecoverJob(false,id,"",original))
+        org.junit.Assert.assertFalse(RepoPolicy.canRecoverJob(true,id,original,original))
+        org.junit.Assert.assertFalse(RepoPolicy.canRecoverJob(false,"",original,original))
+        org.junit.Assert.assertFalse(RepoPolicy.canRecoverJob(false,id,"bad",original))
+    }
     @Test fun dynamicProjectAllowedOnItsVerifiedBranch() {
         assertTrue(RepoPolicy.mayTest("feature/development",true,true,false,"another-project"))
         assertFalse(RepoPolicy.mayTest("Detached HEAD",true,true,false,"another-project"))
