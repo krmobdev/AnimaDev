@@ -268,14 +268,18 @@ class InstrumentationFixture(unittest.TestCase):
     def prepare(self, xml=OK):
         lines=[
             '#!/bin/sh',
-            'mkdir -p app/build/outputs/androidTest-results/connected/Pixel',
+            'init=""',
+            'for arg in "$@"; do case "$arg" in */isolate.gradle) init="$arg";; esac; done',
+            "suffix=$(sed -n \"s/.*build\\/animadev-device-j\\([a-f0-9]*\\).*/\\1/p\" \"$init\")",
+            'out="app/build/animadev-device-j$suffix/outputs/androidTest-results/connected/Pixel"',
+            'mkdir -p "$out"',
             'mkdir -p app/build',
             'printf "%s\\n" "$@" > app/build/device-args.txt',
             'printf "%s\\n" "$ANDROID_SERIAL" > app/build/device-serial.txt',
         ]
         if xml is not None:
             lines.extend([
-                "cat > app/build/outputs/androidTest-results/connected/Pixel/TEST-fixture.xml <<'XML'",
+                'cat > "$out/TEST-fixture.xml" <<\'XML\'',
                 xml,
                 'XML',
             ])

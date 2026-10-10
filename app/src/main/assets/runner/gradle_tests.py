@@ -291,13 +291,14 @@ def device_init_script(jid):
     return """gradle.beforeProject { p ->
     if (p.path == ':app') {
         p.pluginManager.withPlugin('com.android.application') {
+            p.layout.buildDirectory.set(p.layout.projectDirectory.dir('build/animadev-device-j%s'))
             p.extensions.getByName('androidComponents').finalizeDsl { android ->
                 android.defaultConfig.applicationId = android.defaultConfig.applicationId + '%s'
             }
         }
     }
 }
-""" % suffix
+""" % (jid,suffix)
 
 def adb_devices(run=subprocess.run, adb='/data/data/com.termux/files/usr/bin/adb'):
     """Only one authorized hardware/USB/WiFi ADB device is accepted."""
@@ -363,8 +364,9 @@ def reconnect_offline_adb(run=subprocess.run, adb='/data/data/com.termux/files/u
     except (OSError,ValueError,subprocess.TimeoutExpired):
         return False
 
-def device_reports(root):
-    folder=pathlib.Path(root)/DEVICE_RESULTS
+def device_reports(root,jid=''):
+    if jid and not re.fullmatch(r'[a-f0-9]{32}',jid):raise ReportError('REPORTS_INVALID')
+    folder=pathlib.Path(root)/(('app/build/animadev-device-j'+jid+'/outputs/androidTest-results/connected') if jid else DEVICE_RESULTS)
     if folder.is_symlink() or folder.resolve()!=folder.absolute():raise ReportError('REPORTS_INVALID')
     if not folder.is_dir():return {}
     result={}; total_bytes=0
@@ -406,7 +408,7 @@ def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT,a
     wrapper=guard.root/'gradlew'
     if not wrapper.is_file() or wrapper.is_symlink():
         return dict(state='FAILED',error_code='GRADLE_MISSING',exit_code=None,snapshot=snapshot,tests=None)
-    try:before=device_reports(guard.root)
+    try:before=device_reports(guard.root,jid)
     except ReportError as e:
         return dict(state='FAILED',error_code=e.code,exit_code=None,snapshot=snapshot,tests=None)
     env=dict(guard.env)
@@ -431,7 +433,7 @@ def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT,a
     if unknown:
         return dict(state='UNKNOWN',error_code='TEST_TIMEOUT_UNKNOWN',exit_code=None,snapshot=snapshot,tests=None,unresolved=True)
     result=dict(state='FAILED',error_code='GRADLE_FAILED',exit_code=code,snapshot=snapshot,tests=None)
-    try:result['tests']=summary(before,device_reports(guard.root))
+    try:result['tests']=summary(before,device_reports(guard.root,jid))
     except ReportError as e:
         if code==0:result['error_code']=e.code
     # The target must remain exactly the same throughout installation and test run.

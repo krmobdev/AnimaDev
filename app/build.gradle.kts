@@ -11,6 +11,10 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+if (providers.gradleProperty("animadevDeviceFixture").orNull == "true") {
+    layout.buildDirectory.set(layout.projectDirectory.dir("build/device-fixture"))
+}
 android {
     namespace = "com.animacode.animadev"
     compileSdk = 37
