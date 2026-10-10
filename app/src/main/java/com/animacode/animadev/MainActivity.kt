@@ -217,7 +217,13 @@ class MainActivity:ComponentActivity() {
                     top=="termux"->TermuxOverview(context,permitted,version,
                         onPermissionUpdated={permitted=termux.permitted()},
                         onOpenSetup={supportParent="list";route="termux_setup"})
-                    route=="list" || current==null->ProjectsScreen(context,permitted,onOpen={p->clickFeedback();projects.select(p.id);selected=p.id;route="workspace";journalJob=""})
+                    route=="list" || current==null->ProjectsScreen(context,permitted,
+                        onOpen={p->clickFeedback();projects.select(p.id);selected=p.id;route="workspace";journalJob=""},
+                        onMenuRoute={id->
+                            clickFeedback()
+                            if(id=="settings") {settingsParent="list";settingsSection="";route="settings"}
+                            else {supportParent="list";route=id}
+                        })
                     route=="branches"->BranchesScreen(context,current,permitted)
                     route=="workspace"->ProjectWorkspace(context,current,
                         onTool={ id->
