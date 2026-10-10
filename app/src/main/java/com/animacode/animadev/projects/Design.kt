@@ -53,11 +53,36 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
     var minutes by remember {mutableIntStateOf(MonitorPolicy.minutes(prefs.getInt("warning_minutes",10)))}
     val themeLabel=listOf("system" to "Как в системе","light" to "Светлая","dark" to "Тёмная").toMap()[theme] ?: "Как в системе"
     val englishUi=AppLanguage.english(LocalAppLanguage.current,androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language)
+    val neon=LocalNeonSkin.current
     LazyColumn(Modifier.fillMaxSize().imePadding(),state=state,contentPadding=PaddingValues(bottom=24.dp)) {
         if(section.isEmpty()) {
-            item {OutlinedTextField(query,{query=it},label={Text("Поиск настроек")},leadingIcon={Icon(AppIcons.Search,null)},trailingIcon={if(query.isNotEmpty())IconButton(onClick={query=""}){Icon(AppIcons.Close,"Очистить поиск")}},singleLine=true,modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp))}
+            if(neon)item {
+                Text("Settings",style=MaterialTheme.typography.headlineLarge,
+                    fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,
+                    modifier=Modifier.padding(start=20.dp,top=12.dp,bottom=8.dp))
+            }
+            item {OutlinedTextField(query,{query=it},
+                label={Text(if(neon)"Search settings" else "Поиск настроек")},
+                leadingIcon={Icon(AppIcons.Search,null)},
+                trailingIcon={if(query.isNotEmpty())IconButton(onClick={query=""}) {
+                    Icon(AppIcons.Close,"Очистить поиск")
+                }},singleLine=true,shape=androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp))}
             if(query.isBlank())settingsSections.forEach {(id,title)->item(key=id) {
-                ListItem(headlineContent={Text(title)},supportingContent={Text(descriptions.getValue(id))},leadingContent={Icon(when(id){"git"->AppIcons.Git;"profiles"->AppIcons.Tests;"signing"->AppIcons.Build;"jobs"->AppIcons.Waiting;"files"->AppIcons.Folder;"about"->AppIcons.Info;"notifications"->AppIcons.Notifications;else->AppIcons.Palette},null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},modifier=Modifier.clickable{feedback.tap(view);openSection(id)})
+                val tileIcon=when(id) {
+                    "git"->AppIcons.Git;"profiles"->AppIcons.Tests;"signing"->AppIcons.Build
+                    "jobs"->AppIcons.Waiting;"files"->AppIcons.Folder;"about"->AppIcons.Info
+                    "notifications"->AppIcons.Notifications;else->AppIcons.Palette
+                }
+                if(neon)Box(Modifier.padding(horizontal=16.dp,vertical=5.dp)) {
+                    NeonSettingsRow(title,descriptions.getValue(id),tileIcon) {
+                        feedback.tap(view);openSection(id)
+                    }
+                } else ListItem(headlineContent={Text(title)},
+                    supportingContent={Text(descriptions.getValue(id))},
+                    leadingContent={Icon(tileIcon,null,tint=MaterialTheme.colorScheme.primary)},
+                    trailingContent={Icon(AppIcons.Chevron,null)},
+                    modifier=Modifier.clickable{feedback.tap(view);openSection(id)})
             }} else {
                 val results=SettingsPolicy.search(query,englishUi)
                 if(results.isEmpty())item {DetailRow("Ничего не найдено","Попробуйте другое название или описание")}
