@@ -277,7 +277,7 @@ def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT
             or len(output_dir)>520):
         return dict(state='FAILED',error_code='DOWNLOADS_UNAVAILABLE',exit_code=code,snapshot=after)
     parts=output_dir[len('/storage/emulated/0/'):].split('/')
-    if not all(re.fullmatch(r'[\\w ().&-]{1,80}',item) and item not in ('.','..') for item in parts):
+    if not all(re.fullmatch(r'[\w ().&-]{1,80}',item) and item not in ('.','..') for item in parts):
         return dict(state='FAILED',error_code='DOWNLOADS_UNAVAILABLE',exit_code=code,snapshot=after)
     folder=pathlib.Path(output_dir)
     if not folder.is_dir() or folder.is_symlink() or folder.resolve()!=folder.absolute():
