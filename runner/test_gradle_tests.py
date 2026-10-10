@@ -218,8 +218,8 @@ class InstrumentationFixture(unittest.TestCase):
                 'XML',
             ])
         lines.append('exit 0')
-        (self.repo/'gradlew').write_text('\\n'.join(lines)+'\\n')
-        (self.repo/'.gitignore').write_text('app/build/\\n')
+        (self.repo/'gradlew').write_text(chr(10).join(lines)+chr(10))
+        (self.repo/'.gitignore').write_text('app/build/'+chr(10))
         base.git(self.repo,'add','gradlew','.gitignore')
         base.git(self.repo,'commit','-m','instrumentation fixture')
         base.git(self.repo,'push','origin',base.BRANCH)
