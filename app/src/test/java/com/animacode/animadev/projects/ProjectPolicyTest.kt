@@ -19,7 +19,7 @@ class ProjectPolicyTest {
         val id=ProjectPolicy.stableId(path)
         assertTrue(ProjectPolicy.canExecute(id,path,"TEST_DEVICE",false,"github.com/krmobdev/AnimaDev"))
         assertFalse(ProjectPolicy.canExecute(id,path,"TEST_DEVICE",true,"github.com/krmobdev/AnimaDev"))
-        assertFalse(ProjectPolicy.canExecute(id,path,"TEST_DEVICE",false,"github.com/elsewhere/AnotherRepo"))
+        assertFalse(ProjectPolicy.canExecute(id,path,"TEST_DEVICE",false,"https://evil.invalid/repo"))
         assertFalse(ProjectPolicy.canExecute("animaquiz",ProjectPolicy.QUIZ,"SHELL"))
     }
     @Test fun otherProjectCannotFallBackToQuiz() { assertFalse(ProjectPolicy.canExecute("other",ProjectPolicy.QUIZ,"TEST"));assertFalse(ProjectPolicy.canExecute("animaquiz",ProjectPolicy.HOME+"/other","SYNC")) }
