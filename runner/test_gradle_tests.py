@@ -103,6 +103,32 @@ class GradleFixture(unittest.TestCase):
             self.assertEqual(self.engine.query(jid,'animaquiz','TEST')['state'],'SUCCEEDED')
         finally:
             if worker.is_alive():worker.terminate();worker.join()
+    def test_ctrl_c_interrupts_real_gradle_process_group(self):
+        wrapper(self.repo,prefix='sleep 20')
+        jid=uuid.uuid4().hex
+        self.engine.start(jid,'animaquiz','TEST',spawn=False)
+        worker=multiprocessing.get_context('fork').Process(target=self.engine.run_job,args=(jid,))
+        worker.start()
+        try:
+            deadline=time.monotonic()+12
+            ready=False
+            while time.monotonic()<deadline:
+                job=self.engine.query(jid,'animaquiz','TEST')
+                if job.get('child_pid') and job.get('state')=='RUNNING':
+                    ready=True;break
+                time.sleep(.15)
+            self.assertTrue(ready,'Gradle child never reported its identity')
+            self.engine.cancel(jid,'animaquiz','TEST')
+            worker.join(12)
+            self.assertFalse(worker.is_alive(),'Ctrl+C did not terminate Gradle in time')
+            result=self.engine.query(jid,'animaquiz','TEST')
+            self.assertEqual(result['state'],'INTERRUPTED',result)
+            self.assertEqual(result['error_code'],'CANCELLED')
+            self.assertFalse(result.get('unresolved',False))
+            self.assertEqual(base.git(self.repo,'rev-parse','HEAD'),self.before)
+        finally:
+            if worker.is_alive():worker.terminate();worker.join()
+
     def test_git_job_blocks_tests(self):
         self.engine.start(uuid.uuid4().hex,'animaquiz','CHECK',spawn=False)
         with self.assertRaises(runner.Denied) as cm:self.engine.start(uuid.uuid4().hex,'animaquiz','TEST',spawn=False)
