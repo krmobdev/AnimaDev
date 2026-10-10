@@ -265,6 +265,13 @@ object AppTranslation {
         "Кэш зависимостей" to "Dependency cache",
         "Настройки подписания" to "Signing settings"
     )
+    private val trustedPrefixes by lazy {
+        listOf(AppTranslationExtra.dictionary,AppTranslationMore.dictionary,
+            AppTranslationRemaining.dictionary,AppTranslationStatus.dictionary)
+            .flatMap {it.entries}
+            .filter {it.key.length>=8 && it.key.endsWith(" ") && !it.key.contains('\n')}
+            .sortedByDescending {it.key.length}
+    }
     /** Exact literals first; partial phrases preserve job IDs, timestamps and paths. */
     private val phrases=listOf(
         "ЗАДАНИЕ В РАБОТЕ" to "RUNNING JOB",
@@ -300,7 +307,9 @@ object AppTranslation {
         AppTranslationExtra.dictionary[original]?.let {return it}
         AppTranslationMore.dictionary[original]?.let {return it}
         AppTranslationStatus.dictionary[original]?.let {return it}
+        AppTranslationRemaining.dictionary[original]?.let {return it}
         AppTranslationDynamic.translate(original)?.let {return it}
+        trustedPrefixes.firstOrNull {original.startsWith(it.key)}?.let {return it.value+original.removePrefix(it.key)}
         // Only replace a known UI prefix. Global substitutions in arbitrary
         // text risk altering paths, branch names, job IDs and raw diagnostics.
         if(!original.any {it in 'А'..'я' || it=='Ё' || it=='ё'})return original
