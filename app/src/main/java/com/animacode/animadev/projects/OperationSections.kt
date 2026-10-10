@@ -141,7 +141,10 @@ object OperationResultPolicy {
                 if(apk) {
                     val direct=destination.artifactUri(artifact.optString("path"))
                         ?: ArtifactGateway.rememberedUri(context,artifact)
-                    if(direct!=null)scope.launch {ArtifactGateway.install(context,artifact,direct)}
+                    if(direct!=null)scope.launch {
+                        if(!ArtifactGateway.install(context,artifact,direct))
+                            picker.launch(arrayOf("*/*"))
+                    }
                     else picker.launch(arrayOf("*/*"))
                 } else ArtifactGateway.openFolder(context,artifact)
             }) {
