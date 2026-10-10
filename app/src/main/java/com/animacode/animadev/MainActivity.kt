@@ -80,6 +80,20 @@ class MainActivity:ComponentActivity() {
                     delay(2000)
                 }
             }
+            // Read-only local HEAD when opening any project tool. This does not
+            // fetch, push, switch or alter Git worktrees.
+            LaunchedEffect(route,selected,resumed,permitted) {
+                if(resumed && permitted && top=="projects" &&
+                    route in setOf("workspace","build","branches","git","tests")) {
+                    val selectedProject=projects.all().firstOrNull {it.id==selected}
+                    if(selectedProject!=null) {
+                        val catalog=CatalogGateway(context)
+                        catalog.expire()
+                        if(!catalog.prefs.getBoolean("pending",false))
+                            catalog.read("PATH",selectedProject.path)
+                    }
+                }
+            }
             LaunchedEffect(requestedJournal) {
                 if(requestedJournal.isNotEmpty()) {
                     val savedProject=store.read().optString("project_id","animaquiz")
