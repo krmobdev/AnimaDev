@@ -114,5 +114,6 @@ def sign_bundle(unsigned, signed, key_data, store_password, key_password, alias,
             raise SigningError("SIGNATURE_INVALID")
     except (subprocess.TimeoutExpired, OSError):
         raise SigningError("SIGNATURE_INVALID")
-    return {"sha256":hashlib.file_digest(signed.open("rb"),"sha256").hexdigest(),
-            "size":signed.stat().st_size}
+    with signed.open("rb") as stream:
+        digest=hashlib.file_digest(stream,"sha256").hexdigest()
+    return {"sha256":digest,"size":signed.stat().st_size}
