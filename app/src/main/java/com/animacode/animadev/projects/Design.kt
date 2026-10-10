@@ -58,7 +58,7 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
             if(query.isBlank())settingsSections.forEach {(id,title)->item(key=id) {
                 ListItem(headlineContent={Text(title)},supportingContent={Text(descriptions.getValue(id))},leadingContent={Icon(when(id){"git"->AppIcons.Git;"profiles"->AppIcons.Tests;"signing"->AppIcons.Build;"jobs"->AppIcons.Waiting;"files"->AppIcons.Folder;"about"->AppIcons.Info;"notifications"->AppIcons.Notifications;else->AppIcons.Palette},null,tint=MaterialTheme.colorScheme.primary)},trailingContent={Icon(AppIcons.Chevron,null)},modifier=Modifier.clickable{feedback.tap(view);openSection(id)})
             }} else {
-                val results=SettingsPolicy.search(query)
+                val results=SettingsPolicy.search(query,AppLanguage.english(LocalAppLanguage.current,androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language))
                 if(results.isEmpty())item {DetailRow("Ничего не найдено","Попробуйте другое название или описание")}
                 results.forEach {entry->item(key=entry.section+entry.id){Preference(entry.title,entry.description,{openSection(entry.section+"/"+entry.id)})}}
             }
