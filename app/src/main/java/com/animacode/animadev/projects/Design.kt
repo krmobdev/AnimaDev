@@ -35,7 +35,7 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
     val view=LocalView.current
     ListItem(headlineContent={Text(title)},supportingContent={Text(value)},trailingContent=trailing ?: if(onClick!=null)({Icon(AppIcons.Chevron,null)}) else null,modifier=if(onClick!=null)Modifier.clickable {feedback.tap(view);onClick()} else Modifier)
 }
-@Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={},pulse:Boolean=true,onPulse:(Boolean)->Unit={},onOpenBuild:(String)->Unit={}) {
+@Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={},pulse:Boolean=true,onPulse:(Boolean)->Unit={},onOpenBuild:(String)->Unit={},language:String="system",onLanguage:(String)->Unit={}) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
     val feedback=remember {UiFeedback(context)}
@@ -69,6 +69,9 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
                         if(pulse)"Зелёные акценты, светлая или тёмная палитра" else "Классическая палитра Material",
                         trailing={Switch(pulse,onPulse)})
                 }
+                item {Preference("Язык / Language",
+                    when(language) {"en"->"English";"ru"->"Русский";else->"System / Как в системе"},
+                    {selector="language"})}
                 item {Preference("Тема",themeLabel,{selector="theme"})}
                 item {Preference("Динамические цвета",if(pulse)"Не используются в режиме Pulse" else "Палитра обоев Android",trailing={Switch(dynamic,onDynamic,enabled=!pulse)})}
                 item {HorizontalDivider(Modifier.padding(horizontal=20.dp,vertical=8.dp))}
@@ -101,8 +104,9 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
             }
         }
     }
-    if(selector.isNotEmpty())AlertDialog(onDismissRequest={selector=""},title={Text(if(selector=="theme")"Тема" else "Предупреждение без прогресса")},text={Column {
+    if(selector.isNotEmpty())AlertDialog(onDismissRequest={selector=""},title={Text(when(selector) {"theme"->"Тема";"language"->"Язык / Language";else->"Предупреждение без прогресса"})},text={Column {
         if(selector=="theme")listOf("system" to "Как в системе","light" to "Светлая","dark" to "Тёмная").forEach {(id,label)->SingleChoiceRow(label,theme==id){onTheme(id);selector=""}}
+        else if(selector=="language") listOf("system" to "System / Как в системе","ru" to "Русский","en" to "English").forEach {(id,label)->SingleChoiceRow(label,language==id){onLanguage(id);selector=""}}
         else MonitorPolicy.thresholds.forEach {value->SingleChoiceRow("$value минут",minutes==value){minutes=value;prefs.edit().putInt("warning_minutes",value).apply();selector=""}}
     }},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={selector=""}){Text("Отмена")}})
 }
