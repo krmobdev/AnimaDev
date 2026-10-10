@@ -112,7 +112,7 @@ class ReleaseGateway(private val context:Context) {
             val profile=JSONObject().put("id",project.id).put("name",project.name)
                 .put("root",project.path)
                 .put("remote",if(project.id=="animaquiz")"github.com/krmobdev/quizapp" else project.remote)
-                .put("branch",if(project.id=="animaquiz")"test/decomposition-v1" else project.branch)
+                .put("branch",project.branch)
             val payload=JSONObject().put("request_id",request).put("project",profile)
                 .put("alias",alias).put("keystore",Base64.encodeToString(key,Base64.NO_WRAP))
                 .put("store_password",storePassword).put("key_password",keyPassword)
