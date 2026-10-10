@@ -30,6 +30,7 @@ import java.util.Locale
     DisposableEffect(Unit) {onDispose {cache.close()} }
     LaunchedEffect(project.id,record.optLong("journal_generation"),record.optString("state"),record.optString("job_id"),releaseGeneration) {
         jobs=withContext(Dispatchers.IO) {
+            releaseHistory.observe(ReleaseStore(context).read())
             (listOfNotNull(record.optJSONObject("job"),record.optJSONObject("test_job"),record.optJSONObject("device_test_job"),record.optJSONObject("build_job"))+cache.jobs()+releaseHistory.history(project.id))
                 .filter {it.optString("job_id").matches(Regex("[a-f0-9]{32}")) && it.optString("project_id")==project.id}
                 .distinctBy {it.optString("job_id")}.sortedByDescending {it.optDouble("created_at")}
