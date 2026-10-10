@@ -24,7 +24,7 @@ def relocate(source_text, expected, size, output_dir):
         raise ValueError("ARTIFACT_INVALID")
     if (not isinstance(output_dir, str) or len(output_dir) > 520
             or not output_dir.startswith(ROOT)
-            or not all(re.fullmatch(r"[\\w ().&-]{1,80}",part) and part not in (".","..")
+            or not all(re.fullmatch(r"[\w ().&-]{1,80}",part) and part not in (".","..")
                        for part in output_dir[len(ROOT):].split("/"))):
         raise ValueError("DESTINATION_INVALID")
     folder = pathlib.Path(output_dir)
