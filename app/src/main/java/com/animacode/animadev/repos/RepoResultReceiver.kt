@@ -67,7 +67,7 @@ class RepoResultReceiver : BroadcastReceiver() {
                     check(artifact.getString("kind") == "DEBUG_APK" &&
                         artifact.getString("sha256").matches(Regex("[a-f0-9]{64}")) && artifact.getLong("size") > 1024L)
                     check(artifact.getString("commit") == job.getJSONObject("snapshot").getString("local_commit"))
-                    record.put("build_job", job)
+                    // History lives in JournalCache; never retain a stale build card.
                 }
                 if (job.getString("action") in setOf("TEST","TEST_DEVICE")) {
                     val tests = job.optJSONObject("tests")
