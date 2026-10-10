@@ -39,10 +39,12 @@ import org.json.JSONObject
     return remember(generation) { JSONObject().put("pending",gateway.prefs.getBoolean("pending",false)).put("message",gateway.prefs.getString("message","")).put("catalog",JSONObject(gateway.prefs.getString("catalog","{}") ?: "{}")).put("environment",JSONObject(gateway.prefs.getString("environment","{}") ?: "{}")) }
 }
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun ProjectsScreen(context:Context,permitted:Boolean,onOpen:(LocalProject)->Unit) {
+@Composable fun ProjectsScreen(context:Context,permitted:Boolean,onOpen:(LocalProject)->Unit,
+    onMenuRoute:(String)->Unit={}) {
     val haptic=androidx.compose.ui.platform.LocalHapticFeedback.current
     val store=remember { ProjectStore(context) };val gateway=remember { CatalogGateway(context) }
     var generation by remember { mutableIntStateOf(0) };var add by rememberSaveable { mutableStateOf(false) };var remove by remember { mutableStateOf<LocalProject?>(null) }
+    var neonMenu by remember {mutableStateOf(false)}
     var explicitPath by rememberSaveable { mutableStateOf("") };var showIssues by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(Unit) { val l=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,_->generation++ };store.prefs.registerOnSharedPreferenceChangeListener(l);onDispose { store.prefs.unregisterOnSharedPreferenceChangeListener(l) } }
     val projects=remember(generation) { store.all() };val info=rememberCatalogRecord(context);val record=rememberRepoRecord(context)
@@ -59,10 +61,21 @@ import org.json.JSONObject
                 Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                     Text("Projects",style=MaterialTheme.typography.displaySmall,
                         fontWeight=FontWeight.ExtraBold,color=NeonGlass.white,modifier=Modifier.weight(1f))
-                    Surface(shape=RoundedCornerShape(16.dp),color=NeonGlass.raised,
-                        border=BorderStroke(1.dp,NeonGlass.outline)) {
-                        Icon(AppIcons.Folder,null,tint=NeonGlass.green,
-                            modifier=Modifier.padding(13.dp).size(28.dp))
+                    Box {
+                        Surface(shape=RoundedCornerShape(16.dp),color=NeonGlass.raised,
+                            border=BorderStroke(1.dp,NeonGlass.outline)) {
+                            IconButton(onClick={neonMenu=true},modifier=Modifier.size(55.dp)) {
+                                Icon(AppIcons.More,"Menu",tint=NeonGlass.green)
+                            }
+                        }
+                        DropdownMenu(expanded=neonMenu,onDismissRequest={neonMenu=false}) {
+                            listOf("settings" to "Настройки","changelog" to "Список изменений",
+                                "about" to "О программе","help" to "Документация").forEach {(id,label)->
+                                DropdownMenuItem(text={Text(label)},onClick={
+                                    neonMenu=false;onMenuRoute(id)
+                                })
+                            }
+                        }
                     }
                 }
                 Text("Репозитории: ${primaryProjects.size} · worktree: ${projects.count {it.worktree}}",
