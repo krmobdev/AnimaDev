@@ -83,7 +83,7 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
                 item {Preference("Локальные проекты","Worktree сгруппированы по репозиторию. Удаление из списка не удаляет файлы; дополнительные проекты доступны для просмотра.")}
             }
             "profiles"->{
-                item {Preference("AnimaQuiz · unit-тесты Debug","test/decomposition-v1 · фиксированный офлайн-профиль",{showCommand=!showCommand})
+                item {Preference("AnimaQuiz · unit-тесты Debug","main или test/decomposition-v1 · проверенный GitHub SHA",{showCommand=!showCommand})
                     if(showCommand)DetailRow("Команда профиля","bash ./gradlew :app:testDebugUnitTest --offline --no-daemon --rerun-tasks --console=plain")}
                 item {Preference("Профили сборки","Debug APK и подписанный Release AAB после проверки GitHub и выбранного JKS")}
             }
