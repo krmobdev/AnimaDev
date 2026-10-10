@@ -95,9 +95,9 @@ class RepoGateway(private val context: Context) {
         val project=com.animacode.animadev.projects.ProjectStore(context).all().find {it.id==projectId && it.path==projectPath} ?: return
         if (!ProjectPolicy.canExecute(projectId,projectPath,action,project.worktree,project.remote)) return
         val r = store.read()
-        if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST", "BUILD_DEBUG") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked() || com.animacode.animadev.projects.ReleaseStore(context).busy()) return
+        if (action !in setOf("STATUS", "CHECK", "SYNC", "TEST", "TEST_DEVICE", "BUILD_DEBUG") || !r.optBoolean("ready") || r.optBoolean("pending") || store.blocked() || com.animacode.animadev.projects.ReleaseStore(context).busy()) return
         if (action == "SYNC" && !maySync(r,projectId)) return
-        if (action == "TEST" && !mayTest(r,projectId)) return
+        if (action in setOf("TEST","TEST_DEVICE") && !mayTest(r,projectId)) return
         if (action == "BUILD_DEBUG" && !mayBuild(r,projectId)) return
         val previousProject = r.optString("project_id",PROJECT)
         if (previousProject != projectId) {
@@ -122,7 +122,7 @@ class RepoGateway(private val context: Context) {
     fun cancel() {
         val r=store.read()
         if(!r.optBoolean("ready") || r.optBoolean("pending") ||
-            r.optString("action") !in setOf("TEST","BUILD_DEBUG") ||
+            r.optString("action") !in setOf("TEST","TEST_DEVICE","BUILD_DEBUG") ||
             r.optString("state") !in setOf("REQUESTED","QUEUED","RUNNING") ||
             r.optString("job_id").isBlank()) return
         dispatch("CANCEL")
@@ -136,7 +136,7 @@ class RepoGateway(private val context: Context) {
     fun journal(mode: String, job: String, action: String, offset: Long, view: String) {
         val r = store.read()
         if (r.optBoolean("pending") || !r.optBoolean("ready") || r.optString("installed_sha") != sha()) return
-        if (mode !in setOf("LOG", "HISTORY") || !job.matches(Regex("[a-f0-9]{32}")) || action !in setOf("STATUS","CHECK","SYNC","TEST","BUILD_DEBUG")) return
+        if (mode !in setOf("LOG", "HISTORY") || !job.matches(Regex("[a-f0-9]{32}")) || action !in setOf("STATUS","CHECK","SYNC","TEST","TEST_DEVICE","BUILD_DEBUG")) return
         dispatch(mode, job, action, offset, view)
     }
     private fun dispatch(mode: String, target: String = "", targetAction: String = "", offset: Long = 0, view: String = "ALL") {
