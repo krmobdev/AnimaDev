@@ -1,6 +1,7 @@
 package com.animacode.animadev.projects
 
 import android.content.Context
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
@@ -134,6 +135,8 @@ import com.animacode.animadev.repos.*
                 val canReceive=available && !stale && gateway.maySync(r,project.id)
                 val headline=when {
                     working->"Git · операция выполняется"
+                    gitJob && jobState in setOf("FAILED","TIMED_OUT","INTERRUPTED") -> "Ошибка Git · подробности ниже"
+                    gitJob && jobState=="UNKNOWN" -> "Неизвестен результат Git"
                     gitSnap==null->"Сначала проверьте Git"
                     !branchOk->"Ветка не разрешена"
                     !remoteOk->"Origin не подтверждён"
@@ -434,11 +437,14 @@ import com.animacode.animadev.repos.*
         }
         if(belongs && r.optString("job_id").isNotEmpty() &&
             (blocked || r.optString("state")=="UNKNOWN" ||
-             (tool=="git" && r.optString("action") !in setOf("TEST","TEST_DEVICE"))) &&
+             (tool=="git" && blocked)) &&
             (tool=="git" || r.optString("action")!="TEST_DEVICE"))item {
             JobMonitor(context,r,permitted,onJournal)
         }
     }
-    if(confirmSync)AlertDialog(onDismissRequest={confirmSync=false},title={Text("Получить изменения?")},text={Text("${project.name}: ветка, origin и чистота проверятся повторно. Только fast-forward, без отправки на GitHub.")},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmSync=false;gateway.start("SYNC",project.id,project.path)}){Text("Получить")}},dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmSync=false}){Text("Отложить")}})
+    if(confirmSync)AlertDialog(onDismissRequest={confirmSync=false},title={Text("Получить изменения?")},text={Text(project.name+": будет получено "+
+        (if(belongs)r.optJSONObject("snapshot")?.optInt("behind",0) ?: 0 else 0)+" коммитов.\n\n"+
+        "Termux повторно проверит ветку, origin, SHA и чистоту рабочего дерева. "+
+        "Только fast-forward. Push, reset и удаление файлов не выполняются.")},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmSync=false;gateway.start("SYNC",project.id,project.path)}){Text("Получить")}},dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmSync=false}){Text("Отложить")}})
     if(changedFiles)AlertDialog(onDismissRequest={changedFiles=false},title={Text("Изменённые файлы")},text={Column {Text((if(belongs)r.optJSONObject("snapshot") else null)?.optJSONArray("changed_files")?.let {a->(0 until a.length()).joinToString("\n"){a.optString(it)}} ?: "Список недоступен");Text("Просмотр содержимого diff пока не подключён.",style=MaterialTheme.typography.bodySmall)}},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={changedFiles=false}){Text("Закрыть")}})
 }
