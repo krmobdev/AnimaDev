@@ -51,7 +51,11 @@ import com.animacode.animadev.termux.TermuxGateway
     val releaseOwner=projects.all().find {it.id==releaseState.optString("project")}?.name ?: releaseState.optString("project")
     val busyOwner=BuildConcurrencyPolicy.owner(repoOwner,record.optString("job_id"),record.optString("state"),record.optString("action"),releaseOwner,releaseState.optString("state"))
     val ready=HelperPolicy.mayRun(permitted,termuxVersion!=null,record.optBoolean("ready"),record.optBoolean("pending"),blocked)
-    val canDebug=project.supported && ready && !releaseBusy && gateway.mayBuild(record,project.id)
+    val catalogRefresh=rememberCatalogRecord(context).optBoolean("pending")
+    val snapshotMatches=snapshot!=null && snapshot.optString("branch")==project.branch &&
+        snapshot.optString("local_commit")==project.commit
+    val canDebug=project.supported && ready && !releaseBusy && !catalogRefresh &&
+        snapshotMatches && gateway.mayBuild(record,project.id)
     val canCheck=project.supported && ready && !releaseBusy
     var now by remember {mutableLongStateOf(System.currentTimeMillis())}
     LaunchedEffect(releaseOrDebugBusy) {
@@ -59,6 +63,8 @@ import com.animacode.animadev.termux.TermuxGateway
     }
     val blockReason=when {
         busyOwner!=null -> BuildConcurrencyPolicy.waitingMessage(busyOwner,project.name)
+        catalogRefresh -> "Проверяем фактическую активную ветку в Termux. Дождитесь ответа."
+        !snapshotMatches -> "Ветка или SHA изменились после последней проверки. Обновите GitHub SHA."
         blocked -> "Предыдущее задание Termux не завершено или его результат неизвестен. Откройте журнал и уточните статус."
         record.optBoolean("pending") -> "Termux ещё обрабатывает предыдущий запрос. Дождитесь ответа."
         !permitted -> "Разрешите AnimaDev выполнять команды в Termux."
@@ -82,14 +88,13 @@ import com.animacode.animadev.termux.TermuxGateway
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
         item {
-            Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                Text("Центр сборок",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary)
-                Text(project.name,style=MaterialTheme.typography.headlineMedium)
-                Text((snapshot?.optString("branch") ?: "Ветка не проверена")+"  ·  "+
-                    (snapshot?.optString("local_commit")?.take(9) ?: "SHA неизвестен"),
-                    style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(if(busyOwner==null)"Готово к локальной сборке" else "Задание выполняется в Termux",
-                    style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
+            Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                Text("BUILD STUDIO",style=MaterialTheme.typography.labelLarge,
+                    color=AnimaPulse.green)
+                Text(project.name,style=MaterialTheme.typography.headlineLarge)
+                ActiveBranchHero(project.branch,project.commit,project.dirty)
+                if(catalogRefresh)Text("Сверяем активную ветку с Termux…",
+                    style=MaterialTheme.typography.bodySmall)
             }
         }
         if(busyOwner!=null)item {
