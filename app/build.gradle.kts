@@ -2,6 +2,7 @@ val releaseAssetRoot = layout.buildDirectory.dir("generated/animadev-release-ass
 val prepareReleaseScripts by tasks.registering(Copy::class) {
     from(rootProject.file("runner/release_signer.py"))
     from(rootProject.file("runner/release_worker.py"))
+    from(rootProject.file("runner/release_cancel.py"))
     from(rootProject.file("runner/ReleaseTransport.java"))
     into(releaseAssetRoot.map { it.dir("release") })
 }
@@ -17,8 +18,8 @@ android {
         applicationId = "com.animacode.animadev"
         minSdk = 33
         targetSdk = 35
-        versionCode = 26
-        versionName = "0.4.0-beta.8-dev.12"
+        versionCode = 27
+        versionName = "0.4.0-beta.8-dev.13"
     }
     sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
     buildFeatures { compose = true }
