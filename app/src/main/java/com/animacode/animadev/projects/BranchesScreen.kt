@@ -51,6 +51,7 @@ import org.json.JSONObject
         item {
             if(neon)NeonSection("Branches",AppIcons.Git,project.name)
             else Text(project.name,style=MaterialTheme.typography.titleMedium)
+            Text("Здесь показаны Git-ссылки выбранного каталога, а не отдельные рабочие каталоги. Ночная ветка может быть открыта в другом worktree — список таких каталогов теперь находится на экране проекта выше инструментов.",style=MaterialTheme.typography.bodyMedium,color=if(neon)NeonGlass.softGreen else MaterialTheme.colorScheme.primary)
             Text("Выберите строку, чтобы посмотреть коммиты и при необходимости явно переключиться. Переключение допустимо только для чистого AnimaQuiz с совпадающим SHA на GitHub.",
                 style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             if(switcher.message().isNotBlank())Text(switcher.message(),style=MaterialTheme.typography.bodySmall)
