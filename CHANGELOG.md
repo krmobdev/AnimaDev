@@ -1,5 +1,15 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-11 10:24 GMT+03:00 · 0.4.0-beta.10-dev.37 (51)
+- RU: Emerald Glass больше не использует старое выпадающее меню с тремя точками. Во всех вложенных экранах, включая Git, открыт единый графитовый заголовок с отдельной шестерёнкой.
+- EN: Emerald Glass removes the legacy three-dot popup. Project tools, including Git, now have a consistent graphite toolbar and a direct Settings action.
+- RU: На главной странице Projects вместо всплывающего меню — кнопка настроек. Экран Settings дополнен крупными карточками журнала изменений, документации и раздела «О программе».
+- EN: Projects now links straight to Settings, which includes accessible cards for changelog, documentation and About.
+- RU: Возврат из справки и списка изменений ведёт обратно в Settings, а затем к предыдущему инструменту; Git и Termux не теряют контекст.
+- EN: Support pages return to Settings, then to the invoking tool; Git and Termux context is preserved.
+- RU: Pulse и его меню оставлены без изменений; установленные данные, Git и процесс сборки не затронуты.
+- EN: Pulse, persisted data, Git operations and build workflows are unchanged.
+
 ## 2026-10-11 01:34 GMT+03:00 · 0.4.0-beta.10-dev.36 (50) · Device-test diagnostics
 - RU: Compose UI-тесты реально запускались на Pixel 7 в отдельном пакете devicefixture, не затрагивая рабочий AnimaDev. 4/4 теста не увидели иерархию, так как дисплей находился в режиме Dozing / lockscreen. Прогон нужен на разблокированном экране.
 - EN: Four isolated Emerald Compose tests were executed on Pixel 7. All were blocked by the phone being dozing/locked (no visible Compose hierarchy), not by asserted UI behavior. Repeat on an unlocked device.
