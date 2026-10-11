@@ -1,4 +1,4 @@
-# AnimaDev · 0.4.0-beta.10-dev.39
+# AnimaDev · 0.4.0-beta.10-dev.40
 
 Android 13+ companion for **local Git, tests and Android builds in Termux**. Written in Kotlin and Jetpack Compose (Material You / Pulse). No mandatory VPS, AnimaBridge or GitHub API token is needed to use the installed app.
 
@@ -31,7 +31,7 @@ Android 13+ companion for **local Git, tests and Android builds in Termux**. Wri
 6. For Debug tap Build and open APK through the **native Android installer**. AAB is for publishing, not direct device installation.
 ## Worktree overview / Рабочие каталоги
 
-The project dashboard shows the **current worktree** and other linked worktrees discovered by the read-only Termux catalog. Each entry includes its branch, path, local HEAD, and uncommitted-file count when available. Tap another worktree for copyable path details; AnimaDev never switches to or mutates it implicitly. Refresh reads from Termux, **not live GitHub**. Compare the actual remote branch separately before claiming changes were pushed.
+**Main project tools come first.** The Worktrees section below the tools is collapsed by default; it shows the current branch/status and number of other worktrees. Tap **Show** to expand lazy-loaded entries, or **Hide** to collapse them again. The read-only Termux catalog discovers linked working directories. Each entry includes its branch, path, local HEAD, and uncommitted-file count when available. Tap another worktree for copyable path details; AnimaDev never switches to or mutates it implicitly. Refresh reads from Termux, **not live GitHub**. Compare the actual remote branch separately before claiming changes were pushed.
 
 ## Git commit vs working tree / Коммиты и рабочие файлы
 
