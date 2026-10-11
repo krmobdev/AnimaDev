@@ -44,6 +44,7 @@ class EmeraldGlassUiTest {
             }
         }
         compose.waitForIdle()
+        compose.onNodeWithText("Clean").assertIsDisplayed()
         compose.onNodeWithText("AnimaQuiz").assertIsDisplayed().performClick()
         compose.waitForIdle()
         assertTrue(opened)
