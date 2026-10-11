@@ -13,8 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.printToString
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -52,15 +51,12 @@ class EmeraldGlassUiTest {
         compose.waitForIdle()
         // The project tile is clickable and merges semantics in the default tree.
         // Check the real status and branch Text nodes in the unmerged tree.
-        // Status text is a noninteractive child of a clickable merged card.
-        // Assert the accessible content exists; only the card itself must be
-        // fully on screen and clickable.
-        try {
-            compose.onNodeWithText("Clean",useUnmergedTree=true).assertExists()
-        } catch (failure: AssertionError) {
-            throw AssertionError("Card semantics (unmerged):\n"+
-                compose.onRoot(useUnmergedTree=true).printToString(),failure)
-        }
+        // The system locale can be Russian or English. The UI translates
+        // the git status chip; both variants must actually be visible.
+        val statusText=if(compose.onAllNodesWithText(
+                "Чисто",useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()
+            ) "Чисто" else "Clean"
+        compose.onNodeWithText(statusText,useUnmergedTree=true).assertIsDisplayed()
         compose.waitForIdle()
         compose.onNodeWithText("main",useUnmergedTree=true).assertIsDisplayed()
     }
