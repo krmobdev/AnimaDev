@@ -1,5 +1,17 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-11 12:17 GMT+03:00 · 0.4.0-beta.10-dev.40 (54)
+- RU: По обратной связи исправлена неудобная компоновка: «Ветки и переключение», Git, тесты, сборка и история теперь всегда выше рабочих каталогов.
+- EN: Fixed dashboard hierarchy: Branches, Git, Tests, Build and History appear before the Worktrees section.
+- RU: Блок «Рабочие каталоги» по умолчанию свёрнут в небольшую карточку со счётчиком, статусом текущей ветки и отдельной кнопкой обновления.
+- EN: Worktrees default to a compact collapsed summary with count, current-branch status and refresh.
+- RU: Полный список открывается по нажатию и скрывается обратно. Каталоги выводятся отдельными ленивыми элементами прокрутки, без создания десятков тяжёлых карточек сразу.
+- EN: Expand/collapse on demand; rows use the outer LazyColumn for efficient on-screen rendering.
+- RU: Обновлён Compose UI-тест раскрытия/сворачивания. Никаких изменений Git, файлов и функций сборки.
+- EN: Added a Compose UI regression test for collapsed-by-default behavior without changing Git/file/build operations.
+- RU: Ночная ветка AnimaQuiz feature/design-three-themes удалена самим владельцем; main 3.7.22 (101) сохранена и проверена.
+- EN: Owner completed the requested branch cleanup; AnimaQuiz main release 3.7.22 (101) remains verified.
+
 ## 2026-10-11 11:57 GMT+03:00 · 0.4.0-beta.10-dev.39 (53)
 - RU: Проект теперь показывает основной каталог и все найденные связанные Git-worktree прямо над инструментами. Видны путь, ветка, SHA и число незакоммиченных файлов, если Git подтвердил его.
 - EN: The project dashboard now exposes every discovered linked worktree above tool cards, with path, branch, local SHA and safe uncommitted-file count.
