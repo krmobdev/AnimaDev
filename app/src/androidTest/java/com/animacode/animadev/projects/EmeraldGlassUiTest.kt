@@ -48,9 +48,11 @@ class EmeraldGlassUiTest {
         compose.waitForIdle()
         assertTrue(opened)
         compose.waitForIdle()
-        compose.onNodeWithText("Clean").assertIsDisplayed()
+        // The project tile is clickable and merges semantics in the default tree.
+        // Check the real status and branch Text nodes in the unmerged tree.
+        compose.onNodeWithText("Clean",useUnmergedTree=true).assertIsDisplayed()
         compose.waitForIdle()
-        compose.onNodeWithText("main").assertIsDisplayed()
+        compose.onNodeWithText("main",useUnmergedTree=true).assertIsDisplayed()
     }
 
     @Test fun compactTabsRespondToSelectionAtLargeFontScale() {
