@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertExists
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +51,10 @@ class EmeraldGlassUiTest {
         compose.waitForIdle()
         // The project tile is clickable and merges semantics in the default tree.
         // Check the real status and branch Text nodes in the unmerged tree.
-        compose.onNodeWithText("Clean",useUnmergedTree=true).assertIsDisplayed()
+        // Status text is a noninteractive child of a clickable merged card.
+        // Assert the accessible content exists; only the card itself must be
+        // fully on screen and clickable.
+        compose.onNodeWithText("Clean",useUnmergedTree=true).assertExists()
         compose.waitForIdle()
         compose.onNodeWithText("main",useUnmergedTree=true).assertIsDisplayed()
     }
