@@ -24,7 +24,10 @@ fun NeonTopBar(
     onBack:()->Unit,
     onSettings:()->Unit
 ) {
-    Surface(color=NeonGlass.background,tonalElevation=0.dp) {
+    // Scaffold does not apply system-bar insets to a custom topBar.
+    // Reserve the full Android status bar before laying out touch targets.
+    Surface(modifier=Modifier.windowInsetsPadding(WindowInsets.statusBars),
+        color=NeonGlass.background,tonalElevation=0.dp) {
         Column {
             Row(Modifier.fillMaxWidth().heightIn(min=70.dp)
                     .padding(horizontal=13.dp,vertical=8.dp),
