@@ -70,11 +70,28 @@ import org.json.JSONObject
                 val workTree=BranchPolicy.workingTree(metadata.opt("dirty") as? Boolean,
                     metadata.optString("error").isNotBlank())
                 if(neon) NeonPanel(Modifier.fillMaxWidth()) {
-                    NeonKeyValue("Working tree",workTree,AppIcons.Success)
-                    NeonStatus(if(metadata.optBoolean("dirty"))"Local changes" else
-                        if(metadata.isNull("dirty") || metadata.optString("error").isNotBlank())"Not verified" else "Clean",
-                        !metadata.isNull("dirty") && !metadata.optBoolean("dirty") &&
-                            metadata.optString("error").isBlank())
+                    // A status cannot share a weighted row with a long Russian
+                    // label at 360dp and large font scaling; stack vertically.
+                    Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                        Icon(AppIcons.Git,null,tint=NeonGlass.green,
+                            modifier=Modifier.size(24.dp))
+                        Text("Рабочее дерево",style=MaterialTheme.typography.titleMedium,
+                            fontWeight=FontWeight.Bold,color=NeonGlass.white)
+                    }
+                    val verified=!metadata.isNull("dirty") &&
+                        metadata.optString("error").isBlank()
+                    NeonStatus(when {
+                        !verified->"Не проверено"
+                        metadata.optBoolean("dirty")->"Локальные изменения"
+                        else->"Чисто"
+                    },verified && !metadata.optBoolean("dirty"))
+                    Text(if(!verified)"Не удалось подтвердить состояние файлов."
+                        else if(metadata.optBoolean("dirty"))
+                            "Незакоммиченные файлы. Переключение веток заблокировано до их сохранения."
+                        else "Незакоммиченных изменений нет.",
+                        style=MaterialTheme.typography.bodySmall,
+                        color=NeonGlass.muted)
                 } else Text("Рабочее дерево: "+workTree,
                     style=MaterialTheme.typography.bodyMedium)
             }
@@ -82,7 +99,9 @@ import org.json.JSONObject
                 if(metadata.optBoolean("branches_limited"))Text("Старый снимок неполный. Обновите список для чтения всех страниц.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
                 Text("Загружено веток: ${BranchPolicy.merge(refs).size}"+(if(metadata.optBoolean("branches_more"))" · есть следующая страница" else ""),style=MaterialTheme.typography.bodySmall)
                 if(metadata.optString("default_branch").isEmpty())Text("Главная ветка не подтверждена: origin/HEAD отсутствует.",style=MaterialTheme.typography.bodySmall)
-                Text("Origin показывает последний локальный снимок, а не текущие данные GitHub. Для актуальности используйте проверку обновлений в Git.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                Text("Origin — сохранённые локальные ссылки на ветки. Кнопка «Обновить список» перечитывает их в Termux, но не выполняет GitHub fetch. Актуальный SHA GitHub проверяйте в разделе Git. Несохранённые изменения не удаляются автоматически.",
+                    style=MaterialTheme.typography.bodySmall,
+                    color=MaterialTheme.colorScheme.onSurfaceVariant)}
             items(rows,key={it.name}) {b->
                 Surface(onClick={feedback.tap(feedbackView);selectedBranch=b},
                     modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(24.dp),
