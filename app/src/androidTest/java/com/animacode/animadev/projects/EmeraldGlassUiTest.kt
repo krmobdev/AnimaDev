@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -45,7 +46,8 @@ class EmeraldGlassUiTest {
             }
         }
         compose.waitForIdle()
-        android.util.Log.i("ANIMA_CARD_BOUNDS", "status="+compose.onNodeWithText("Clean").fetchSemanticsNode().boundsInRoot+" root="+compose.onRoot().fetchSemanticsNode().boundsInRoot)
+        compose.onRoot(useUnmergedTree=true).printToLog("ANIMA_TREE")
+        android.util.Log.i("ANIMA_CARD_BOUNDS", "root="+compose.onRoot().fetchSemanticsNode().boundsInRoot)
         compose.onNodeWithText("Clean").assertIsDisplayed()
         compose.onNodeWithText("AnimaQuiz").assertIsDisplayed().performClick()
         compose.waitForIdle()
