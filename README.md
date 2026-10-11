@@ -1,4 +1,4 @@
-# AnimaDev · 0.4.0-beta.10-dev.37
+# AnimaDev · 0.4.0-beta.10-dev.38
 
 Android 13+ companion for **local Git, tests and Android builds in Termux**. Written in Kotlin and Jetpack Compose (Material You / Pulse). No mandatory VPS, AnimaBridge or GitHub API token is needed to use the installed app.
 
@@ -29,6 +29,10 @@ Android 13+ companion for **local Git, tests and Android builds in Termux**. Wri
 4. In Git tools verify branch, origin and GitHub SHA before TEST/BUILD. / Сверьте GitHub SHA и чистоту дерева.
 5. Inspect Job ID and Journal during execution. **QUERY** does not start another job. / Проверяйте статус прежнего задания по ID.
 6. For Debug tap Build and open APK through the **native Android installer**. AAB is for publishing, not direct device installation.
+## Git commit vs working tree / Коммиты и рабочие файлы
+
+Matching local and GitHub commit IDs confirms commit alignment **only**. A dirty working tree means tracked or untracked local file differences still exist. AnimaDev reports filenames and blocks unsafe fast-forward/checkout rather than silently resetting or committing user files. The Branches view lists cached local/origin references; refresh reads them from Termux without a network fetch. Git → Check updates verifies the current GitHub commit separately.
+
 ## Emerald navigation / Навигация Emerald
 
 The new skin has no legacy three-dot overflow on the Projects or project tool screens. A dedicated gear action opens Settings, where Change log, Documentation and About are first-class cards. Back returns to the previous tool through Settings. The older Pulse skin remains unchanged.
