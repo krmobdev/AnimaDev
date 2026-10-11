@@ -1,5 +1,13 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-11 · Pixel 7 instrumentation retest — 5/5 PASS (dev.40 unchanged)
+- RU: Повторно выполнены 5 Compose UI-тестов на реальном Pixel 7 (Android API 37) в изолированном пакете devicefixture. XML-отчёт: 5 тестов, 0 ошибок, 0 пропусков; BUILD SUCCESSFUL.
+- EN: Five Compose UI tests reran on real Pixel 7 (API 37), isolated devicefixture. XML: 5 tests, zero failures/errors/skips; BUILD SUCCESSFUL.
+- RU: Причина прежнего падения — тест ожидал английское Clean на телефоне с русской локалью, где правильная строка — «Чисто». Проверка теперь поддерживает оба языка и требует видимости статуса.
+- EN: The previous failure was test-only: expected English Clean while the Russian UI correctly renders Чисто. The assertion now accepts both locales and checks visibility.
+- RU: Код приложения, его версия и подписанная сборка dev.40 не менялись; рабочие данные AnimaDev не затрагивались.
+- EN: No application runtime/version changes; installed AnimaDev data remained untouched.
+
 ## 2026-10-11 · Pixel 7 device QA of dev.40 (no app version change)
 - RU: На Pixel 7 (API 37) реально запущены пять Compose UI-тестов в отдельном пакете devicefixture: 4 прошли, 1 упал.
 - EN: Five actual Compose instrumentation tests ran on Pixel 7 (API 37) in isolated devicefixture: 4 passed, 1 failed.
