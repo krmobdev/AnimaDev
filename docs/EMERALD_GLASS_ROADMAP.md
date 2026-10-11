@@ -23,6 +23,10 @@ repository, job, Git, signing and storage state remain unchanged. No invented da
 - [x] Job monitor / journal: Emerald status, stage, controls, safe raw logs, event timeline
 
 ## Sprint 3 — planned
+- [x] dev.39: Show all discovered linked worktrees before Git/Tests/Build, including local branch, path, SHA and file counts
+- [x] dev.39: Clear warning that worktree presence and main SHA equality do not prove any GitHub push
+- [ ] Device acceptance: verify full catalog enumeration, large-font cards and copy-path details
+- [ ] Requested deletion of unrelated AnimaQuiz design-three-themes branch requires a connection that permits safe ref/worktree removal; existing connector blocks ref deletion
 - [x] Termux environment / tools / SDK overview, real versions from probes
 - [x] Settings index and nested sections use Emerald cards, preserving original preferences
 - [x] Remove Emerald three-dot popups on Projects and project tools; use dedicated graphitic toolbar/gear and Settings navigation hub (dev.37)
