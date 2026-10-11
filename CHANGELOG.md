@@ -1,5 +1,17 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-11 11:31 GMT+03:00 · 0.4.0-beta.10-dev.38 (52)
+- RU: Исправлено наложение шестерёнки/заголовка Emerald Glass на статус-бар Android. Пользовательские верхние панели теперь учитывают системный отступ.
+- EN: Fix Emerald custom toolbar overlapping the Android system status bar by respecting status-bar window insets.
+- RU: «Ветки и переключение» вынесены сразу под названием проекта, текущей веткой и SHA; дублирующая кнопка удалена из нижней части карточки инструментов.
+- EN: Move Branches & switching beside project branch/SHA, removing the buried duplicate beneath tool tiles.
+- RU: Исправлен перенос надписи «Рабочее дерево» на экранe Branches; заголовок, статус и пояснение теперь расположены вертикально.
+- EN: Correct broken Working tree label layout using a responsive stacked status section.
+- RU: Git объясняет различие между совпадающими коммитами и незакоммиченными файлами. При 1–3 изменениях показываются их имена. Автоматический reset/checkout/push запрещён.
+- EN: Explain matching remote commits versus an uncommitted working tree, showing up to three changed filenames; never perform automatic reset/checkout/push.
+- RU: Ветки origin — последний локальный снимок, а не доказательство актуальности GitHub; это явно обозначено на экране.
+- EN: Branches view now clearly labels origin refs as local snapshots, not live GitHub state.
+
 ## 2026-10-11 10:24 GMT+03:00 · 0.4.0-beta.10-dev.37 (51)
 - RU: Emerald Glass больше не использует старое выпадающее меню с тремя точками. Во всех вложенных экранах, включая Git, открыт единый графитовый заголовок с отдельной шестерёнкой.
 - EN: Emerald Glass removes the legacy three-dot popup. Project tools, including Git, now have a consistent graphite toolbar and a direct Settings action.
