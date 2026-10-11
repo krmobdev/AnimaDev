@@ -1,4 +1,4 @@
-# AnimaDev · 0.4.0-beta.10-dev.38
+# AnimaDev · 0.4.0-beta.10-dev.39
 
 Android 13+ companion for **local Git, tests and Android builds in Termux**. Written in Kotlin and Jetpack Compose (Material You / Pulse). No mandatory VPS, AnimaBridge or GitHub API token is needed to use the installed app.
 
@@ -29,6 +29,10 @@ Android 13+ companion for **local Git, tests and Android builds in Termux**. Wri
 4. In Git tools verify branch, origin and GitHub SHA before TEST/BUILD. / Сверьте GitHub SHA и чистоту дерева.
 5. Inspect Job ID and Journal during execution. **QUERY** does not start another job. / Проверяйте статус прежнего задания по ID.
 6. For Debug tap Build and open APK through the **native Android installer**. AAB is for publishing, not direct device installation.
+## Worktree overview / Рабочие каталоги
+
+The project dashboard shows the **current worktree** and other linked worktrees discovered by the read-only Termux catalog. Each entry includes its branch, path, local HEAD, and uncommitted-file count when available. Tap another worktree for copyable path details; AnimaDev never switches to or mutates it implicitly. Refresh reads from Termux, **not live GitHub**. Compare the actual remote branch separately before claiming changes were pushed.
+
 ## Git commit vs working tree / Коммиты и рабочие файлы
 
 Matching local and GitHub commit IDs confirms commit alignment **only**. A dirty working tree means tracked or untracked local file differences still exist. AnimaDev reports filenames and blocks unsafe fast-forward/checkout rather than silently resetting or committing user files. The Branches view lists cached local/origin references; refresh reads them from Termux without a network fetch. Git → Check updates verifies the current GitHub commit separately.
