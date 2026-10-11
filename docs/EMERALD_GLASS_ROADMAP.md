@@ -23,10 +23,13 @@ repository, job, Git, signing and storage state remain unchanged. No invented da
 - [x] Job monitor / journal: Emerald status, stage, controls, safe raw logs, event timeline
 
 ## Sprint 3 — planned
-- [x] dev.39: Show all discovered linked worktrees before Git/Tests/Build, including local branch, path, SHA and file counts
+- [x] dev.39: Show all discovered linked worktrees before Git/Tests/Build, including local branch, path, SHA and file counts (superseded by dev.40 compact layout)
+- [x] dev.40: Move worktree section AFTER Git / Tests / Build / History, collapsed by default
+- [x] dev.40: Lazy worktree rows on expand, hide/show toggle, compact count/status and refresh
+- [x] dev.40: Add Compose UI regression fixture covering collapsed and expanded states
 - [x] dev.39: Clear warning that worktree presence and main SHA equality do not prove any GitHub push
 - [ ] Device acceptance: verify full catalog enumeration, large-font cards and copy-path details
-- [ ] Requested deletion of unrelated AnimaQuiz design-three-themes branch requires a connection that permits safe ref/worktree removal; existing connector blocks ref deletion
+- [x] Owner deleted AnimaQuiz feature/design-three-themes locally and on GitHub; main 3.7.22 (101) verified clean
 - [x] Termux environment / tools / SDK overview, real versions from probes
 - [x] Settings index and nested sections use Emerald cards, preserving original preferences
 - [x] Remove Emerald three-dot popups on Projects and project tools; use dedicated graphitic toolbar/gear and Settings navigation hub (dev.37)
