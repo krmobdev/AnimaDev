@@ -154,6 +154,7 @@ import org.json.JSONObject
 @Composable fun ProjectWorkspace(context:Context,project:LocalProject,onTool:(String)->Unit,
     permitted:Boolean=false,onJournal:(String)->Unit={}) {
     var worktreesExpanded by rememberSaveable(project.id) { mutableStateOf(false) }
+    var emeraldWorktreesExpanded by rememberSaveable(project.id, "emerald_worktrees") { mutableStateOf(false) }
     val catalogGateway=remember {CatalogGateway(context)}
     var selectedWorktree by remember {mutableStateOf<LocalProject?>(null)}
     val neon=LocalNeonSkin.current
@@ -252,12 +253,6 @@ import org.json.JSONObject
                 }
             }
         }
-        if(neon)item {
-            EmeraldWorktreeOverview(context,currentCatalogProject,worktreesSorted,
-                permitted,catalog.optBoolean("pending"),
-                catalog.getJSONObject("catalog").optDouble("scanned_at",0.0)>0.0,
-                onRefresh={catalogGateway.read("CATALOG")})
-        }
         if(!neon)item {ActiveBranchHero(branch,sha,dirty)}
         if(isActiveJob)item {
             val action=record.optString("action")
@@ -340,6 +335,23 @@ import org.json.JSONObject
                 }
             }
         }
+        if(neon)item(key="worktree_overview") {
+            EmeraldWorktreeOverview(
+                root=currentCatalogProject,
+                relatedCount=worktreesSorted.size,
+                permitted=permitted,
+                pending=catalog.optBoolean("pending"),
+                scanned=catalog.getJSONObject("catalog").optDouble("scanned_at",0.0)>0.0,
+                expanded=emeraldWorktreesExpanded,
+                onToggle={emeraldWorktreesExpanded=!emeraldWorktreesExpanded},
+                onRefresh={catalogGateway.read("CATALOG")}
+            )
+        }
+        if(neon && emeraldWorktreesExpanded) {
+            items(worktreesSorted,key={ "worktree_"+it.path }) {wt->
+                EmeraldWorktreeRow(wt,onOpen={selectedWorktree=wt})
+            }
+        }
         if(!neon && worktrees.isNotEmpty())item {
             OutlinedCard(onClick={worktreesExpanded=!worktreesExpanded},
                 modifier=Modifier.fillMaxWidth(),
@@ -365,6 +377,9 @@ import org.json.JSONObject
                 style=MaterialTheme.typography.bodySmall,
                 color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+    selectedWorktree?.let { wt->
+        EmeraldWorktreeDetails(context,wt,onDismiss={selectedWorktree=null})
     }
     if(releaseJournal) ReleaseJournalDialog(context,release.optString("id")) {releaseJournal=false}
     if(releaseStopConfirm)AlertDialog(onDismissRequest={releaseStopConfirm=false},
