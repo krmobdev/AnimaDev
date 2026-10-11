@@ -154,6 +154,8 @@ import org.json.JSONObject
 @Composable fun ProjectWorkspace(context:Context,project:LocalProject,onTool:(String)->Unit,
     permitted:Boolean=false,onJournal:(String)->Unit={}) {
     var worktreesExpanded by rememberSaveable(project.id) { mutableStateOf(false) }
+    val catalogGateway=remember {CatalogGateway(context)}
+    var selectedWorktree by remember {mutableStateOf<LocalProject?>(null)}
     val neon=LocalNeonSkin.current
     val catalog=rememberCatalogRecord(context)
     val entries=catalog.getJSONObject("catalog").optJSONArray("projects")
@@ -163,6 +165,8 @@ import org.json.JSONObject
                 ?.takeIf {it.worktree && it.repositoryPath.isNotEmpty() &&
                     it.repositoryPath==(project.repositoryPath.ifEmpty {project.path})}?.let {add(it)}
     }
+    val worktreesSorted=worktrees.distinctBy {it.path}.sortedWith(compareByDescending<LocalProject>{it.dirty==true}.thenBy {it.path})
+    val currentCatalogProject=entries?.let {a->(0 until a.length()).mapNotNull {i->runCatching {LocalProject.parse(a.getJSONObject(i))}.getOrNull()}.firstOrNull {it.path==project.path}} ?:project
     val record=rememberRepoRecord(context)
     val snap=if(project.supported && record.optString("project_id","animaquiz")==project.id)
         record.optJSONObject("snapshot")?.takeIf {
@@ -330,7 +334,7 @@ import org.json.JSONObject
                 }
             }
         }
-        if(worktrees.isNotEmpty())item {
+        if(!neon && worktrees.isNotEmpty())item {
             OutlinedCard(onClick={worktreesExpanded=!worktreesExpanded},
                 modifier=Modifier.fillMaxWidth(),
                 shape=androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
