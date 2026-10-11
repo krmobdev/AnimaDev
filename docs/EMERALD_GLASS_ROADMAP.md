@@ -42,8 +42,8 @@ repository, job, Git, signing and storage state remain unchanged. No invented da
 - [x] Lightweight selection transitions and cached ambient glow (no heavy blur)
 - [ ] Validate 60 fps frame pacing, insets, TalkBack, screenshot reference matching on device
 - [x] 2026-10-11: Run dev.40 Emerald Compose instrumentation on awake, unlocked Pixel 7 (API 37), isolated `devicefixture`: **5 executed, 4 passed, 1 failed**; the new collapsed-worktrees test passed
-- [ ] Investigate `EmeraldGlassUiTest.projectCardDisplaysActualGitMetadataAndOpens`: `Clean` status exists in initial run but `assertIsDisplayed` fails; before-click reproduction and a later absent-node result mean its visibility/fixture stability is unresolved
-- [ ] Rerun full Emerald suite **5/5 green** on Pixel 7 after fixing card status visibility; do not count compilation as device acceptance
+- [x] Resolved Pixel 7 project-card test: Russian UI displays «Чисто», not English Clean. Locale-aware assertion verifies visible status in both languages
+- [x] Reran complete EmeraldGlassUiTest suite on real Pixel 7 (API 37): **5/5 pass**, XML confirms 0 failures, 0 errors and 0 skips
 - [ ] RU / EN TalkBack, screenshot comparison and frame-pacing on device (RU caption and back-navigation unit regression tests added)
 
 ## Non-negotiable correctness
