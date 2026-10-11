@@ -25,6 +25,8 @@ repository, job, Git, signing and storage state remain unchanged. No invented da
 ## Sprint 3 — planned
 - [x] Termux environment / tools / SDK overview, real versions from probes
 - [x] Settings index and nested sections use Emerald cards, preserving original preferences
+- [x] Remove Emerald three-dot popups on Projects and project tools; use dedicated graphitic toolbar/gear and Settings navigation hub (dev.37)
+- [x] Changelog, documentation and About are navigable Settings cards with Back preserving original tool
 - [x] About branded hero, changelog and bilingual bundled documentation
 - [x] Small-screen tabs, bottom navigation, project tile grid, SHA layout and long labels adapt to width/font scale
 - [x] Lightweight selection transitions and cached ambient glow (no heavy blur)
