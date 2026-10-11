@@ -1,5 +1,17 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-11 11:57 GMT+03:00 · 0.4.0-beta.10-dev.39 (53)
+- RU: Проект теперь показывает основной каталог и все найденные связанные Git-worktree прямо над инструментами. Видны путь, ветка, SHA и число незакоммиченных файлов, если Git подтвердил его.
+- EN: The project dashboard now exposes every discovered linked worktree above tool cards, with path, branch, local SHA and safe uncommitted-file count.
+- RU: «Обновить рабочие каталоги» заново читает их в Termux без checkout, fetch или изменения файлов; дополнительные сведения и копирование пути — по нажатию на карточку.
+- EN: Refresh rereads local worktrees in Termux without checkout, fetch or writes; detail dialog exposes a copyable path.
+- RU: Состояние отправки в GitHub обозначено как непроверенное в обзоре; совпадение коммитов в main не подтверждает отправку работы из отдельного worktree.
+- EN: A clean main or matching SHAs never falsely certifies a different worktree as pushed to GitHub.
+- RU: В «Ветках» объяснено отличие Git-ссылок от рабочих каталогов; Pulse сохранён.
+- EN: Branches explains refs versus worktrees; Pulse remains unchanged.
+- RU: Удаление ночной ветки AnimaQuiz запрошено отдельно, но из доступных коннекторов заблокировано защитой Git. Удаление не выполнялось.
+- EN: Destructive cleanup of AnimaQuiz night branch remains blocked by the connected Git tool's guard; no branch was deleted.
+
 ## 2026-10-11 11:31 GMT+03:00 · 0.4.0-beta.10-dev.38 (52)
 - RU: Исправлено наложение шестерёнки/заголовка Emerald Glass на статус-бар Android. Пользовательские верхние панели теперь учитывают системный отступ.
 - EN: Fix Emerald custom toolbar overlapping the Android system status bar by respecting status-bar window insets.
