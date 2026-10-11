@@ -1,11 +1,19 @@
 package com.animacode.animadev.projects
 
-/** Read-only Git catalog status. Neither a branch nor a clean tree proves that GitHub is up-to-date. */
+/** A local status is not evidence of any push, PR, or remote comparison. */
 object WorktreeStatusText {
-    fun describe(dirty:Boolean?,files:Int?):String = when(dirty) {
-        true -> if(files!=null) "Локальные изменения: $files файлов (ещё не в коммите)"
+    private fun countLabel(count:Int):String {
+        val word=if(count%100 in 11..14)"файлов" else when(count%10) {
+            1->"файл"
+            2,3,4->"файла"
+            else->"файлов"
+        }
+        return "$count $word"
+    }
+    fun describe(dirty:Boolean?,files:Int?):String=when(dirty) {
+        true->if(files!=null)"Локальные изменения: ${countLabel(files)} (ещё не в коммите)"
             else "Есть незакоммиченные файлы"
-        false -> "Рабочие файлы без изменений"
-        null -> "Состояние файлов не проверено"
+        false->"Рабочие файлы без изменений"
+        null->"Состояние файлов не проверено"
     }
 }
