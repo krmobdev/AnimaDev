@@ -57,7 +57,7 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
         trailingContent=trailing ?: if(onClick!=null)({Icon(AppIcons.Chevron,null)}) else null,
         modifier=if(onClick!=null)Modifier.clickable {feedback.tap(view);onClick()} else Modifier)
 }
-@Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={},pulse:Boolean=true,onPulse:(Boolean)->Unit={},onOpenBuild:(String)->Unit={},language:String="system",onLanguage:(String)->Unit={},emerald:Boolean=false,onEmerald:(Boolean)->Unit={}) {
+@Composable fun AppearanceSettings(context:Context,theme:String,dynamic:Boolean,onTheme:(String)->Unit,onDynamic:(Boolean)->Unit,section:String="",onSection:(String)->Unit={},pulse:Boolean=true,onPulse:(Boolean)->Unit={},onOpenBuild:(String)->Unit={},language:String="system",onLanguage:(String)->Unit={},emerald:Boolean=false,onEmerald:(Boolean)->Unit={},onSupport:(String)->Unit={}) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
     val feedback=remember {UiFeedback(context)}
@@ -105,7 +105,44 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
                     leadingContent={Icon(tileIcon,null,tint=MaterialTheme.colorScheme.primary)},
                     trailingContent={Icon(AppIcons.Chevron,null)},
                     modifier=Modifier.clickable{feedback.tap(view);openSection(id)})
-            }} else {
+            }}
+            if(neon && query.isBlank()) {
+                item(key="app_support_header") {
+                    NeonSection(if(englishUi)"App & support" else "Приложение и помощь",
+                        AppIcons.Info,
+                        if(englishUi)"Information, documentation and changes"
+                        else "Информация, документация и изменения",
+                        modifier=Modifier.padding(start=20.dp,end=20.dp,top=23.dp,bottom=9.dp))
+                }
+                item(key="app_support_changelog") {
+                    Box(Modifier.padding(horizontal=16.dp,vertical=5.dp)) {
+                        NeonSettingsRow(
+                            if(englishUi)"Change log" else "Список изменений",
+                            if(englishUi)"Newest versions, dates and fixes first"
+                            else "Версии, даты и исправления — новые сверху",
+                            AppIcons.History) {feedback.tap(view);onSupport("changelog")}
+                    }
+                }
+                item(key="app_support_docs") {
+                    Box(Modifier.padding(horizontal=16.dp,vertical=5.dp)) {
+                        NeonSettingsRow(
+                            if(englishUi)"Documentation" else "Документация",
+                            if(englishUi)"Git, Termux, tests and build instructions"
+                            else "Git, Termux, тесты и инструкции по сборке",
+                            AppIcons.Folder) {feedback.tap(view);onSupport("help")}
+                    }
+                }
+                item(key="app_support_about") {
+                    Box(Modifier.padding(horizontal=16.dp,vertical=5.dp)) {
+                        NeonSettingsRow(
+                            if(englishUi)"About AnimaDev" else "О программе AnimaDev",
+                            if(englishUi)"Version, platform and GitHub"
+                            else "Версия, система и GitHub",
+                            AppIcons.Info) {feedback.tap(view);onSupport("about")}
+                    }
+                }
+            }
+            else if(query.isNotBlank()) {
                 val results=SettingsPolicy.search(query,englishUi)
                 if(results.isEmpty())item {DetailRow("Ничего не найдено","Попробуйте другое название или описание")}
                 results.forEach {entry->item(key=entry.section+entry.id){Preference(entry.title,entry.description,{openSection(entry.section+"/"+entry.id)})}}
