@@ -79,12 +79,12 @@ class OperationScreensInstrumentedTest {
         compose.setContent {MaterialTheme {
             BuildScreen(context,project,false,null,{}, {})
         }}
-        compose.onNodeWithText("Собрать Debug APK").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Собрать Debug APK",substring=true).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("9 из 10 успешно").assertDoesNotExist()
         compose.onNodeWithText("Собрать Release AAB").assertDoesNotExist()
         compose.onNodeWithText("Release AAB").performScrollTo().performClick()
         compose.onNodeWithText("Собрать Release AAB").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Собрать Debug APK").assertDoesNotExist()
+        compose.onNodeWithText("Собрать Debug APK",substring=true).assertDoesNotExist()
     }
     @Test fun apkButtonUsesSystemInstallerFlowNotTermuxOpen() {
         val artifact=JSONObject().put("path","/storage/emulated/0/Download/fixture.apk")
@@ -174,7 +174,7 @@ class OperationScreensInstrumentedTest {
         compose.onNodeWithText("Экран журнала").assertIsDisplayed()
         compose.onNodeWithText("Переключить экран").performClick()
         compose.onNodeWithText("Собрать Release AAB").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Собрать Debug APK").assertDoesNotExist()
+        compose.onNodeWithText("Собрать Debug APK",substring=true).assertDoesNotExist()
     }
 
 }

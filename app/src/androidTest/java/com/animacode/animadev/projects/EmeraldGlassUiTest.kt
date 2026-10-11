@@ -30,8 +30,8 @@ class EmeraldGlassUiTest {
 
     @Test fun projectCardDisplaysActualGitMetadataAndOpens() {
         val ctx=InstrumentationRegistry.getInstrumentation().targetContext
-        check(ctx.packageName == "com.animacode.animadev.devicefixture") {
-            "Refusing to run Emerald UI fixture against installed AnimaDev"
+        check(ctx.packageName.matches(Regex("""com\.animacode\.animadev(?:\.devicefixture|\.animadevtests\.j[a-f0-9]{32})"""))) {
+            "Emerald UI fixture requires an isolated test package"
         }
         var opened=false
         val project=LocalProject("animaquiz","AnimaQuiz",ProjectPolicy.QUIZ,

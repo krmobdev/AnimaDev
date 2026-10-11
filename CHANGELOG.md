@@ -1,5 +1,13 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-12 01:00 GMT+03:00 · 0.4.0-beta.10-dev.40 (54) — RMX3301 Android tests 32/32 PASS
+- RU: Все 32 инструментальных теста выполнены через Termux/ADB на RMX3301 в изолированном пакете: 32 успешных, 0 ошибок, 0 пропусков; Gradle BUILD SUCCESSFUL.
+- EN: All 32 Android instrumentation tests ran via Termux/ADB on RMX3301 in an isolated app package: 32 passed, zero failures/errors/skips; Gradle BUILD SUCCESSFUL.
+- RU: Тест Pulse теперь находит нужный переключатель по стабильному Compose testTag, не путая его с Emerald Glass; исправлены проверка ID изолированного пакета и устойчивость поиска кнопки Debug APK к поясняющему тексту.
+- EN: Pulse test now targets a stable Compose testTag instead of Emerald Glass; isolated package ID validation and Debug APK button matcher now reflect the current UI.
+- RU: Только тестовые проверки и невидимая тестовая семантика; версия приложения и данные установленного AnimaDev не изменялись. Pixel 7 доступен по ADB, но был отключён на время запуска тестов на одном устройстве.
+- EN: Only test assertions and invisible UI test semantics changed; installed AnimaDev version/data were not altered. Pixel 7 remained ADB-reachable but was temporarily disconnected for single-device testing.
+
 ## 2026-10-11 · Pixel 7 instrumentation retest — 5/5 PASS (dev.40 unchanged)
 - RU: Повторно выполнены 5 Compose UI-тестов на реальном Pixel 7 (Android API 37) в изолированном пакете devicefixture. XML-отчёт: 5 тестов, 0 ошибок, 0 пропусков; BUILD SUCCESSFUL.
 - EN: Five Compose UI tests reran on real Pixel 7 (API 37), isolated devicefixture. XML: 5 tests, zero failures/errors/skips; BUILD SUCCESSFUL.

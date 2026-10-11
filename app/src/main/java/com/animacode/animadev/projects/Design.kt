@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 @Composable fun SectionLabel(text:String) { Text(text,style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary,modifier=Modifier.padding(top=8.dp,bottom=4.dp)) }
@@ -163,7 +164,7 @@ private val descriptions=mapOf("appearance" to "Тема, динамически
                 item {
                     Preference("Pulse · молодёжный дизайн",
                         if(emerald)"Сохранён как запасной стиль" else if(pulse)"Зелёные акценты, светлая или тёмная палитра" else "Классическая палитра Material",
-                        trailing={Switch(pulse,onPulse)})
+                        trailing={Switch(pulse,onPulse,modifier=Modifier.testTag("appearance-pulse-toggle"))})
                 }
                 item {Preference("Язык / Language",
                     when(language) {"en"->"English";"ru"->"Русский";else->"System / Как в системе"},
