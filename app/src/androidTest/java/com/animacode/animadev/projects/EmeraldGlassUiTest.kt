@@ -9,6 +9,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -82,6 +86,36 @@ class EmeraldGlassUiTest {
         compose.onNodeWithText("Termux").assertIsDisplayed().performClick()
         compose.waitForIdle()
         assertTrue(termux)
+    }
+
+    @Test fun worktreesRemainCollapsedUntilRequestedAndToolsStayVisible() {
+        val project=LocalProject("animaquiz","AnimaQuiz",ProjectPolicy.QUIZ,
+            "main","7d3faa2",dirty=false)
+        compose.setContent {
+            var expanded by remember {mutableStateOf(false)}
+            MaterialTheme(colorScheme=neonColorScheme()) {
+                Column {
+                    Text("Инструменты")
+                    EmeraldWorktreeOverview(
+                        root=project,relatedCount=21,permitted=true,
+                        pending=false,scanned=true,expanded=expanded,
+                        onToggle={expanded=!expanded},onRefresh={}
+                    )
+                    if(expanded)Text("test/another-worktree")
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("Инструменты").assertIsDisplayed()
+        compose.onNodeWithText("Показать каталоги (21)").assertIsDisplayed()
+        compose.onNodeWithText("test/another-worktree").assertDoesNotExist()
+        compose.onNodeWithText("Показать каталоги (21)").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Скрыть список").assertIsDisplayed()
+        compose.onNodeWithText("test/another-worktree").assertIsDisplayed()
+        compose.onNodeWithText("Скрыть список").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("test/another-worktree").assertDoesNotExist()
     }
 
     @Test fun buildEntryHasWorkingCallback() {
