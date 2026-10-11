@@ -1,4 +1,4 @@
-# AnimaDev · 0.4.0-beta.10-dev.36
+# AnimaDev · 0.4.0-beta.10-dev.37
 
 Android 13+ companion for **local Git, tests and Android builds in Termux**. Written in Kotlin and Jetpack Compose (Material You / Pulse). No mandatory VPS, AnimaBridge or GitHub API token is needed to use the installed app.
 
@@ -29,6 +29,10 @@ Android 13+ companion for **local Git, tests and Android builds in Termux**. Wri
 4. In Git tools verify branch, origin and GitHub SHA before TEST/BUILD. / Сверьте GitHub SHA и чистоту дерева.
 5. Inspect Job ID and Journal during execution. **QUERY** does not start another job. / Проверяйте статус прежнего задания по ID.
 6. For Debug tap Build and open APK through the **native Android installer**. AAB is for publishing, not direct device installation.
+## Emerald navigation / Навигация Emerald
+
+The new skin has no legacy three-dot overflow on the Projects or project tool screens. A dedicated gear action opens Settings, where Change log, Documentation and About are first-class cards. Back returns to the previous tool through Settings. The older Pulse skin remains unchanged.
+
 ## Android UI testing / Проверка на устройстве
 
 Emerald Compose tests use a separate `-PanimadevDeviceFixture=true` package so the installed AnimaDev application and its data remain untouched. Pixel 7 was reachable via ADB; the 2026-10-11 run was inconclusive because its screen was dozing/locked, so all four tests reported no Compose hierarchy. Rerun with the device awake and unlocked; do not treat this as a successful UI test.
