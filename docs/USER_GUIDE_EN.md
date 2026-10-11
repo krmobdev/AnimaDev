@@ -6,6 +6,9 @@ AnimaDev is an Android companion for local Git repositories in Termux. It inspec
 ## Git revisions and uncommitted files
 Equal local and GitHub commit SHAs do **not** imply a clean working tree. Uncommitted changes and untracked files are separate from commit history. AnimaDev can display changed filenames and never resets, commits or pushes them automatically. Safe fast-forward requires a verified clean worktree. Branches refresh reads locally cached origin refs in Termux; Git checks the actual GitHub commit separately.
 
+## Locating an agent's separate working tree
+From the project dashboard, use the Worktrees / «Рабочие каталоги» section and refresh the catalog. The view shows the current directory alongside all discovered linked worktrees, with branch, local SHA, path and uncommitted file count. Tap a worktree to copy its path. **This is a local Termux snapshot, not a live GitHub verification.** Changes in another worktree cannot be inferred from the main working-tree status. No worktree is reset, checked out, or deleted automatically.
+
 ## First-time setup
 1. Install Termux from a trusted source and open it once.
 2. Enable its RUN_COMMAND integration explicitly in Termux settings. AnimaDev does not change that preference for you.
