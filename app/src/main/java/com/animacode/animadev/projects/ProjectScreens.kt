@@ -44,7 +44,6 @@ import org.json.JSONObject
     val haptic=androidx.compose.ui.platform.LocalHapticFeedback.current
     val store=remember { ProjectStore(context) };val gateway=remember { CatalogGateway(context) }
     var generation by remember { mutableIntStateOf(0) };var add by rememberSaveable { mutableStateOf(false) };var remove by remember { mutableStateOf<LocalProject?>(null) }
-    var neonMenu by remember {mutableStateOf(false)}
     var explicitPath by rememberSaveable { mutableStateOf("") };var showIssues by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(Unit) { val l=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,_->generation++ };store.prefs.registerOnSharedPreferenceChangeListener(l);onDispose { store.prefs.unregisterOnSharedPreferenceChangeListener(l) } }
     val projects=remember(generation) { store.all() };val info=rememberCatalogRecord(context);val record=rememberRepoRecord(context)
@@ -61,20 +60,13 @@ import org.json.JSONObject
                 Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                     Text("Projects",style=MaterialTheme.typography.displaySmall,
                         fontWeight=FontWeight.ExtraBold,color=NeonGlass.white,modifier=Modifier.weight(1f))
-                    Box {
-                        Surface(shape=RoundedCornerShape(16.dp),color=NeonGlass.raised,
-                            border=BorderStroke(1.dp,NeonGlass.outline)) {
-                            IconButton(onClick={neonMenu=true},modifier=Modifier.size(55.dp)) {
-                                Icon(AppIcons.More,"Menu",tint=NeonGlass.green)
-                            }
-                        }
-                        DropdownMenu(expanded=neonMenu,onDismissRequest={neonMenu=false}) {
-                            listOf("settings" to "Настройки","changelog" to "Список изменений",
-                                "about" to "О программе","help" to "Документация").forEach {(id,label)->
-                                DropdownMenuItem(text={Text(label)},onClick={
-                                    neonMenu=false;onMenuRoute(id)
-                                })
-                            }
+                    Surface(onClick={onMenuRoute("settings")},
+                        shape=RoundedCornerShape(16.dp),color=NeonGlass.raised,
+                        border=BorderStroke(1.dp,NeonGlass.outline)) {
+                        Box(Modifier.size(54.dp),
+                            contentAlignment=androidx.compose.ui.Alignment.Center) {
+                            Icon(AppIcons.Settings,"Настройки и информация",
+                                modifier=Modifier.size(26.dp),tint=NeonGlass.green)
                         }
                     }
                 }
