@@ -188,6 +188,14 @@ def inspect(root,home=HOME,git=None,branches=False,branch_offset=0):
         code,changes=call(['status','--porcelain=v1','-z','--untracked-files=all'])
         if code:raise ValueError('GIT_FAILED')
         result['dirty']=bool(changes)
+        fields=changes.split(chr(0))
+        index=0
+        count=0
+        while index<len(fields) and fields[index]:
+            status=fields[index][:2]
+            count+=1
+            index+=2 if ('R' in status or 'C' in status) else 1
+        result['changes_count']=count
         if branches:
             code,default=call(['symbolic-ref','--quiet','refs/remotes/origin/HEAD'])
             confirmed=code==0 and default.startswith('refs/remotes/origin/') and call(['show-ref','--verify','--quiet',default])[0]==0
