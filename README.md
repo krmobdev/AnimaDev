@@ -1,9 +1,10 @@
 # AnimaDev · 0.4.0-beta.10-dev.40
 
-Android 13+ companion for **local Git, tests and Android builds in Termux**. Written in Kotlin and Jetpack Compose (Material You / Pulse). No mandatory VPS, AnimaBridge or GitHub API token is needed to use the installed app.
+**AnimaDev** — Android-приложение для тех, кто разрабатывает и собирает проекты **прямо на телефоне через Termux**. Оно объединяет Git и worktree, Gradle-тесты, сборку Debug APK и подписанных Release AAB, мониторинг задач, журналы и историю операций. Требуется Android 13+; интерфейс написан на Kotlin и Jetpack Compose.
 
-**English:** Local Android Git/Gradle assistant with safe per-project operations and persistent history.
-**Русский:** Локальный Android-инструмент управления Git и сборками с журналами и безопасными ограничениями.
+**English:** An Android 13+ companion for local Git, Gradle tests, APK/AAB builds and job history in Termux. No mandatory PC, VPS, AnimaBridge or GitHub API token is required by the installed app.
+
+**Статус / Status:** `0.4.0-beta.10-dev.40`. Владелец подтвердил ручное тестирование приложения на устройстве 11.10.2026; автоматизированная UI-проверка Emerald ещё не завершена. Публичный GitHub Release с готовым APK пока не опубликован — см. [инструкцию по подготовке Termux](docs/TERMUX_SETUP.md) и раздел разработки ниже.
 
 ## Функционал / Features
 
@@ -29,6 +30,7 @@ Android 13+ companion for **local Git, tests and Android builds in Termux**. Wri
 4. In Git tools verify branch, origin and GitHub SHA before TEST/BUILD. / Сверьте GitHub SHA и чистоту дерева.
 5. Inspect Job ID and Journal during execution. **QUERY** does not start another job. / Проверяйте статус прежнего задания по ID.
 6. For Debug tap Build and open APK through the **native Android installer**. AAB is for publishing, not direct device installation.
+
 ## Worktree overview / Рабочие каталоги
 
 **Main project tools come first.** The Worktrees section below the tools is collapsed by default; it shows the current branch/status and number of other worktrees. Tap **Show** to expand lazy-loaded entries, or **Hide** to collapse them again. The read-only Termux catalog discovers linked working directories. Each entry includes its branch, path, local HEAD, and uncommitted-file count when available. Tap another worktree for copyable path details; AnimaDev never switches to or mutates it implicitly. Refresh reads from Termux, **not live GitHub**. Compare the actual remote branch separately before claiming changes were pushed.
@@ -49,7 +51,7 @@ Emerald Compose tests use a separate `-PanimadevDeviceFixture=true` package so t
 
 - **Pulse / Material:** existing UI preserved. Stored settings, project data and results stay intact.
 - **Emerald Glass (opt-in):** graphite/emerald theme inspired by owner-approved mockups.
-  Implemented across Projects, project dashboard, root navigation, Build, Tests, History, Branches, Termux, Settings index and About. Live job monitoring, journal filtering/export and nested settings now use Emerald components. Adaptive narrow-screen layouts, large-font navigation/tabs and lightweight color transitions have been added. On-device visual acceptance remains pending; UI test execution is planned for the isolated devicefixture package.
+  Implemented across Projects, project dashboard, root navigation, Build, Tests, History, Branches, Termux, Settings index and About. Live job monitoring, journal filtering/export and nested settings now use Emerald components. Adaptive narrow-screen layouts, large-font navigation/tabs and lightweight color transitions have been added. The owner has confirmed a manual on-device check; automated Emerald UI acceptance still requires a conclusive run in the isolated device-fixture package.
 - Switch using **Settings → Appearance → Emerald Glass**. Turning it off restores
   your previous Pulse/Material style without resetting projects or jobs.
 - [Emerald Glass implementation checklist](docs/EMERALD_GLASS_ROADMAP.md).
@@ -77,7 +79,7 @@ The guides and change log are bundled offline into the APK from these **same Git
 
 ## Development / Разработка
 
-- Active integration branch: `feature/termux-probe`; do not merge to `main` without explicit owner review.
+- `main` is the owner-approved baseline; ongoing integration work happens in `feature/termux-probe`. Do not merge further development changes without owner review.
 - Kotlin, Compose, AGP 9.3.1, Gradle 9.5.0, compileSdk 37, minSdk 33, Java 21 toolchain (bytecode 17).
 - Gradle (on an already prepared Termux instance):
 
