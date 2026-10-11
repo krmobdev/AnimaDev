@@ -34,8 +34,8 @@ android {
         minSdk = 33
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 53
-        versionName = "0.4.0-beta.10-dev.39"
+        versionCode = 54
+        versionName = "0.4.0-beta.10-dev.40"
     }
     sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
     sourceSets.getByName("main").assets.srcDir(supportAssets.get().asFile)
