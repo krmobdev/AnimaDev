@@ -225,6 +225,29 @@ import org.json.JSONObject
                         style=MaterialTheme.typography.bodySmall)
             }
         }
+        if(neon)item {
+            // Branch switching belongs beside the current branch / SHA, not
+            // buried below Build Now at the bottom of the tool grid.
+            Surface(onClick={open("branches")},modifier=Modifier.fillMaxWidth(),
+                color=NeonGlass.surface,shape=RoundedCornerShape(20.dp),
+                border=BorderStroke(1.dp,NeonGlass.green.copy(alpha=.48f))) {
+                Row(Modifier.fillMaxWidth().padding(horizontal=17.dp,vertical=15.dp),
+                    verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.spacedBy(13.dp)) {
+                    NeonIconTile(AppIcons.Git,Modifier.size(48.dp))
+                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                        Text("Ветки и переключение",
+                            style=MaterialTheme.typography.titleMedium,
+                            fontWeight=FontWeight.Bold,color=NeonGlass.white)
+                        Text(branch.ifBlank {"Ветка не проверена"},
+                            style=MaterialTheme.typography.bodySmall,
+                            color=NeonGlass.muted,maxLines=2,
+                            overflow=TextOverflow.Ellipsis)
+                    }
+                    Icon(AppIcons.Chevron,null,tint=NeonGlass.green)
+                }
+            }
+        }
         if(!neon)item {ActiveBranchHero(branch,sha,dirty)}
         if(isActiveJob)item {
             val action=record.optString("action")
@@ -294,10 +317,6 @@ import org.json.JSONObject
                 }
                 NeonPrimaryAction("Build Now","Latest commit · "+sha.take(8).ifBlank {"not verified"},
                     AppIcons.Build,onClick={open("build")})
-                OutlinedButton(onClick={open("branches")},modifier=Modifier.fillMaxWidth()) {
-                    Icon(AppIcons.Git,null);Spacer(Modifier.width(8.dp))
-                    Text("Ветки и переключение")
-                }
             } else Column(verticalArrangement=Arrangement.spacedBy(13.dp)) {
                 Text("ИНСТРУМЕНТЫ",style=MaterialTheme.typography.titleSmall,
                     color=MaterialTheme.colorScheme.primary)
