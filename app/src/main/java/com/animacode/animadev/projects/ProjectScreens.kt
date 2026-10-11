@@ -252,6 +252,12 @@ import org.json.JSONObject
                 }
             }
         }
+        if(neon)item {
+            EmeraldWorktreeOverview(context,currentCatalogProject,worktreesSorted,
+                permitted,catalog.optBoolean("pending"),
+                catalog.getJSONObject("catalog").optDouble("scanned_at",0.0)>0.0,
+                onRefresh={catalogGateway.read("CATALOG")})
+        }
         if(!neon)item {ActiveBranchHero(branch,sha,dirty)}
         if(isActiveJob)item {
             val action=record.optString("action")
