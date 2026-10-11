@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.animacode.animadev.repos.*
 
@@ -169,12 +170,30 @@ import com.animacode.animadev.repos.*
                                 style=MaterialTheme.typography.bodyMedium)
                             Text("Файлы: "+when {gitSnap==null->"Не проверены";dirty->"Есть изменения";else->"Чисто"},
                                 style=MaterialTheme.typography.bodyMedium)
+                            if(checked && localSha.isNotBlank() && localSha==remoteSha) {
+                                Text("Коммиты синхронизированы с GitHub. Это не означает, что рабочие файлы неизменны.",
+                                    style=MaterialTheme.typography.bodySmall,
+                                    color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                             if(dirty) {
                                 val files=gitSnap?.optJSONArray("changed_files")
-                                Text("Изменено файлов (в ответе): "+(files?.length() ?: 0),
-                                    style=MaterialTheme.typography.bodySmall)
+                                val count=files?.length() ?: 0
+                                Text("Незакоммиченные локальные изменения · файлов: "+count,
+                                    style=MaterialTheme.typography.bodyMedium,
+                                    color=MaterialTheme.colorScheme.error)
+                                if(count in 1..3) {
+                                    for(i in 0 until count) {
+                                        Text(files?.optString(i).orEmpty(),
+                                            style=MaterialTheme.typography.bodySmall,
+                                            color=MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines=3,overflow=TextOverflow.Ellipsis)
+                                    }
+                                }
+                                Text("Проверка GitHub не удаляет локальные правки и не отправляет их на сервер. Для получения коммитов нужно чистое рабочее дерево.",
+                                    style=MaterialTheme.typography.bodySmall,
+                                    color=MaterialTheme.colorScheme.onSurfaceVariant)
                                 com.animacode.animadev.projects.ActionButton(onClick={changedFiles=true}) {
-                                    Text("Показать изменённые файлы")
+                                    Text("Показать все изменённые файлы")
                                 }
                             }
                             Text(if(checked)"Коммитов на GitHub: +"+behind+" · локально: +"+ahead
