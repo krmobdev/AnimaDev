@@ -1,5 +1,11 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-11 · Pixel 7 device QA of dev.40 (no app version change)
+- RU: На Pixel 7 (API 37) реально запущены пять Compose UI-тестов в отдельном пакете devicefixture: 4 прошли, 1 упал.
+- EN: Five actual Compose instrumentation tests ran on Pixel 7 (API 37) in isolated devicefixture: 4 passed, 1 failed.
+- RU: Новый тест сворачиваемого списка рабочих каталогов прошёл. Непройденный тест — видимость статуса Clean на карточке проекта; причина остаётся на проверке.
+- EN: The collapsed worktree-list regression passed. Project-card Clean status visibility is unresolved; this is not a fully green device test run.
+
 ## 2026-10-11 12:17 GMT+03:00 · 0.4.0-beta.10-dev.40 (54)
 - RU: По обратной связи исправлена неудобная компоновка: «Ветки и переключение», Git, тесты, сборка и история теперь всегда выше рабочих каталогов.
 - EN: Fixed dashboard hierarchy: Branches, Git, Tests, Build and History appear before the Worktrees section.
