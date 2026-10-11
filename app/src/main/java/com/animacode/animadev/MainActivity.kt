@@ -172,16 +172,49 @@ class MainActivity:ComponentActivity() {
                 route=="settings"->SettingsPolicy.toolbarTitle(settingsSection);top=="termux"->"Termux";route=="list"->"Проекты";route=="branches"->"Ветки";route=="git"->"Git";route=="tests"->"Тесты";route=="build"->"Сборка";route=="journal"->"Журнал";route=="history"->"История";route=="wait"->"Контроль задания";else->current?.name ?: "Проект" }
             Scaffold(
                 contentWindowInsets=WindowInsets.safeDrawing,
-                topBar={if(!(emerald && root && top=="projects")) TopAppBar(title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={if(!root)IconButton(onClick={clickFeedback();back()}){Icon(AppIcons.Back,"Вернуться")}},actions={
-                    Box { IconButton(onClick={clickFeedback();menu=true}){Icon(AppIcons.More,"Меню приложения")}
-                        DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
-                            DropdownMenuItem(text={Text(if(english)"Settings" else "Настройки")},leadingIcon={Icon(AppIcons.Settings,null)},onClick={clickFeedback();menu=false;if(route!="settings"){settingsParent=route;settingsSection="";route="settings"}})
-                            DropdownMenuItem(text={Text(if(english)"Change log" else "Список изменений")},onClick={clickFeedback();menu=false;supportParent=route;route="changelog"})
-                            DropdownMenuItem(text={Text(if(english)"About" else "О программе")},onClick={clickFeedback();menu=false;supportParent=route;route="about"})
-                            DropdownMenuItem(text={Text(if(english)"Documentation" else "Документация")},onClick={clickFeedback();menu=false;supportParent=route;route="help"})
+                topBar={
+                    if(emerald) {
+                        if(!(root && top=="projects")) NeonTopBar(
+                            title=title,canGoBack=!root,
+                            showSettings=route!="settings",
+                            onBack={clickFeedback();back()},
+                            onSettings={
+                                clickFeedback()
+                                settingsParent=route
+                                settingsSection=""
+                                route="settings"
+                            })
+                    } else TopAppBar(
+                        title={Text(title,maxLines=1,overflow=TextOverflow.Ellipsis)},
+                        navigationIcon={if(!root)IconButton(onClick={clickFeedback();back()}) {
+                            Icon(AppIcons.Back,"Вернуться")
+                        }},
+                        actions={
+                            Box {
+                                IconButton(onClick={clickFeedback();menu=true}) {
+                                    Icon(AppIcons.More,"Меню приложения")
+                                }
+                                DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
+                                    DropdownMenuItem(
+                                        text={Text(if(english)"Settings" else "Настройки")},
+                                        leadingIcon={Icon(AppIcons.Settings,null)},
+                                        onClick={
+                                            clickFeedback();menu=false
+                                            if(route!="settings") {
+                                                settingsParent=route;settingsSection="";route="settings"
+                                            }
+                                        })
+                                    DropdownMenuItem(text={Text(if(english)"Change log" else "Список изменений")},
+                                        onClick={clickFeedback();menu=false;supportParent=route;route="changelog"})
+                                    DropdownMenuItem(text={Text(if(english)"About" else "О программе")},
+                                        onClick={clickFeedback();menu=false;supportParent=route;route="about"})
+                                    DropdownMenuItem(text={Text(if(english)"Documentation" else "Документация")},
+                                        onClick={clickFeedback();menu=false;supportParent=route;route="help"})
+                                }
+                            }
                         }
-                    }
-                })},
+                    )
+                },
                 bottomBar={if(root) {
                     if(emerald) NeonBottomBar(
                         onProjects={clickFeedback();top="projects";route="list";journalJob=""},
@@ -204,6 +237,7 @@ class MainActivity:ComponentActivity() {
                         pulse=pulse,onPulse={value->pulse=value;settings.edit().putBoolean("pulse",value).apply()},
                         emerald=emerald,onEmerald={value->emerald=value;settings.edit().putBoolean("emerald_glass",value).apply()},
                         language=language,onLanguage={value->language=value;settings.edit().putString("language",value).apply()},
+                        onSupport={target->clickFeedback();supportParent="settings";route=target},
                         onOpenBuild={projectId->
                             val project=projects.all().firstOrNull {it.id==projectId && it.supported}
                             if(project!=null) {
@@ -221,8 +255,11 @@ class MainActivity:ComponentActivity() {
                         onOpen={p->clickFeedback();projects.select(p.id);selected=p.id;route="workspace";journalJob=""},
                         onMenuRoute={id->
                             clickFeedback()
-                            if(id=="settings") {settingsParent="list";settingsSection="";route="settings"}
-                            else {supportParent="list";route=id}
+                            if(id=="settings") {
+                                settingsParent="list";settingsSection="";route="settings"
+                            } else {
+                                supportParent="list";route=id
+                            }
                         })
                     route=="branches"->BranchesScreen(context,current,permitted)
                     route=="workspace"->ProjectWorkspace(context,current,
