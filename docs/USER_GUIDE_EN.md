@@ -3,6 +3,9 @@
 ## Overview
 AnimaDev is an Android companion for local Git repositories in Termux. It inspects branches and GitHub SHA alignment, runs authorized Gradle tests/builds and keeps job journals. Builds run locally in Termux; finished APKs are handed to the **native Android Package Installer**.
 
+## Git revisions and uncommitted files
+Equal local and GitHub commit SHAs do **not** imply a clean working tree. Uncommitted changes and untracked files are separate from commit history. AnimaDev can display changed filenames and never resets, commits or pushes them automatically. Safe fast-forward requires a verified clean worktree. Branches refresh reads locally cached origin refs in Termux; Git checks the actual GitHub commit separately.
+
 ## First-time setup
 1. Install Termux from a trusted source and open it once.
 2. Enable its RUN_COMMAND integration explicitly in Termux settings. AnimaDev does not change that preference for you.
