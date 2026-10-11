@@ -4,13 +4,13 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class LocalProject(val id:String,val name:String,val path:String,val branch:String="",val commit:String="",val remote:String="",val dirty:Boolean?=null,val error:String="",val worktree:Boolean=false,val repositoryPath:String="") {
+data class LocalProject(val id:String,val name:String,val path:String,val branch:String="",val commit:String="",val remote:String="",val dirty:Boolean?=null,val error:String="",val worktree:Boolean=false,val repositoryPath:String="",val changesCount:Int?=null) {
     val supported get()=!worktree && ProjectPolicy.supported(id,path,remote)
-    fun json()=JSONObject().put("id",id).put("name",name).put("path",path).put("branch",branch).put("commit",commit).put("remote",remote).put("dirty",dirty ?: JSONObject.NULL).put("error",error).put("worktree",worktree).put("repository_path",repositoryPath)
+    fun json()=JSONObject().put("id",id).put("name",name).put("path",path).put("branch",branch).put("commit",commit).put("remote",remote).put("dirty",dirty ?: JSONObject.NULL).put("error",error).put("worktree",worktree).put("repository_path",repositoryPath).put("changes_count",changesCount ?: JSONObject.NULL)
     companion object {
         fun parse(j:JSONObject):LocalProject {
             val id=j.getString("id");val path=j.getString("path");require(ProjectPolicy.validId(id,path))
-            return LocalProject(id,j.getString("name").take(80),path,j.optString("branch").take(200),j.optString("commit").take(64),j.optString("remote").take(200),if(j.isNull("dirty"))null else j.optBoolean("dirty"),j.optString("error").take(200),j.optBoolean("worktree"),j.optString("repository_path").takeIf {ProjectPolicy.permittedPath(it)} ?: "")
+            return LocalProject(id,j.getString("name").take(80),path,j.optString("branch").take(200),j.optString("commit").take(64),j.optString("remote").take(200),if(j.isNull("dirty"))null else j.optBoolean("dirty"),j.optString("error").take(200),j.optBoolean("worktree"),j.optString("repository_path").takeIf {ProjectPolicy.permittedPath(it)} ?: "",if(j.isNull("changes_count") || !j.has("changes_count"))null else j.optInt("changes_count").takeIf {it in 0..100000})
         }
     }
 }
