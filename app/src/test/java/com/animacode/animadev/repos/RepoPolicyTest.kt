@@ -3,6 +3,15 @@ import org.junit.Assert.*
 import org.junit.Test
 class RepoPolicyTest {
     private fun sync(branch:String="test/decomposition-v1", dirty:Boolean=false, remote:Boolean=true, ahead:Int=0, behind:Int=1, checked:Boolean=true, runner:Boolean=true, blocked:Boolean=false) = RepoPolicy.maySync(branch,dirty,remote,ahead,behind,checked,runner,blocked)
+    @Test fun journalFullIsDeterministicOnlyWithConfirmedRunnerRefusal() {
+        assertTrue(RepoPolicy.journalCapacityRejected("UNKNOWN",0,-1,"HISTORY_FULL",false))
+        assertFalse(RepoPolicy.journalCapacityRejected("UNKNOWN",0,-1,"JOB_BUSY",false))
+        assertFalse(RepoPolicy.journalCapacityRejected("UNKNOWN",-1,-1,"HISTORY_FULL",false))
+        assertFalse(RepoPolicy.journalCapacityRejected("RUNNING",0,-1,"HISTORY_FULL",false))
+        assertFalse(RepoPolicy.journalCapacityRejected("UNKNOWN",0,-1,"HISTORY_FULL",true))
+        assertEquals("0.4.0",RepoPolicy.runnerVersion(
+            "33e2668e27ed92ac12b0ea6170dfcf91fff4ea0af5d08380a1038679bf549507","0.4.1"))
+    }
     @Test fun staleJobCanBeQueriedAfterHelperUpdate() {
         val id="a".repeat(32)
         val original="b".repeat(64)

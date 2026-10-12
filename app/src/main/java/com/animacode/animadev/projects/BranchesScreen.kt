@@ -52,7 +52,7 @@ import org.json.JSONObject
             if(neon)NeonSection("Branches",AppIcons.Git,project.name)
             else Text(project.name,style=MaterialTheme.typography.titleMedium)
             Text("Здесь показаны Git-ссылки выбранного каталога, а не отдельные рабочие каталоги. Ночная ветка может быть открыта в другом worktree — список таких каталогов теперь находится на экране проекта выше инструментов.",style=MaterialTheme.typography.bodyMedium,color=if(neon)NeonGlass.softGreen else MaterialTheme.colorScheme.primary)
-            Text("Выберите локальную ветку с подтверждённым SHA GitHub, чтобы безопасно переключиться. Для всех подключённых обычных репозиториев без локальных изменений.",
+            Text("Выбирайте существующую локальную ветку при чистом рабочем дереве. Если origin отсутствует, переключение локальное, без push. Расходящиеся SHA заблокированы.",
                 style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             if(switcher.message().isNotBlank())Text(switcher.message(),style=MaterialTheme.typography.bodySmall)
             if(switcher.pending())LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -160,8 +160,7 @@ import org.json.JSONObject
         } else item {Text("Обновите список. Результаты другого проекта здесь не показываются.",style=MaterialTheme.typography.bodyMedium)}
     }
     selectedBranch?.let {row->
-        val eligible=project.supported && !project.worktree && row.local!=null && row.remote!=null &&
-            row.local.sha==row.remote.sha && !row.active &&
+        val eligible=project.supported && !project.worktree && BranchPolicy.maySwitch(row) &&
             metadata?.optBoolean("dirty")==false && !switcher.pending() &&
             !gateway.prefs.getBoolean("pending",false) &&
             !com.animacode.animadev.repos.RepoStore(context).blocked() &&
@@ -173,8 +172,11 @@ import org.json.JSONObject
                 Text(if(row.active)"Эта ветка уже активна." else "Выбрана ветка для переключения.",style=MaterialTheme.typography.bodyMedium)
                 Text("Локальный SHA: "+(row.local?.sha?.take(12) ?: "отсутствует"),style=MaterialTheme.typography.bodySmall)
                 Text("Origin SHA: "+(row.remote?.sha?.take(12) ?: "отсутствует"),style=MaterialTheme.typography.bodySmall)
-                Text(if(eligible)"Перед переключением Termux заново проверит чистоту дерева, локальный SHA и GitHub. Без merge, reset или удаления."
-                     else "Для безопасного переключения нужна локальная ветка, подтверждённая в origin. Только локальные или расходящиеся ветки пока не переключаются.",
+                Text(when {
+                    eligible && BranchPolicy.localOnly(row) -> "Ветка только локальная: Termux проверит SHA и чистоту дерева, затем переключит без сети, merge, reset, удаления или push. GitHub-сборки требуют отдельной проверки."
+                    eligible -> "Termux повторно проверит чистоту дерева, SHA и GitHub. Без merge, reset или удаления."
+                    else -> "Нужна локальная ветка и чистое дерево. Расходящиеся SHA local/origin не переключаем."
+                 },
                      style=MaterialTheme.typography.bodySmall)
             }},
             confirmButton={

@@ -3,6 +3,16 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.time.ZoneId
 class BranchPolicyTest {
+    @Test fun localOnlyBranchIsSelectableButDivergenceRemainsBlocked() {
+        val sha="a".repeat(40)
+        val local=BranchRow("archive/snapshot",BranchRef("archive/snapshot",sha,"",true),null)
+        assertTrue(BranchPolicy.localOnly(local))
+        assertTrue(BranchPolicy.maySwitch(local))
+        val diverged=local.copy(remote=BranchRef("archive/snapshot","b".repeat(40),"",false))
+        assertFalse(BranchPolicy.maySwitch(diverged))
+        assertFalse(BranchPolicy.maySwitch(local.copy(local=null)))
+        assertFalse(BranchPolicy.maySwitch(local.copy(local=local.local?.copy(active=true))))
+    }
     @Test fun cleanWorkingTreeIsExplicit(){assertEquals("Чисто",BranchPolicy.workingTree(false))}
     @Test fun localChangesAreSeparateFromBranchComparison(){assertEquals("Есть локальные изменения",BranchPolicy.workingTree(true))}
     @Test fun missingMetadataNeverClaimsClean(){assertEquals("Не подтверждено",BranchPolicy.workingTree(null))}

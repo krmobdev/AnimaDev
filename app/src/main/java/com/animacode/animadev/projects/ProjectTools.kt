@@ -54,6 +54,7 @@ import com.animacode.animadev.repos.*
         it.optString("branch")==project.branch && it.optString("local_commit")==project.commit
     } else null
     val pending=r.optBoolean("pending");val blocked=store.blocked();val ready=r.optBoolean("ready")
+    val historyFull=RepoGateway.historyCapacityFailure(r)
     val releaseGeneration=ReleaseStore.generation.intValue
     val releaseBusy=remember(releaseGeneration) { ReleaseStore(context).busy() }
     val available=HelperPolicy.mayRun(permitted,termuxVersion!=null,ready,pending,blocked)
@@ -104,8 +105,9 @@ import com.animacode.animadev.repos.*
         if(!ready)item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             val installed=r.optString("installed_sha").isNotEmpty()
             Text(if(installed)"Доступно обновление локального помощника" else "Нужен локальный помощник Termux",style=MaterialTheme.typography.titleSmall)
-            Text(if(blocked)"Сначала уточните прежнее задание по Job ID. Обновление сейчас заблокировано." else "Результаты и история сохранятся. После подключения обновите состояние Git.",style=MaterialTheme.typography.bodySmall)
-            com.animacode.animadev.projects.ActionButton(onClick={gateway.install()},enabled=HelperPolicy.mayConnect(permitted,termuxVersion!=null,pending,blocked)){Text(if(pending)"Подключаем…" else HelperPolicy.label(installed))}
+            Text(if(historyFull)"Журнал Termux заполнен. Обновите помощника: старые задания и журналы сохранятся. Затем подтвердите статус прежнего ID."
+                else if(blocked)"Сначала уточните прежнее задание по Job ID. Обновление сейчас заблокировано." else "Результаты и история сохранятся. После подключения обновите состояние Git.",style=MaterialTheme.typography.bodySmall)
+            com.animacode.animadev.projects.ActionButton(onClick={gateway.install()},enabled=HelperPolicy.mayConnect(permitted,termuxVersion!=null,pending,blocked && !historyFull)){Text(if(pending)"Подключаем…" else HelperPolicy.label(installed))}
         }} }
         if(TestScreenStatusPolicy.needsRecovery(r.optString("state")) &&
             r.optString("job_id").isNotBlank()) item {
@@ -124,10 +126,11 @@ import com.animacode.animadev.repos.*
                     val queryAllowed=RepoPolicy.canRecoverJob(pending,
                         r.optString("job_id"),r.optString("job_runner_sha"),
                         r.optString("installed_sha"))
-                    Button(onClick={gateway.query(true)},enabled=queryAllowed && permitted &&
-                        termuxVersion!=null,modifier=Modifier.fillMaxWidth()) {
+                    Button(onClick={gateway.query(true)},enabled=queryAllowed && permitted && termuxVersion!=null &&
+                        (!historyFull || ready),modifier=Modifier.fillMaxWidth()) {
                         Text("Проверить статус в Termux")
                     }
+                    if(historyFull && !ready)Text("Сначала обновите локального помощника кнопкой выше. Запрос к старой версии повторять бессмысленно.",style=MaterialTheme.typography.bodySmall)
                     if(pending)Text("Ожидаем предыдущий ответ Termux. Если он потерялся, "+
                         "через 15 секунд станет доступен повторный запрос.",
                         style=MaterialTheme.typography.bodySmall)

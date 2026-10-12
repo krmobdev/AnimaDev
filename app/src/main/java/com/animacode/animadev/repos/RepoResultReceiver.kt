@@ -47,7 +47,11 @@ class RepoResultReceiver : BroadcastReceiver() {
             } else if (!j.optBoolean("ok") || !successfulTransport) {
                 val code = j.optString("error_code", "RESULT_MALFORMED")
                 // Any uncertainty retains the job ID. QUERY resolves it without issuing another START.
-                record.put("state", "UNKNOWN").put("message", j.optString("message", "Ответ не подтверждён."))
+                if (code=="HISTORY_FULL" && successfulTransport) {
+                    record.put("state","FAILED").put("error_code",code)
+                        .put("history_full_recovery",true)
+                } else record.put("state", "UNKNOWN").put("error_code",code)
+                record.put("message", j.optString("message", "Ответ не подтверждён."))
                 if (code == "RUNNER_CHECKSUM_MISMATCH") record.put("ready", false)
                 val active = j.optJSONObject("active_job")
                 if (code == "JOB_BUSY" && active != null) {
@@ -80,6 +84,8 @@ class RepoResultReceiver : BroadcastReceiver() {
                     cache.rememberJob(job,record.optString("project_id",RepoGateway.PROJECT))
                 }
                 if(record.optBoolean("manual_query")) record.put("query_result","Состояние задания проверено: ${MonitorPolicy.label(job.getString("state"),false,false)}")
+                record.remove("history_full_recovery")
+                record.remove("error_code")
                 record.put("state", job.getString("state")).put("job", job)
                     .put("message", job.optString("message")).put("runner_version", j.getString("runner_version"))
                     .put("last_confirmed",System.currentTimeMillis()).put("manual_query",false)

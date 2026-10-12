@@ -1,5 +1,14 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-13 · 0.4.0-beta.10-dev.45 (59)
+- RU: Исправлена блокировка Git CHECK после 100 заданий (HISTORY_FULL): расширена ёмкость долговременного SQLite-журнала до 10 000 без удаления ранее записанных результатов. Android распознаёт подтверждённый отказ, предлагает обновить Termux runner и позволяет безопасно уточнить прежний Job ID новым runner. Никаких автоматических повторов Git, Gradle или принудительной очистки.
+- EN: Fixed Git CHECK stuck in UNKNOWN after the 100-job limit. The persistent SQLite job capacity is raised to 10,000 without deleting existing records; Android offers a safe runner-upgrade and exact-ID recovery path.
+- RU: Разрешено явное переключение на существующие локальные ветки без upstream, только с повторной проверкой чистоты дерева и SHA. Нет fetch, push, reset, merge, принудительного checkout или удаления. Разошедшиеся SHA по-прежнему блокируются.
+- EN: Existing local-only Git branches can now be selected after strict worktree/SHA verification, with no network access or destructive Git operations.
+- RU: Новый embedded runner 0.4.1; сохранена совместимость с историей заданий старого runner 0.4.0.
+- EN: Runner 0.4.1 preserves old job history and exact-ID recovery for 0.4.0.
+
+
 ## 2026-10-12 · 0.4.0-beta.10-dev.44 (58)
 - RU: Исправлена автопрокрутка к статусу после запуска Debug APK, Release AAB, unit- и инструментальных тестов — теперь через позиции LazyColumn вместо неинициализированного bringIntoView.
 - EN: Build/test actions reliably jump to the job card; lazy lists scroll to the target item even when it was not composed yet.

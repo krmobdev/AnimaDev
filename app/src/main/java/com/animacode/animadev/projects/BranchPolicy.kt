@@ -13,6 +13,12 @@ data class BranchRow(val name:String,val local:BranchRef?,val remote:BranchRef?)
     val comparison get()=when {local==null->"Только origin";remote==null->"Только локальная";local.sha==remote.sha->"SHA совпадают в локальном снимке";else->"SHA различаются · требуется проверка обновлений"}
 }
 object BranchPolicy {
+    /** Local-only is an explicit safe checkout, not a remote synchronization. */
+    fun maySwitch(row:BranchRow):Boolean =
+        !row.active && row.local != null &&
+            row.local.sha.matches(Regex("[a-f0-9]{40,64}")) &&
+            (row.remote == null || row.local.sha == row.remote.sha)
+    fun localOnly(row:BranchRow):Boolean = row.local != null && row.remote == null
     fun workingTree(dirty:Boolean?,metadataError:Boolean=false):String=when {
         metadataError || dirty==null->"Не подтверждено"
         dirty->"Есть локальные изменения"

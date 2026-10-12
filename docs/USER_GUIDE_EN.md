@@ -1,5 +1,10 @@
 # AnimaDev — User Guide
 
+## Git recovery and local branches in dev.45
+If Git CHECK is stuck in UNKNOWN due to the old 100-job limit, open Git/Tests, tap **Update local helper**, then **Check status in Termux** for the original job ID. The new runner accepts 10,000 job records while preserving the complete SQLite history. An unstarted request becomes confirmed NOT_STARTED, allowing a new check. Never clear the private Termux journal manually.
+The **Branches** screen also supports deliberate switching to existing local-only refs: a clean worktree and exact SHA are rechecked on device, without a remote query, reset, merge or push. Diverged local/origin references remain denied.
+
+
 ## New in dev.44
 Debug APK, Release AAB, unit and device test launches automatically jump to the job result card. During Release, the app updates Termux process CPU usage across all cores, available/used RAM and zRAM around every five seconds. The Shizuku **Refresh** control checks Binder in the background and shows a spinner with automatically refreshed ping latency in milliseconds.
 

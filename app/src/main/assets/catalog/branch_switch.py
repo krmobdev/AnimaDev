@@ -55,7 +55,7 @@ def validate_project(root_string, expected_remote):
         raise SwitchDenied("REMOTE_DENIED")
     return root
 
-def switch(target,expected_current,expected_target,expected_remote="github.com/krmobdev/quizapp"):
+def switch(target,expected_current,expected_target,expected_remote="github.com/krmobdev/quizapp",local_only=False):
     if not valid_branch(target) or not SHA.fullmatch(expected_current) or not SHA.fullmatch(expected_target):
         raise SwitchDenied("INVALID_INPUT")
     if not ROOT.is_dir() or ROOT.is_symlink() or not (ROOT/".git").is_dir():
@@ -73,10 +73,13 @@ def switch(target,expected_current,expected_target,expected_remote="github.com/k
         raise SwitchDenied("WORKTREE_DIRTY")
     if not run(["show-ref","--verify","refs/heads/"+target]) or run(["rev-parse","refs/heads/"+target])!=expected_target:
         raise SwitchDenied("LOCAL_BRANCH_CHANGED")
-    raw=run(["ls-remote","--heads","origin","refs/heads/"+target],timeout=60)
-    line=raw.splitlines()
-    if len(line)!=1 or line[0]!=expected_target+"\trefs/heads/"+target:
-        raise SwitchDenied("GITHUB_SHA_MISMATCH")
+    if not local_only:
+        raw=run(["ls-remote","--heads","origin","refs/heads/"+target],timeout=60)
+        line=raw.splitlines()
+        if len(line)!=1 or line[0]!=expected_target+"\trefs/heads/"+target:
+            raise SwitchDenied("GITHUB_SHA_MISMATCH")
+    # Local-only mode was explicitly chosen in Android. Do not fetch, push,
+    # create refs or claim that GitHub contains this commit.
     if target==current:
         return {"branch":target,"commit":expected_target,"unchanged":True}
     # Refuse branches checked out elsewhere; git switch will enforce it without --ignore-other-worktrees.
@@ -91,11 +94,12 @@ def main():
     global ROOT
     request=""
     try:
-        if len(sys.argv)!=7:raise SwitchDenied("INVALID_INPUT")
-        request,project_path,remote,target,current,selected=sys.argv[1:]
+        if len(sys.argv)!=8:raise SwitchDenied("INVALID_INPUT")
+        request,project_path,remote,target,current,selected,mode=sys.argv[1:]
+        if mode not in ("LOCAL","VERIFIED"):raise SwitchDenied("INVALID_INPUT")
         if not re.fullmatch(r"[a-f0-9]{32}",request):raise SwitchDenied("INVALID_INPUT")
         ROOT=validate_project(project_path,remote)
-        outcome=switch(target,current,selected,remote)
+        outcome=switch(target,current,selected,remote,local_only=(mode=="LOCAL"))
         print(json.dumps({"request_id":request,"ok":True,**outcome}))
     except SwitchDenied as err:
         print(json.dumps({"request_id":request,"ok":False,"error_code":str(err)}))

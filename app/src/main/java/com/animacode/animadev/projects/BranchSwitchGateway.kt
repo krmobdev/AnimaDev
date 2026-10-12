@@ -20,9 +20,9 @@ class BranchSwitchGateway(private val context:Context) {
         if(pending() || RepoStore(context).blocked() || ReleaseStore(context).busy()
            || CatalogGateway(context).prefs.getBoolean("pending",false))return
         if(!project.supported || project.worktree || !ProjectPolicy.validId(project.id,project.path)
-           || target.active || target.local==null || target.remote==null
-           || target.local.sha!=target.remote.sha || !currentSha.matches(Regex("[a-f0-9]{40,64}"))) {
-            prefs.edit().putString("message","Нужна локальная ветка с одинаковыми SHA у local и origin. Сначала обновите список.").apply()
+           || target.local==null || !BranchPolicy.maySwitch(target)
+           || !currentSha.matches(Regex("[a-f0-9]{40,64}"))) {
+            prefs.edit().putString("message","Нужна локальная ветка с проверенным SHA. Расходящиеся SHA local/origin не переключаем.").apply()
             return
         }
         val id=UUID.randomUUID().toString().replace("-","")
@@ -34,7 +34,7 @@ class BranchSwitchGateway(private val context:Context) {
         if(!prefs.edit().putBoolean("pending",true).putString("id",id)
                 .putString("project",project.id).putString("path",project.path)
                 .putString("branch",target.name).putString("sha",target.local.sha)
-                .putString("message","Проверяю GitHub и чистоту рабочего дерева…").commit())return
+                .putString("message",if(BranchPolicy.localOnly(target))"Проверяю локальный SHA и чистоту дерева…" else "Проверяю GitHub и чистоту рабочего дерева…").commit())return
         val callback=PendingIntent.getBroadcast(context,id.hashCode(),
             Intent(context,BranchSwitchReceiver::class.java).apply {
                 action="com.animacode.animadev.BRANCH_SWITCH"
@@ -43,7 +43,8 @@ class BranchSwitchGateway(private val context:Context) {
         val intent=Intent("com.termux.RUN_COMMAND").apply {
             setClassName("com.termux","com.termux.app.RunCommandService")
             putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
-            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",code,id,project.path,project.remote,target.name,currentSha,target.local.sha))
+            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",code,id,project.path,project.remote,target.name,currentSha,target.local.sha,
+                    if(BranchPolicy.localOnly(target))"LOCAL" else "VERIFIED"))
             putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
             putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
             putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
@@ -99,7 +100,7 @@ class BranchSwitchReceiver:BroadcastReceiver() {
             }
             CatalogGateway(context).prefs.edit().remove("branches").commit()
             prefs.edit().putBoolean("pending",false).remove("id")
-                .putString("message","Активная ветка: "+branch+" · "+sha.take(12)+". Обновите список и проверьте GitHub SHA в разделе Git.").commit()
+                .putString("message","Активная ветка: "+branch+" · "+sha.take(12)+". Обновите список; локальная ветка без origin не считается опубликованной на GitHub.").commit()
         } catch(_:Exception) {
             prefs.edit().putBoolean("pending",false).remove("id").putString("message",
                 "Результат переключения не подтверждён. Проверьте ветку в Git перед сборкой.").commit()
