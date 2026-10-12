@@ -25,7 +25,7 @@ class OperationScreensInstrumentedTest {
         "test/decomposition-v1","a".repeat(40),"git@github.com:krmobdev/quizapp.git",false)
     private var previous:String?=null
     @Before fun fixtureOnly() {
-        check(context.packageName.matches(Regex("com\\.animacode\\.animadev\\.animadevtests\\.j[a-f0-9]{32}")))
+        check(context.packageName.matches(Regex("""com\.animacode\.animadev(?:\.devicefixture|\.animadevtests\.j[a-f0-9]{32})""")))
         previous=RepoStore(context).prefs.getString("record",null)
     }
     @After fun restore() {
