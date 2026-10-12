@@ -1,5 +1,9 @@
 # AnimaDev — User Guide
 
+## Shizuku in dev.43
+Open the **Termux → Shizuku** card. AnimaDev detects a running Shizuku service through Android Binder. Tap **Allow access** and approve in Shizuku. A connected session shows the API version and effective UID (typically **2000 / shell** when started through wireless debugging). **Refresh** rechecks the status; **Open Shizuku** opens its manager. AnimaDev never grants permission or starts the service automatically. No Render, VPN or ongoing `adb connect` is required. This version adds the connection and diagnostics; privileged Android operations are a separate next step.
+
+
 ## Improvements in dev.41
 Pin a repository via its overflow menu → Pin to top. This only changes AnimaDev's display order.
 Branch switching supports registered ordinary Git repositories when the worktree is clean, local and GitHub SHA agree and another worktree does not own the target branch. Use the explicit Refresh origin from GitHub action when local remote-tracking refs are stale; its guarded fetch never checks out, merges, resets, prunes, deletes worktree files or fetches submodules.

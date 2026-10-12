@@ -34,8 +34,8 @@ android {
         minSdk = 33
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 56
-        versionName = "0.4.0-beta.10-dev.42"
+        versionCode = 57
+        versionName = "0.4.0-beta.10-dev.43"
     }
     sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
     sourceSets.getByName("main").assets.srcDir(supportAssets.get().asFile)
@@ -46,6 +46,8 @@ android {
     }
 }
 dependencies {
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("androidx.core:core-ktx:1.19.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")

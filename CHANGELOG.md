@@ -1,5 +1,12 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-12 22:30 GMT+03:00 · 0.4.0-beta.10-dev.43 (57)
+- RU: В разделе Termux появилась отдельная карточка Shizuku: подключение к работающей Android Binder-службе, запрос разрешения по нажатию и отображение состояния, API/UID. Никаких новых серверов или обязательного ADB.
+- EN: New Shizuku card inside Termux: direct Binder connection to an existing service, user-initiated permission request, live service/UID/API status. No new server or mandatory ADB.
+- RU: Старые данные Git, сборок и журналов остаются без изменений; функции Termux работают без Shizuku. Добавлены unit-проверки состояний разрешений.
+- EN: Existing Git, build and journal data are preserved; Termux works without Shizuku. New permission-state unit tests.
+
+
 ## 2026-10-12 12:15 GMT+03:00 · 0.4.0-beta.10-dev.42 (56)
 - RU: В разделе «Ветки» добавлена отдельная кнопка «Обновить origin с GitHub»: по явному нажатию выполняется ограниченный безопасный fetch без checkout, merge, reset, prune, удаления файлов и submodule-запросов.
 - EN: Branches offers explicit guarded GitHub origin refresh: remote-tracking references only, without checkout, merge, reset, prune, file removal or submodule fetch.
