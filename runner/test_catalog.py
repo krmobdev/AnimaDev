@@ -6,6 +6,12 @@ import unittest
 import catalog
 
 class CatalogTests(unittest.TestCase):
+    def test_bundled_runner_is_exactly_the_verified_catalog(self):
+        source=pathlib.Path(__file__).resolve().parent/"catalog.py"
+        bundled=source.parent.parent/"app/src/main/assets/catalog/catalog.py"
+        self.assertEqual(source.read_bytes(),bundled.read_bytes(),
+                         "The APK catalog asset is out of sync with tested runner/catalog.py")
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.home=pathlib.Path(self.tmp.name)

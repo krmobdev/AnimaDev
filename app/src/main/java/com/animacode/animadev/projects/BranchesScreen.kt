@@ -57,7 +57,27 @@ import org.json.JSONObject
             if(switcher.message().isNotBlank())Text(switcher.message(),style=MaterialTheme.typography.bodySmall)
             if(switcher.pending())LinearProgressIndicator(Modifier.fillMaxWidth())
         }
-        item {OutlinedButton(onClick={feedback.tap(feedbackView);gateway.read("BRANCHES",project.path)},enabled=permitted && !pending){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Обновить список")};if(pending)LinearProgressIndicator(Modifier.fillMaxWidth());Text(gateway.prefs.getString("message","") ?: "",style=MaterialTheme.typography.bodySmall)}
+        item {
+            Column(verticalArrangement=Arrangement.spacedBy(9.dp)) {
+                OutlinedButton(onClick={feedback.tap(feedbackView);gateway.read("BRANCHES",project.path)},
+                    enabled=permitted && !pending,modifier=Modifier.fillMaxWidth()) {
+                    Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp))
+                    Text("Перечитать локальные ветки")
+                }
+                Button(onClick={feedback.tap(feedbackView);gateway.read("BRANCHES_FETCH",project.path)},
+                    enabled=permitted && !pending && project.supported && !project.worktree &&
+                        metadata?.optBoolean("dirty")==false &&
+                        !com.animacode.animadev.repos.RepoStore(context).blocked() &&
+                        !ReleaseStore(context).busy() && !switcher.pending(),
+                    modifier=Modifier.fillMaxWidth()) {
+                    Icon(AppIcons.Git,null);Spacer(Modifier.width(8.dp))
+                    Text("Обновить origin с GitHub")
+                }
+                if(pending)LinearProgressIndicator(Modifier.fillMaxWidth())
+                Text(gateway.prefs.getString("message","") ?: "",
+                    style=MaterialTheme.typography.bodySmall)
+            }
+        }
         item {
             if(neon) NeonPanel(Modifier.fillMaxWidth()) {
                 OutlinedTextField(search,{search=it},label={Text("Search branches")},
@@ -100,7 +120,7 @@ import org.json.JSONObject
                 if(metadata.optBoolean("branches_limited"))Text("Старый снимок неполный. Обновите список для чтения всех страниц.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
                 Text("Загружено веток: ${BranchPolicy.merge(refs).size}"+(if(metadata.optBoolean("branches_more"))" · есть следующая страница" else ""),style=MaterialTheme.typography.bodySmall)
                 if(metadata.optString("default_branch").isEmpty())Text("Главная ветка не подтверждена: origin/HEAD отсутствует.",style=MaterialTheme.typography.bodySmall)
-                Text("Origin — сохранённые локальные ссылки на ветки. Кнопка «Обновить список» перечитывает их в Termux, но не выполняет GitHub fetch. Актуальный SHA GitHub проверяйте в разделе Git. Несохранённые изменения не удаляются автоматически.",
+                Text("«Перечитать локальные ветки» не использует сеть. «Обновить origin с GitHub» явно запускает безопасный fetch: меняются только remote-tracking ссылки, файлы и текущая ветка не затрагиваются. Перед переключением SHA GitHub проверяется ещё раз.",
                     style=MaterialTheme.typography.bodySmall,
                     color=MaterialTheme.colorScheme.onSurfaceVariant)}
             items(rows,key={it.name}) {b->

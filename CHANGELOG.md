@@ -1,5 +1,14 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-12 12:15 GMT+03:00 · 0.4.0-beta.10-dev.42 (56)
+- RU: В разделе «Ветки» добавлена отдельная кнопка «Обновить origin с GitHub»: по явному нажатию выполняется ограниченный безопасный fetch без checkout, merge, reset, prune, удаления файлов и submodule-запросов.
+- EN: Branches offers explicit guarded GitHub origin refresh: remote-tracking references only, without checkout, merge, reset, prune, file removal or submodule fetch.
+- RU: При несовпадении SHA старый локальный снимок можно обновить из GitHub и повторно проверить целевую ветку. Fetch запрещён для грязного дерева, worktree и неподтверждённого origin.
+- EN: Update stale origin SHA snapshots before selecting a branch. Dirty repositories, worktrees and unverified origins are denied.
+- RU: Три отдельные Python-проверки подтверждают отсутствие Git-операций, меняющих пользовательские файлы при обновлении origin. Прокрутка тестов больше не повторяется на каждом обновлении статуса.
+- EN: Three tests verify no user worktree changes from origin refresh. Tests no longer scroll on every status transition.
+
+
 ## 2026-10-12 11:45 GMT+03:00 · 0.4.0-beta.10-dev.41 (55)
 - RU: Release AAB теперь показывает безопасный прогресс Gradle по задачам с сохранением последних диагностических этапов без вывода паролей и данных JKS. Журнал Release приведён к стилю Debug (все/важные события).
 - EN: Release AAB now reports allowlisted Gradle task progress and sanitized diagnostics without JKS contents or passwords. The Release journal follows Debug's ALL/IMPORTANT presentation.

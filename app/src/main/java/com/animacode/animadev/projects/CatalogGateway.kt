@@ -14,8 +14,8 @@ class CatalogGateway(private val context:Context) {
     fun expire() { if(prefs.getBoolean("pending",false) && System.currentTimeMillis()-prefs.getLong("sent",0)>75_000)prefs.edit().putBoolean("pending",false).putString("message","Ответ задержался. Повторите безопасное чтение.").remove("request").commit() }
     fun read(mode:String,path:String="",branchOffset:Long=0) {
         expire();if(branchOffset<0)return
-        if(mode !in setOf("CATALOG","ENV","PATH","BRANCHES") || prefs.getBoolean("pending",false))return
-        if(mode in setOf("PATH","BRANCHES") && !ProjectPolicy.permittedPath(path.replace("~/",ProjectPolicy.HOME+"/"))) { prefs.edit().putString("message","Путь запрещён политикой безопасности.").apply();return }
+        if(mode !in setOf("CATALOG","ENV","PATH","BRANCHES","BRANCHES_FETCH") || prefs.getBoolean("pending",false))return
+        if(mode in setOf("PATH","BRANCHES","BRANCHES_FETCH") && !ProjectPolicy.permittedPath(path.replace("~/",ProjectPolicy.HOME+"/"))) { prefs.edit().putString("message","Путь запрещён политикой безопасности.").apply();return }
         val id=UUID.randomUUID().toString().replace("-","")
         val source=context.assets.open("catalog/catalog.py").bufferedReader().use { it.readText() }
         if(!prefs.edit().putString("request",id).putString("mode",mode).putString("path",path.replace("~/",ProjectPolicy.HOME+"/")).putLong("branch_offset",branchOffset).putLong("sent",System.currentTimeMillis()).putBoolean("pending",true).putString("message","Читаем Termux…").commit())return
@@ -24,7 +24,7 @@ class CatalogGateway(private val context:Context) {
         val intent=Intent("com.termux.RUN_COMMAND").apply {
             setClassName("com.termux","com.termux.app.RunCommandService")
             putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
-            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",if(mode=="BRANCHES")arrayOf("-c",source,id,mode,path,branchOffset.toString()) else if(mode=="PATH")arrayOf("-c",source,id,mode,path) else arrayOf("-c",source,id,mode))
+            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",if(mode=="BRANCHES")arrayOf("-c",source,id,mode,path,branchOffset.toString()) else if(mode in setOf("PATH","BRANCHES_FETCH"))arrayOf("-c",source,id,mode,path) else arrayOf("-c",source,id,mode))
             putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
             putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
             putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
@@ -44,15 +44,21 @@ class CatalogReceiver:BroadcastReceiver() {
             val out=result.getString("stdout","") ?: "";require(out.length<=40_000)
             val j=JSONObject(out);require(j.getString("request_id")==id && j.getString("mode")==prefs.getString("mode","") && result.getInt("exitCode")==0 && result.getInt("err")==-1 && j.getBoolean("ok"))
             val data=j.getJSONObject("data");val editor=prefs.edit().putBoolean("pending",false).remove("request").putString("message","Обзор обновлён")
-            if(j.getString("mode")=="BRANCHES") {
+            if(j.getString("mode") in setOf("BRANCHES","BRANCHES_FETCH")) {
                 val a=data.getJSONArray("projects");require(a.length()<=1)
                 if(a.length()==1) {
                     val page=a.getJSONObject(0);val offset=prefs.getLong("branch_offset",0)
                     require(page.getString("path")==prefs.getString("path","") && (page.optJSONArray("branches")?.length() ?: 0)<=34)
-                    if(page.optString("error").isNotEmpty()) {
-                        editor.putString("message","Список не дочитан: метаданные или лимит чтения. Повторите эту страницу.")
-                        if(offset==0L)editor.putString("branches",data.toString())
+                    if(page.optString("error").isNotEmpty() ||
+                       (j.getString("mode")=="BRANCHES_FETCH" && !page.optBoolean("refs_refreshed"))) {
+                        editor.putString("message",page.optString("error").ifBlank {
+                            "Не удалось подтвердить обновление GitHub. Прежние ветки сохранены."
+                        }.take(180))
+                        if(offset==0L && j.getString("mode")=="BRANCHES")
+                            editor.putString("branches",data.toString())
                     } else {
+                        if(j.getString("mode")=="BRANCHES_FETCH")
+                            editor.putString("message","GitHub origin обновлён. SHA веток перечитаны в Termux.")
                         require(page.getLong("branches_offset")==offset && page.getLong("branches_next")>=offset)
                         if(offset>0) {
                             val previous=JSONObject(prefs.getString("branches","{}") ?: "{}").getJSONArray("projects").getJSONObject(0)

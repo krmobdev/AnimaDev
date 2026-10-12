@@ -188,14 +188,6 @@ def inspect(root,home=HOME,git=None,branches=False,branch_offset=0):
         code,changes=call(['status','--porcelain=v1','-z','--untracked-files=all'])
         if code:raise ValueError('GIT_FAILED')
         result['dirty']=bool(changes)
-        fields=changes.split(chr(0))
-        index=0
-        count=0
-        while index<len(fields) and fields[index]:
-            status=fields[index][:2]
-            count+=1
-            index+=2 if ('R' in status or 'C' in status) else 1
-        result['changes_count']=count
         if branches:
             code,default=call(['symbolic-ref','--quiet','refs/remotes/origin/HEAD'])
             confirmed=code==0 and default.startswith('refs/remotes/origin/') and call(['show-ref','--verify','--quiet',default])[0]==0
@@ -236,6 +228,40 @@ def catalog(home=HOME,git=None):
         elif len(issues)<40:issues.append(dict(path=str(root),reason='.git или worktree не прошёл проверку безопасности'))
     return dict(projects=entries,issues=issues,visited=visited,limited=limited or bool(issues),depth=MAX_DEPTH,scanned_at=time.time())
 
+def refresh_origin(path,home=HOME,git=None):
+    """User-requested, non-destructive remote-tracking refs refresh.
+    Does not checkout, reset, merge, prune, delete files or run project hooks.
+    """
+    value=str(path)
+    if value.startswith('~/'):value=str(home)+value[1:]
+    root=pathlib.Path(value)
+    failure='Не удалось обновить origin. Проверьте GitHub, сеть или SSH и повторите.'
+    if not permitted(root,home):return dict(projects=[],issues=[dict(path='',reason='Путь запрещён')])
+    current=inspect(root,home,git)
+    if not current or current['error'] or current['worktree'] or current['dirty'] is not False or not re.fullmatch(r'github[.]com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+',current['remote']):
+        return dict(projects=[dict(current or {},error='Нужна чистая подтверждённая Git-копия для обновления origin')],
+                    issues=[],scanned_at=time.time())
+    executable=str(git or PREFIX/'bin/git')
+    env={k:v for k,v in os.environ.items() if not k.startswith('GIT_') and k not in ('SSH_ASKPASS','DISPLAY')}
+    env.update(GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_GLOBAL=os.devnull,
+               GIT_TERMINAL_PROMPT='0',LC_ALL='C')
+    args=[executable,'-c','core.hooksPath='+os.devnull,
+          '-c','core.fsmonitor=false','-c','gc.auto=0',
+          '-c','maintenance.auto=false','-c','credential.helper=',
+          '-c','protocol.file.allow=never',
+          'fetch','--no-tags','--no-recurse-submodules','--no-write-fetch-head','origin']
+    try:
+        p=subprocess.run(args,cwd=root,env=env,stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=70,check=False)
+        if p.returncode:raise ValueError('FETCH_FAILED')
+        result=inspect(root,home,git,branches=True)
+        if not result or result['error']:raise ValueError('FETCH_UNCONFIRMED')
+        result['refs_refreshed']=True
+        return dict(projects=[result],issues=[],scanned_at=time.time())
+    except (OSError,ValueError,subprocess.TimeoutExpired):
+        current['error']=failure
+        return dict(projects=[current],issues=[],scanned_at=time.time())
+
 def explicit(path,home=HOME,git=None,branches=False,branch_offset=0):
     value=str(path)
     if value.startswith('~/'):value=str(home)+value[1:]
@@ -260,11 +286,11 @@ def environment():
 
 def main():
     request,mode=sys.argv[1:3]
-    if not re.fullmatch('[a-f0-9]{32}',request) or mode not in ('CATALOG','ENV','PATH','BRANCHES') or len(sys.argv) not in ((4,5) if mode=='BRANCHES' else (4,) if mode=='PATH' else (3,)):return 1
+    if not re.fullmatch('[a-f0-9]{32}',request) or mode not in ('CATALOG','ENV','PATH','BRANCHES','BRANCHES_FETCH') or len(sys.argv) not in ((4,5) if mode=='BRANCHES' else (4,) if mode in ('PATH','BRANCHES_FETCH') else (3,)):return 1
     try:
         offset=int(sys.argv[4]) if mode=='BRANCHES' and len(sys.argv)==5 else 0
         if offset<0:raise ValueError('BAD_OFFSET')
-        data=catalog() if mode=='CATALOG' else explicit(sys.argv[3],branches=mode=='BRANCHES',branch_offset=offset) if mode in ('PATH','BRANCHES') else environment()
+        data=catalog() if mode=='CATALOG' else refresh_origin(sys.argv[3]) if mode=='BRANCHES_FETCH' else explicit(sys.argv[3],branches=mode=='BRANCHES',branch_offset=offset) if mode in ('PATH','BRANCHES') else environment()
     except Exception:
         print(json.dumps(dict(request_id=request,mode=mode,ok=False,message='Не удалось прочитать разрешённые каталоги Termux.')));return 0
     print(json.dumps(dict(request_id=request,mode=mode,ok=True,data=data),ensure_ascii=False));return 0

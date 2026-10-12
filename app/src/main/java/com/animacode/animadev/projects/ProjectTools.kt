@@ -72,7 +72,7 @@ import com.animacode.animadev.repos.*
     val testTab=selectedTestTab ?: fallbackTestTab
     val unitFocus=remember {BringIntoViewRequester()}
     val deviceFocus=remember {BringIntoViewRequester()}
-    LaunchedEffect(testTab,r.optString("job_id"),r.optString("state")) {
+    LaunchedEffect(testTab,r.optString("job_id"),tool) {
         if(belongs && r.optString("job_id").isNotBlank() && tool=="tests") {
             when(r.optString("action")) {
                 "TEST" -> if(testTab==0) {kotlinx.coroutines.delay(250);unitFocus.bringIntoView()}

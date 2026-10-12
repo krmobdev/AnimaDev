@@ -2,7 +2,7 @@
 
 ## Improvements in dev.41
 Pin a repository via its overflow menu → Pin to top. This only changes AnimaDev's display order.
-Branch switching supports registered ordinary Git repositories when the worktree is clean, local and GitHub SHA agree and another worktree does not own the target branch. No force, reset or file deletion.
+Branch switching supports registered ordinary Git repositories when the worktree is clean, local and GitHub SHA agree and another worktree does not own the target branch. Use the explicit Refresh origin from GitHub action when local remote-tracking refs are stale; its guarded fetch never checks out, merges, resets, prunes, deletes worktree files or fetches submodules.
 Build and test screens scroll to the active task. Release AAB displays allowlisted Gradle task events in the same ALL/IMPORTANT journal style as Debug. No signing secrets are logged.
 The JKS store password opens the keystore; a different private key password is optional. Encrypted storage in Android Keystore is not validation; the signing operation confirms credentials.
 
