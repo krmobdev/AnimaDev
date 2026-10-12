@@ -1,5 +1,8 @@
 # AnimaDev — User Guide
 
+## New in dev.44
+Debug APK, Release AAB, unit and device test launches automatically jump to the job result card. During Release, the app updates Termux process CPU usage across all cores, available/used RAM and zRAM around every five seconds. The Shizuku **Refresh** control checks Binder in the background and shows a spinner with automatically refreshed ping latency in milliseconds.
+
 ## Shizuku in dev.43
 Open the **Termux → Shizuku** card. AnimaDev detects a running Shizuku service through Android Binder. Tap **Allow access** and approve in Shizuku. A connected session shows the API version and effective UID (typically **2000 / shell** when started through wireless debugging). **Refresh** rechecks the status; **Open Shizuku** opens its manager. AnimaDev never grants permission or starts the service automatically. No Render, VPN or ongoing `adb connect` is required. This version adds the connection and diagnostics; privileged Android operations are a separate next step.
 

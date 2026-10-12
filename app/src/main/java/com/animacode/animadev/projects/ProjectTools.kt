@@ -4,8 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -70,20 +69,19 @@ import com.animacode.animadev.repos.*
     var adbDetails by rememberSaveable(project.id) {mutableStateOf(!deviceReady)}
     var fallbackTestTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
     val testTab=selectedTestTab ?: fallbackTestTab
-    val unitFocus=remember {BringIntoViewRequester()}
-    val deviceFocus=remember {BringIntoViewRequester()}
+    val toolsListState=rememberLazyListState()
     LaunchedEffect(testTab,r.optString("job_id"),tool) {
         if(belongs && r.optString("job_id").isNotBlank() && tool=="tests") {
             when(r.optString("action")) {
-                "TEST" -> if(testTab==0) {kotlinx.coroutines.delay(250);unitFocus.bringIntoView()}
-                "TEST_DEVICE" -> if(testTab==1) {kotlinx.coroutines.delay(250);deviceFocus.bringIntoView()}
+                "TEST" -> if(testTab==0) {kotlinx.coroutines.delay(250);toolsListState.scrollToItem((toolsListState.layoutInfo.totalItemsCount-1).coerceAtLeast(0))}
+                "TEST_DEVICE" -> if(testTab==1) {kotlinx.coroutines.delay(250);toolsListState.scrollToItem((toolsListState.layoutInfo.totalItemsCount-1).coerceAtLeast(0))}
             }
         }
     }
     var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)}
     var gitDetails by rememberSaveable(project.id) {mutableStateOf(false)}
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize(),state=toolsListState,contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
             if(neon)NeonPanel(Modifier.fillMaxWidth(),glowing=true) {
                 NeonSection(if(tool=="git")"Git" else "Tests",
@@ -319,7 +317,7 @@ import com.animacode.animadev.repos.*
                     color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainer,
                     border=androidx.compose.foundation.BorderStroke(1.dp,
                         if(neon)NeonGlass.outline else MaterialTheme.colorScheme.outlineVariant),
-                    modifier=Modifier.fillMaxWidth().bringIntoViewRequester(unitFocus)) {
+                    modifier=Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(20.dp),
                         verticalArrangement=Arrangement.spacedBy(12.dp)) {
                         if(neon)NeonSection("Run unit tests",AppIcons.Tests,
@@ -375,7 +373,7 @@ import com.animacode.animadev.repos.*
                     color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainer,
                     border=androidx.compose.foundation.BorderStroke(1.dp,
                         if(neon)NeonGlass.outline else MaterialTheme.colorScheme.outlineVariant),
-                    modifier=Modifier.fillMaxWidth().bringIntoViewRequester(deviceFocus)) {
+                    modifier=Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(20.dp),
                         verticalArrangement=Arrangement.spacedBy(12.dp)) {
                         if(neon)NeonSection("Instrumentation tests",AppIcons.Tests,

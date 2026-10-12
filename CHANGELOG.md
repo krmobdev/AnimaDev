@@ -1,5 +1,14 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-12 · 0.4.0-beta.10-dev.44 (58)
+- RU: Исправлена автопрокрутка к статусу после запуска Debug APK, Release AAB, unit- и инструментальных тестов — теперь через позиции LazyColumn вместо неинициализированного bringIntoView.
+- EN: Build/test actions reliably jump to the job card; lazy lists scroll to the target item even when it was not composed yet.
+- RU: Release AAB отображает обновляемые каждые ~5 секунд CPU-процентов процессов Termux по всем ядрам, свободную и занятую RAM и zRAM. Цифры читаются локально без секретов.
+- EN: Release AAB shows sanitized live Termux CPU, available/used RAM and swap/zRAM readings.
+- RU: Shizuku проверяет Binder в фоне, показывает индикатор проверки и обновляемый пинг (мс); без блокировки интерфейса.
+- EN: Responsive Shizuku Binder refresh with spinner and automatically updated latency.
+
+
 ## 2026-10-12 22:30 GMT+03:00 · 0.4.0-beta.10-dev.43 (57)
 - RU: В разделе Termux появилась отдельная карточка Shizuku: подключение к работающей Android Binder-службе, запрос разрешения по нажатию и отображение состояния, API/UID. Никаких новых серверов или обязательного ADB.
 - EN: New Shizuku card inside Termux: direct Binder connection to an existing service, user-initiated permission request, live service/UID/API status. No new server or mandatory ADB.

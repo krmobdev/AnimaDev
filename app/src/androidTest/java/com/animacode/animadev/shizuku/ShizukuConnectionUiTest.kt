@@ -20,5 +20,6 @@ class ShizukuConnectionUiTest {
         composeRule.onAllNodesWithText("Termux").onFirst().performClick()
         composeRule.onNodeWithTag("shizuku_connection_card").assertExists()
         composeRule.onNodeWithTag("shizuku_refresh").performClick()
+        composeRule.onNodeWithTag("shizuku_ping").assertExists()
     }
 }

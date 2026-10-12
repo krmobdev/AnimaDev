@@ -2,10 +2,13 @@ package com.animacode.animadev.shizuku
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import rikka.shizuku.Shizuku
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Direct Shizuku Binder access. Never starts the Android service or launches an ADB shell. */
 enum class ShizukuState {
@@ -96,6 +99,14 @@ class ShizukuConnection(private val context: Context) {
         } catch (_: RuntimeException) {
             info = ShizukuInfo(ShizukuState.ERROR)
         }
+    }
+
+    /** Real Binder round-trip latency off the main thread, no shell command. */
+    suspend fun pingMillis(): Long? = withContext(Dispatchers.IO) {
+        val begin=SystemClock.elapsedRealtimeNanos()
+        val alive=runCatching {Shizuku.pingBinder()}.getOrDefault(false)
+        if(alive) ((SystemClock.elapsedRealtimeNanos()-begin)/1_000_000L).coerceAtLeast(1)
+        else null
     }
 
     fun requestPermission() {

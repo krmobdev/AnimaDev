@@ -1,10 +1,10 @@
-# AnimaDev · 0.4.0-beta.10-dev.43
+# AnimaDev · 0.4.0-beta.10-dev.44
 
 **AnimaDev** — Android-приложение для тех, кто разрабатывает и собирает проекты **прямо на телефоне через Termux**. Оно объединяет Git и worktree, Gradle-тесты, сборку Debug APK и подписанных Release AAB, мониторинг задач, журналы и историю операций. Требуется Android 13+; интерфейс написан на Kotlin и Jetpack Compose.
 
 **English:** An Android 13+ companion for local Git, Gradle tests, APK/AAB builds and job history in Termux. No mandatory PC, VPS, AnimaBridge or GitHub API token is required by the installed app.
 
-**Статус / Status:** `0.4.0-beta.10-dev.42`. Владелец подтвердил ручное тестирование приложения на устройстве 11.10.2026; автоматизированная UI-проверка Emerald ещё не завершена. Публичный GitHub Release с готовым APK пока не опубликован — см. [инструкцию по подготовке Termux](docs/TERMUX_SETUP.md) и раздел разработки ниже.
+**Статус / Status:** `0.4.0-beta.10-dev.44`. Владелец подтвердил ручное тестирование приложения на устройстве 11.10.2026; автоматизированная UI-проверка Emerald ещё не завершена. Публичный GitHub Release с готовым APK пока не опубликован — см. [инструкцию по подготовке Termux](docs/TERMUX_SETUP.md) и раздел разработки ниже.
 
 ## Функционал / Features
 

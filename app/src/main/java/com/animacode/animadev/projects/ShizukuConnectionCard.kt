@@ -5,14 +5,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -21,6 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle.State
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import com.animacode.animadev.shizuku.ShizukuConnection
 import com.animacode.animadev.shizuku.ShizukuState
 
@@ -31,14 +42,36 @@ fun ShizukuConnectionCard(context: Context) {
         ShizukuConnection(context.applicationContext)
     }
     val owner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    var active by remember(owner) {mutableStateOf(owner.lifecycle.currentState.isAtLeast(State.RESUMED))}
+    var checking by remember {mutableStateOf(false)}
+    var pingMs by remember {mutableStateOf<Long?>(null)}
+    var checked by remember {mutableStateOf(false)}
+    suspend fun checkService() {
+        if(checking)return
+        checking=true
+        try {
+            pingMs=withTimeoutOrNull(2500L) {connection.pingMillis()}
+            checked=true
+            connection.refresh()
+        } finally {checking=false}
+    }
+    LaunchedEffect(connection,active) {
+        while(active) {
+            checkService()
+            delay(5000L)
+        }
+    }
     DisposableEffect(connection, owner) {
         connection.start()
         val watcher = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) connection.refresh()
+            if (event == Lifecycle.Event.ON_RESUME) active=true
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) active=false
         }
         owner.lifecycle.addObserver(watcher)
         onDispose {
             owner.lifecycle.removeObserver(watcher)
+            active=false
             connection.stop()
         }
     }
@@ -87,9 +120,21 @@ fun ShizukuConnectionCard(context: Context) {
                         Text(if (english) "Allow access" else "Разрешить доступ")
                     }
                 }
-                OutlinedButton(onClick = connection::refresh, modifier = Modifier.testTag("shizuku_refresh")) {
-                    Text(if (english) "Refresh" else "Проверить")
+                OutlinedButton(
+                    onClick = { scope.launch {checkService()} },
+                    enabled = !checking,
+                    modifier = Modifier.testTag("shizuku_refresh")
+                ) {
+                    Text(if (english) "Check" else "Проверить")
                 }
+                if(checking) CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Text(when {
+                    !checked -> if(english) "Waiting for ping" else "Ожидаем пинг"
+                    pingMs != null -> "Пинг: ${pingMs} мс"
+                    else -> if(english) "No response" else "Нет ответа"
+                },style=MaterialTheme.typography.labelMedium,
+                  modifier=Modifier.testTag("shizuku_ping"))
             }
             if (info.state == ShizukuState.NOT_INSTALLED ||
                 info.state == ShizukuState.SERVICE_STOPPED ||
