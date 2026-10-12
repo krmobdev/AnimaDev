@@ -37,6 +37,7 @@ class ReleaseHistoryCache(context:Context) {
             .put("job_id",jobId).put("id",jobId)
             .put("state",status).put("phase",phase).put("message",message)
             .put("sha",record.optString("sha")).put("error_code",record.optString("error_code").take(60))
+            .put("progress_lines",record.optString("progress_lines").takeLast(9500))
             .put("started_at",record.optLong("started_at")/1000.0)
             .put("created_at",record.optLong("started_at")/1000.0)
             .put("ended_at",record.optLong("ended_at")/1000.0)

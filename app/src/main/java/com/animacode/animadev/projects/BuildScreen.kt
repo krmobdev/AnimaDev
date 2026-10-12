@@ -5,6 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,6 +40,7 @@ import com.animacode.animadev.termux.TermuxGateway
     val hasSigningKey=signing.hasDocument(project.id)
     val releaseStore=remember {ReleaseStore(context)}
     val releaseGateway=remember {ReleaseGateway(context)}
+    val progressGateway=remember {ReleaseProgressGateway(context)}
     val vault=remember {SigningSecretVault(context)}
     var vaultGeneration by remember(project.id){mutableIntStateOf(0)}
     val vaultSaved=remember(project.id,vaultGeneration){vault.has(project.id)}
@@ -98,6 +101,30 @@ import com.animacode.animadev.termux.TermuxGateway
     var fallbackBuildTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
     val buildTab=selectedBuildTab ?: fallbackBuildTab
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
+    val releaseResultFocus=remember {BringIntoViewRequester()}
+    val debugResultFocus=remember {BringIntoViewRequester()}
+    LaunchedEffect(releaseState.optString("id"),releaseBusy,permitted) {
+        val id=releaseState.optString("id")
+        if(permitted && releaseBusy && releaseForProject && id.matches(Regex("[a-f0-9]{32}"))) {
+            while(true) {
+                progressGateway.poll(id)
+                delay(4500)
+            }
+        }
+    }
+    LaunchedEffect(buildTab,releaseState.optString("id")) {
+        if(buildTab==1 && releaseForProject && releaseState.optString("id").isNotBlank()) {
+            delay(300)
+            releaseResultFocus.bringIntoView()
+        }
+    }
+    LaunchedEffect(buildTab,record.optString("job_id")) {
+        if(buildTab==0 && belongs && record.optString("action")=="BUILD_DEBUG" &&
+           record.optString("job_id").isNotBlank()) {
+            delay(300)
+            debugResultFocus.bringIntoView()
+        }
+    }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
         item {
             if(neon) NeonPanel(Modifier.fillMaxWidth(),glowing=true) {
@@ -178,7 +205,11 @@ import com.animacode.animadev.termux.TermuxGateway
                 }
             }
         }}
-        if(buildTab==0)item {DebugBuildResult(context,record,project,permitted,onJournal)}
+        if(buildTab==0)item {
+            Box(Modifier.fillMaxWidth().bringIntoViewRequester(debugResultFocus)) {
+                DebugBuildResult(context,record,project,permitted,onJournal)
+            }
+        }
         if(buildTab==1)item {
             Surface(shape=RoundedCornerShape(23.dp),
                 color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainer,
@@ -214,8 +245,11 @@ import com.animacode.animadev.termux.TermuxGateway
                     }
                     if(neon)NeonSection("Passwords",AppIcons.Info,
                         "Passwords stay protected by Android Keystore")
+                    Text("Пароль хранилища JKS открывает файл .jks. Пароль закрытого ключа нужен только если отличается. "+
+                        "Пароль не проверяется при простом сохранении; правильность окончательно подтверждает подпись в Termux.",
+                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     if(storedCredentials!=null && !showPasswordFields) {
-                        Text("Пароль готов к использованию",style=MaterialTheme.typography.bodyMedium,
+                        Text("Зашифрованные пароли сохранены на этом телефоне. Повторный ввод не нужен, пока не сменишь JKS или alias.",style=MaterialTheme.typography.bodyMedium,
                             color=MaterialTheme.colorScheme.primary)
                         com.animacode.animadev.projects.ActionButton(onClick={tap();showPasswordFields=true},
                             enabled=!releaseOrDebugBusy) {Text("Использовать другой пароль")}
@@ -223,7 +257,7 @@ import com.animacode.animadev.termux.TermuxGateway
                     AnimatedVisibility(storedCredentials==null || showPasswordFields) {
                         Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
                             OutlinedTextField(releasePassword,{releasePassword=it},
-                                label={Text("Пароль хранилища JKS")},
+                                label={Text("Пароль файла JKS (keystore password)")},
                                 visualTransformation=PasswordVisualTransformation(),singleLine=true,
                                 enabled=!releaseOrDebugBusy,modifier=Modifier.fillMaxWidth())
                             OutlinedTextField(releaseKeyPassword,{releaseKeyPassword=it},
@@ -235,8 +269,8 @@ import com.animacode.animadev.termux.TermuxGateway
                                     tap()
                                     val ok=vault.save(project.id,signing.documentUri(project.id),signing.alias(project.id),
                                         releasePassword,releaseKeyPassword)
-                                    vaultMessage=if(ok)"Пароль зашифрован и сохранён только на телефоне."
-                                        else "Не удалось сохранить секрет. Проверьте JKS и alias."
+                                    vaultMessage=if(ok)"Сохранено в Android Keystore. Пароль ещё не проверен; подтверждение будет при подписи Release."
+                                        else "Не удалось сохранить пароль в Android Keystore. Проверьте доступ к телефону."
                                     if(ok) {
                                         releasePassword="";releaseKeyPassword=""
                                         showPasswordFields=false;vaultGeneration++
@@ -301,6 +335,7 @@ import com.animacode.animadev.termux.TermuxGateway
         if(buildTab==1 && releaseForProject)item {
             val state=releaseState.optString("state")
             OutlinedCard(shape=RoundedCornerShape(22.dp),
+                modifier=Modifier.fillMaxWidth().bringIntoViewRequester(releaseResultFocus),
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp),
                     verticalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -315,7 +350,13 @@ import com.animacode.animadev.termux.TermuxGateway
                     if(phase.isNotBlank())Text("Этап: "+when(phase) {
                         "ENROLLING"->"Подготовка безопасной подписи"
                         "DISPATCHING"->"Передача защищённого задания"
-                        "EXPORTING"->"Проверка и перенос файла"
+                        "STARTING"->"Termux принял задание"
+                        "GIT"->"Проверка GitHub и SHA"
+                        "GRADLE"->"Gradle · сборка Release"
+                        "SIGNING"->"Подпись ключом JKS"
+                        "EXPORTING"->"Проверка и перенос AAB"
+                        "DONE"->"AAB сохранён"
+                        "FAILED"->"Ошибка сборки"
                         else->phase
                     },style=MaterialTheme.typography.bodySmall)
                     val startedAt=releaseState.optLong("started_at")
@@ -371,6 +412,13 @@ import com.animacode.animadev.termux.TermuxGateway
                         }
                     }
                     Text(releaseState.optString("message"),style=MaterialTheme.typography.bodyMedium)
+                    releaseState.optString("progress_lines").takeIf {it.isNotBlank()}?.let {safeLog->
+                        HorizontalDivider()
+                        Text("Этапы Gradle · без ключей и паролей",style=MaterialTheme.typography.titleSmall)
+                        Text(safeLog.lines().takeLast(7).joinToString("\n"),
+                            style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     if(releaseMessage.isNotBlank())Text(releaseMessage,
                         style=MaterialTheme.typography.bodySmall)
                     releaseState.optString("output_dir").takeIf {it.isNotBlank()}?.let {

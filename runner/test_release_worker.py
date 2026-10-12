@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import pathlib
+import tempfile
 import sys
 import unittest
 from unittest import mock
@@ -40,6 +41,23 @@ class ReleaseProtocolTests(unittest.TestCase):
             with self.assertRaises(scope["ReleaseFailure"]) as e:
                 scope["_receive_secure_payload"]()
         self.assertEqual(e.exception.code,"CHANNEL_DENIED")
+
+    def test_release_progress_exposes_tasks_but_never_raw_build_output(self):
+        scope=self.worker
+        safe=scope["safe_gradle_line"]
+        self.assertEqual(safe("> Task :app:bundleRelease"),"Gradle :app:bundleRelease")
+        self.assertEqual(safe("> Task :app:minifyReleaseWithR8 FAILED"),
+                         "Gradle :app:minifyReleaseWithR8 · FAILED")
+        self.assertEqual(safe("Password=FAKE_SECRET_MARKER"),"")
+        self.assertEqual(safe("file:///home/project/local.properties has pass=123"),"")
+        with tempfile.TemporaryDirectory() as temp:
+            with mock.patch.dict(scope,{"STATE":pathlib.Path(temp)}):
+                progress=scope["ReleaseProgress"]("a"*32)
+                progress.gradle("> Task :app:bundleRelease")
+                progress.gradle("Password=FAKE_SECRET_MARKER")
+                payload=(pathlib.Path(temp)/("release-progress-"+"a"*32+".json")).read_text()
+                self.assertIn("bundleRelease",payload)
+                self.assertNotIn("FAKE_SECRET_MARKER",payload)
 
     def test_worker_reply_does_not_echo_untrusted_input(self):
         scope=self.worker

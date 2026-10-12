@@ -1,5 +1,10 @@
 # Termux — local Android build setup
 
+## Background Release AAB in AnimaDev dev.41
+The background worker uses the existing `~/android-sdk` if RUN_COMMAND does not provide ANDROID_HOME, without writing project files.
+Release progress contains allowlisted Gradle task names and fixed diagnostic summaries only. Signing secrets are never logged. Prime missing dependencies using one unsigned online AAB build before an offline build.
+
+
 Run these commands **manually in Termux** after checking what they do. AnimaDev never silently installs toolchains.
 
 ## 1. Base packages

@@ -114,7 +114,7 @@ fun neonColorScheme():ColorScheme=darkColorScheme(
 
 @Composable fun NeonProjectCard(
     project:LocalProject,branch:String,dirty:Boolean?,running:Boolean,onClick:()->Unit,
-    onMore:()->Unit
+    onMore:()->Unit,pinned:Boolean=false
 ) {
     val positive=dirty==false && project.error.isEmpty()
     val status=when {
@@ -145,6 +145,7 @@ fun neonColorScheme():ColorScheme=darkColorScheme(
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween,
             modifier=Modifier.fillMaxWidth()) {
             NeonStatus(status,positive && !running)
+            if(pinned) Text("★ Закреплён",style=MaterialTheme.typography.labelSmall,color=NeonGlass.softGreen)
             IconButton(onClick=onMore,modifier=Modifier.size(42.dp)) {
                 Icon(AppIcons.More,"Project actions",tint=NeonGlass.muted)
             }
@@ -164,12 +165,13 @@ fun neonColorScheme():ColorScheme=darkColorScheme(
 @Composable fun NeonToolCard(
     title:String,subtitle:String,icon:ImageVector,modifier:Modifier=Modifier,onClick:()->Unit
 ) {
-    Surface(onClick=onClick,modifier=modifier.heightIn(min=152.dp),
+    Surface(onClick=onClick,modifier=modifier.fillMaxHeight().heightIn(min=164.dp),
         color=NeonGlass.surface,shape=RoundedCornerShape(22.dp),
         border=BorderStroke(1.dp,NeonGlass.outline)) {
-        Column(Modifier.fillMaxWidth().padding(15.dp),
-            verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxSize().padding(15.dp),
+            verticalArrangement=Arrangement.spacedBy(10.dp)) {
             NeonIconTile(icon,Modifier.size(53.dp))
+            Spacer(Modifier.weight(1f))
             Text(title,style=MaterialTheme.typography.titleMedium,
                 fontWeight=FontWeight.Bold,color=NeonGlass.white)
             Text(subtitle,color=NeonGlass.muted,style=MaterialTheme.typography.bodySmall,

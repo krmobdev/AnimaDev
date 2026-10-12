@@ -19,6 +19,22 @@ class BranchSwitchTests(unittest.TestCase):
         for name in ("main","test/decomposition-v1","release/3.7.21"):
             self.assertTrue(module.valid_branch(name),name)
 
+    def test_additional_registered_repository_is_allowed_but_symlink_is_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home=pathlib.Path(tmp)
+            root=home/"anima-workspace"/"MicrolabSolo7CRemoteV2"
+            root.mkdir(parents=True)
+            (root/".git").mkdir()
+            with mock.patch.object(module,"HOME",home):
+                self.assertEqual(module.validate_project(str(root),
+                    "github.com/krmobdev/MicrolabSolo7CRemoteV2"),root)
+                with self.assertRaises(module.SwitchDenied):
+                    module.validate_project(str(root),"example.com/other/Microlab")
+                linked=home/"anima-workspace"/"link"
+                linked.symlink_to(root,target_is_directory=True)
+                with self.assertRaises(module.SwitchDenied):
+                    module.validate_project(str(linked),"github.com/krmobdev/MicrolabSolo7CRemoteV2")
+
     def test_dirty_worktree_cannot_switch(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=pathlib.Path(tmp)/"quizapp";root.mkdir();(root/".git").mkdir()

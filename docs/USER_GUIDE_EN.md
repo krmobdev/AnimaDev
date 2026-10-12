@@ -1,5 +1,12 @@
 # AnimaDev — User Guide
 
+## Improvements in dev.41
+Pin a repository via its overflow menu → Pin to top. This only changes AnimaDev's display order.
+Branch switching supports registered ordinary Git repositories when the worktree is clean, local and GitHub SHA agree and another worktree does not own the target branch. No force, reset or file deletion.
+Build and test screens scroll to the active task. Release AAB displays allowlisted Gradle task events in the same ALL/IMPORTANT journal style as Debug. No signing secrets are logged.
+The JKS store password opens the keystore; a different private key password is optional. Encrypted storage in Android Keystore is not validation; the signing operation confirms credentials.
+
+
 ## Overview
 AnimaDev is an Android companion for local Git repositories in Termux. It inspects branches and GitHub SHA alignment, runs authorized Gradle tests/builds and keeps job journals. Builds run locally in Termux; finished APKs are handed to the **native Android Package Installer**.
 

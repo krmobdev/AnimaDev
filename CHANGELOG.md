@@ -1,5 +1,16 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-12 11:45 GMT+03:00 · 0.4.0-beta.10-dev.41 (55)
+- RU: Release AAB теперь показывает безопасный прогресс Gradle по задачам с сохранением последних диагностических этапов без вывода паролей и данных JKS. Журнал Release приведён к стилю Debug (все/важные события).
+- EN: Release AAB now reports allowlisted Gradle task progress and sanitized diagnostics without JKS contents or passwords. The Release journal follows Debug's ALL/IMPORTANT presentation.
+- RU: Фоновая сборка сама находит установленный Android SDK в Termux, даже когда Android RUN_COMMAND не передал ANDROID_HOME.
+- EN: Background Release automatically locates the existing Termux SDK when RUN_COMMAND omits ANDROID_HOME.
+- RU: Переключение веток разрешено для любых зарегистрированных обычных Git-репозиториев с чистым деревом, совпадающим SHA в GitHub и локальной веткой; без force/reset. Репозитории можно закрепить сверху.
+- EN: Guarded branch switching supports registered ordinary Git checkouts with clean worktrees and matching GitHub SHA. Projects can be pinned at the top.
+- RU: Карточки инструментов выровнены по высоте. Debug, Release и тесты автоматически прокручиваются к карточке запущенного задания. Пояснены сохранение и проверка пароля JKS.
+- EN: Equal-height tool cards, automatic scrolling to active builds/tests, and clearer keystore password saved-versus-verified states.
+
+
 ## 2026-10-12 01:00 GMT+03:00 · 0.4.0-beta.10-dev.40 (54) — RMX3301 Android tests 32/32 PASS
 - RU: Все 32 инструментальных теста выполнены через Termux/ADB на RMX3301 в изолированном пакете: 32 успешных, 0 ошибок, 0 пропусков; Gradle BUILD SUCCESSFUL.
 - EN: All 32 Android instrumentation tests ran via Termux/ADB on RMX3301 in an isolated app package: 32 passed, zero failures/errors/skips; Gradle BUILD SUCCESSFUL.

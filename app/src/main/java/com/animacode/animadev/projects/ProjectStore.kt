@@ -29,5 +29,17 @@ class ProjectStore(context:Context) {
     })
     fun select(id:String)=selection.choose(all().map { it.id },id)
     fun selected()=selection.read(all().map { it.id })
+    /** Only local presentation order is stored. No git branches or files are modified. */
+    fun pinned(id:String):Boolean=all().any { it.id==id } && prefs.getStringSet("pinned_ids",emptySet())?.contains(id)==true
+    fun togglePinned(id:String):Boolean {
+        if(all().none { it.id==id })return false
+        val next=(prefs.getStringSet("pinned_ids",emptySet()) ?: emptySet()).toMutableSet()
+        if(!next.add(id))next.remove(id)
+        return prefs.edit().putStringSet("pinned_ids",next).commit()
+    }
+    fun sorted(items:List<LocalProject>):List<LocalProject> =
+        items.withIndex().sortedWith(compareBy<IndexedValue<LocalProject>>(
+            { !pinned(it.value.id) },{ it.index }
+        )).map { it.value }
     fun update(found:List<LocalProject>)=save(all().map { old -> found.find { it.path==old.path && it.id==old.id } ?: old })
 }

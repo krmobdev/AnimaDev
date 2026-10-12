@@ -139,9 +139,9 @@ class SigningStore(private val context: Context) {
             enabled=currentId.isNotBlank() && hasAccess && alias.isNotBlank()
         ) {Text("Сохранить alias")}
         Text("Проверка ключа",style=MaterialTheme.typography.titleSmall)
-        Text("Эта проверка выполняется локально. Пароли для сборки можно отдельно и добровольно сохранить через Android Keystore на экране «Сборка».",
+        Text("Пароль хранилища открывает файл JKS. Пароль закрытого ключа может быть таким же — второе поле тогда оставь пустым. Проверка не сохраняет пароли. Сохранение в Android Keystore доступно отдельно на экране «Сборка».",
             style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedTextField(storePassword,{storePassword=it},label={Text("Пароль хранилища")},
+        OutlinedTextField(storePassword,{storePassword=it},label={Text("Пароль файла JKS (хранилища)")},
             visualTransformation=PasswordVisualTransformation(),singleLine=true,
             modifier=Modifier.fillMaxWidth(),enabled=!checking)
         OutlinedTextField(keyPassword,{keyPassword=it},label={Text("Пароль ключа (если отличается)")},

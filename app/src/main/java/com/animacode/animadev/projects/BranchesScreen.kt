@@ -52,7 +52,7 @@ import org.json.JSONObject
             if(neon)NeonSection("Branches",AppIcons.Git,project.name)
             else Text(project.name,style=MaterialTheme.typography.titleMedium)
             Text("Здесь показаны Git-ссылки выбранного каталога, а не отдельные рабочие каталоги. Ночная ветка может быть открыта в другом worktree — список таких каталогов теперь находится на экране проекта выше инструментов.",style=MaterialTheme.typography.bodyMedium,color=if(neon)NeonGlass.softGreen else MaterialTheme.colorScheme.primary)
-            Text("Выберите строку, чтобы посмотреть коммиты и при необходимости явно переключиться. Переключение допустимо только для чистого AnimaQuiz с совпадающим SHA на GitHub.",
+            Text("Выберите локальную ветку с подтверждённым SHA GitHub, чтобы безопасно переключиться. Для всех подключённых обычных репозиториев без локальных изменений.",
                 style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             if(switcher.message().isNotBlank())Text(switcher.message(),style=MaterialTheme.typography.bodySmall)
             if(switcher.pending())LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -140,7 +140,7 @@ import org.json.JSONObject
         } else item {Text("Обновите список. Результаты другого проекта здесь не показываются.",style=MaterialTheme.typography.bodyMedium)}
     }
     selectedBranch?.let {row->
-        val eligible=project.id=="animaquiz" && row.local!=null && row.remote!=null &&
+        val eligible=project.supported && !project.worktree && row.local!=null && row.remote!=null &&
             row.local.sha==row.remote.sha && !row.active &&
             metadata?.optBoolean("dirty")==false && !switcher.pending() &&
             !gateway.prefs.getBoolean("pending",false) &&

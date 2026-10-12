@@ -49,7 +49,7 @@ import org.json.JSONObject
     val projects=remember(generation) { store.all() };val info=rememberCatalogRecord(context);val record=rememberRepoRecord(context)
     val neon=LocalNeonSkin.current
     val registeredGroups=ProjectGrouping.groups(projects.map {ProjectIdentity(it.id,it.path,it.repositoryPath,it.worktree)})
-    val primaryProjects=registeredGroups.mapNotNull {g->projects.find {it.id==g.first().id}}
+    val primaryProjects=store.sorted(registeredGroups.mapNotNull {g->projects.find {it.id==g.first().id}})
     val catalog=info.getJSONObject("catalog");val a=catalog.optJSONArray("projects")
     val found=remember(info.toString(),projects) { buildList { if(a!=null)for(i in 0 until a.length())runCatching { LocalProject.parse(a.getJSONObject(i)) }.getOrNull()?.takeIf { p->projects.none { it.path==p.path } }?.let { add(it) } } }
     val foundGroups=ProjectGrouping.groups(found.map {ProjectIdentity(it.id,it.path,it.repositoryPath,it.worktree)})
@@ -85,8 +85,10 @@ import org.json.JSONObject
                 val active=p.supported && record.optString("project_id","animaquiz")==p.id && RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
                 if(neon) {
                     Box {
-                        NeonProjectCard(p,branch,dirty,active,onClick={onOpen(p)},onMore={menu=true})
+                        NeonProjectCard(p,branch,dirty,active,onClick={onOpen(p)},onMore={menu=true},pinned=store.pinned(p.id))
                         DropdownMenu(menu,{menu=false}) {
+                            DropdownMenuItem(text={Text(if(store.pinned(p.id))"Открепить от начала списка" else "Закрепить сверху")},
+                                onClick={menu=false;store.togglePinned(p.id)})
                             DropdownMenuItem(text={Text("Убрать из приложения")},
                                 onClick={menu=false;remove=p})
                         }
@@ -106,7 +108,10 @@ import org.json.JSONObject
                             Text(if(active)"${record.optString("action")} · ${MonitorPolicy.label(record.optString("state"),false,false)}" else if(p.error.isNotEmpty())"Нужна проверка" else if(p.worktree)"Worktree · только просмотр" else when(dirty){true->"Локальные изменения";false->"Чисто";else->"Не проверено"},style=MaterialTheme.typography.labelMedium,color=if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Box { IconButton(onClick={haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick);menu=true}) {Icon(AppIcons.More,"Меню ${p.name}")}
-                            DropdownMenu(menu,{menu=false}) {DropdownMenuItem(text={Text("Убрать из приложения")},onClick={menu=false;remove=p})}
+                            DropdownMenu(menu,{menu=false}) {
+                                DropdownMenuItem(text={Text(if(store.pinned(p.id))"Открепить" else "Закрепить сверху")},onClick={menu=false;store.togglePinned(p.id)})
+                                DropdownMenuItem(text={Text("Убрать из приложения")},onClick={menu=false;remove=p})
+                            }
                         }
                     }
                 }
@@ -310,11 +315,11 @@ import org.json.JSONObject
                         NeonToolCard("Build","Debug & Release",AppIcons.Build,Modifier.fillMaxWidth()){open("build")}
                         NeonToolCard("History","Jobs & results",AppIcons.History,Modifier.fillMaxWidth()){open("history")}
                     } else Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Max),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                             NeonToolCard("Git","Branches & SHA",AppIcons.Git,Modifier.weight(1f)){open("git")}
                             NeonToolCard("Tests","Gradle & reports",AppIcons.Tests,Modifier.weight(1f)){open("tests")}
                         }
-                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Max),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                             NeonToolCard("Build","Debug & Release",AppIcons.Build,Modifier.weight(1f)){open("build")}
                             NeonToolCard("History","Jobs & results",AppIcons.History,Modifier.weight(1f)){open("history")}
                         }

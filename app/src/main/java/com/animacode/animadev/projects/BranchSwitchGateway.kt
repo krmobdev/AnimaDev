@@ -19,8 +19,8 @@ class BranchSwitchGateway(private val context:Context) {
     fun request(project:LocalProject,target:BranchRow,currentSha:String) {
         if(pending() || RepoStore(context).blocked() || ReleaseStore(context).busy()
            || CatalogGateway(context).prefs.getBoolean("pending",false))return
-        if(project.id!="animaquiz" || !project.supported || project.worktree
-           || project.path!=ProjectPolicy.QUIZ || target.active || target.local==null || target.remote==null
+        if(!project.supported || project.worktree || !ProjectPolicy.validId(project.id,project.path)
+           || target.active || target.local==null || target.remote==null
            || target.local.sha!=target.remote.sha || !currentSha.matches(Regex("[a-f0-9]{40,64}"))) {
             prefs.edit().putString("message","Нужна локальная ветка с одинаковыми SHA у local и origin. Сначала обновите список.").apply()
             return
@@ -43,7 +43,7 @@ class BranchSwitchGateway(private val context:Context) {
         val intent=Intent("com.termux.RUN_COMMAND").apply {
             setClassName("com.termux","com.termux.app.RunCommandService")
             putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
-            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",code,id,target.name,currentSha,target.local.sha))
+            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",code,id,project.path,project.remote,target.name,currentSha,target.local.sha))
             putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
             putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
             putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
@@ -87,10 +87,12 @@ class BranchSwitchReceiver:BroadcastReceiver() {
             val branch=response.getString("branch");val sha=response.getString("commit")
             check(branch==prefs.getString("branch","") && sha==prefs.getString("sha","") && sha.matches(Regex("[a-f0-9]{40,64}")))
             val project=ProjectStore(context)
-            project.update(listOfNotNull(project.all().firstOrNull{it.id=="animaquiz" && it.path==prefs.getString("path","")}
+            val selectedId=prefs.getString("project","") ?: ""
+            val path=prefs.getString("path","") ?: ""
+            project.update(listOfNotNull(project.all().firstOrNull{it.id==selectedId && it.path==path}
                 ?.copy(branch=branch,commit=sha,dirty=false,error="")))
             RepoStore(context).edit {
-                if(it.optString("project_id","animaquiz")=="animaquiz") {
+                if(it.optString("project_id","animaquiz")==selectedId) {
                     it.remove("snapshot")
                     it.put("message","Ветка изменена. Проверьте GitHub SHA перед тестами и сборкой.")
                 }
