@@ -4,8 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,6 +54,7 @@ import com.animacode.animadev.repos.*
         it.optString("branch")==project.branch && it.optString("local_commit")==project.commit
     } else null
     val pending=r.optBoolean("pending");val blocked=store.blocked();val ready=r.optBoolean("ready")
+    val historyFull=RepoGateway.historyCapacityFailure(r)
     val releaseGeneration=ReleaseStore.generation.intValue
     val releaseBusy=remember(releaseGeneration) { ReleaseStore(context).busy() }
     val available=HelperPolicy.mayRun(permitted,termuxVersion!=null,ready,pending,blocked)
@@ -70,20 +70,19 @@ import com.animacode.animadev.repos.*
     var adbDetails by rememberSaveable(project.id) {mutableStateOf(!deviceReady)}
     var fallbackTestTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
     val testTab=selectedTestTab ?: fallbackTestTab
-    val unitFocus=remember {BringIntoViewRequester()}
-    val deviceFocus=remember {BringIntoViewRequester()}
+    val toolsListState=rememberLazyListState()
     LaunchedEffect(testTab,r.optString("job_id"),tool) {
         if(belongs && r.optString("job_id").isNotBlank() && tool=="tests") {
             when(r.optString("action")) {
-                "TEST" -> if(testTab==0) {kotlinx.coroutines.delay(250);unitFocus.bringIntoView()}
-                "TEST_DEVICE" -> if(testTab==1) {kotlinx.coroutines.delay(250);deviceFocus.bringIntoView()}
+                "TEST" -> if(testTab==0) {kotlinx.coroutines.delay(250);toolsListState.scrollToItem((toolsListState.layoutInfo.totalItemsCount-1).coerceAtLeast(0))}
+                "TEST_DEVICE" -> if(testTab==1) {kotlinx.coroutines.delay(250);toolsListState.scrollToItem((toolsListState.layoutInfo.totalItemsCount-1).coerceAtLeast(0))}
             }
         }
     }
     var confirmSync by rememberSaveable {mutableStateOf(false)};var changedFiles by rememberSaveable {mutableStateOf(false)}
     var gitDetails by rememberSaveable(project.id) {mutableStateOf(false)}
     val grant=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {onPermissionUpdated()}
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize(),state=toolsListState,contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
             if(neon)NeonPanel(Modifier.fillMaxWidth(),glowing=true) {
                 NeonSection(if(tool=="git")"Git" else "Tests",
@@ -106,8 +105,9 @@ import com.animacode.animadev.repos.*
         if(!ready)item {Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             val installed=r.optString("installed_sha").isNotEmpty()
             Text(if(installed)"Доступно обновление локального помощника" else "Нужен локальный помощник Termux",style=MaterialTheme.typography.titleSmall)
-            Text(if(blocked)"Сначала уточните прежнее задание по Job ID. Обновление сейчас заблокировано." else "Результаты и история сохранятся. После подключения обновите состояние Git.",style=MaterialTheme.typography.bodySmall)
-            com.animacode.animadev.projects.ActionButton(onClick={gateway.install()},enabled=HelperPolicy.mayConnect(permitted,termuxVersion!=null,pending,blocked)){Text(if(pending)"Подключаем…" else HelperPolicy.label(installed))}
+            Text(if(historyFull)"Журнал Termux заполнен. Обновите помощника: старые задания и журналы сохранятся. Затем подтвердите статус прежнего ID."
+                else if(blocked)"Сначала уточните прежнее задание по Job ID. Обновление сейчас заблокировано." else "Результаты и история сохранятся. После подключения обновите состояние Git.",style=MaterialTheme.typography.bodySmall)
+            com.animacode.animadev.projects.ActionButton(onClick={gateway.install()},enabled=HelperPolicy.mayConnect(permitted,termuxVersion!=null,pending,blocked && !historyFull)){Text(if(pending)"Подключаем…" else HelperPolicy.label(installed))}
         }} }
         if(TestScreenStatusPolicy.needsRecovery(r.optString("state")) &&
             r.optString("job_id").isNotBlank()) item {
@@ -126,10 +126,11 @@ import com.animacode.animadev.repos.*
                     val queryAllowed=RepoPolicy.canRecoverJob(pending,
                         r.optString("job_id"),r.optString("job_runner_sha"),
                         r.optString("installed_sha"))
-                    Button(onClick={gateway.query(true)},enabled=queryAllowed && permitted &&
-                        termuxVersion!=null,modifier=Modifier.fillMaxWidth()) {
+                    Button(onClick={gateway.query(true)},enabled=queryAllowed && permitted && termuxVersion!=null &&
+                        (!historyFull || ready),modifier=Modifier.fillMaxWidth()) {
                         Text("Проверить статус в Termux")
                     }
+                    if(historyFull && !ready)Text("Сначала обновите локального помощника кнопкой выше. Запрос к старой версии повторять бессмысленно.",style=MaterialTheme.typography.bodySmall)
                     if(pending)Text("Ожидаем предыдущий ответ Termux. Если он потерялся, "+
                         "через 15 секунд станет доступен повторный запрос.",
                         style=MaterialTheme.typography.bodySmall)
@@ -319,7 +320,7 @@ import com.animacode.animadev.repos.*
                     color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainer,
                     border=androidx.compose.foundation.BorderStroke(1.dp,
                         if(neon)NeonGlass.outline else MaterialTheme.colorScheme.outlineVariant),
-                    modifier=Modifier.fillMaxWidth().bringIntoViewRequester(unitFocus)) {
+                    modifier=Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(20.dp),
                         verticalArrangement=Arrangement.spacedBy(12.dp)) {
                         if(neon)NeonSection("Run unit tests",AppIcons.Tests,
@@ -375,7 +376,7 @@ import com.animacode.animadev.repos.*
                     color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainer,
                     border=androidx.compose.foundation.BorderStroke(1.dp,
                         if(neon)NeonGlass.outline else MaterialTheme.colorScheme.outlineVariant),
-                    modifier=Modifier.fillMaxWidth().bringIntoViewRequester(deviceFocus)) {
+                    modifier=Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(20.dp),
                         verticalArrangement=Arrangement.spacedBy(12.dp)) {
                         if(neon)NeonSection("Instrumentation tests",AppIcons.Tests,

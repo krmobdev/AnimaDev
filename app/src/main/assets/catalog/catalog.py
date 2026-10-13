@@ -97,6 +97,37 @@ def remote_label(value):
 
 BRANCH_PAGE_SIZE=32
 
+def paired_ref_rows(rows,call):
+    """Show a local ref together with its matching fetched origin ref per page.
+
+    Paging walks local and remote namespaces separately, so a matching origin
+    can otherwise sit on a later page and incorrectly look absent in Android.
+    Query only the counterpart names (one bounded Git call); never fetch.
+    """
+    rows=list(dict.fromkeys(rows))
+    known=set()
+    wanted=set()
+    for row in rows:
+        pieces=row.split("\t",2)
+        if len(pieces)!=3:continue
+        ref=pieces[0]
+        known.add(ref)
+        if ref.startswith("refs/heads/"):
+            wanted.add("refs/remotes/origin/"+ref[len("refs/heads/"):])
+        elif ref.startswith("refs/remotes/origin/") and ref!="refs/remotes/origin/HEAD":
+            wanted.add("refs/heads/"+ref[len("refs/remotes/origin/"):])
+    wanted.difference_update(known)
+    if wanted:
+        args=["for-each-ref","--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)",*sorted(wanted)]
+        code,out=call(args)
+        if code:raise ValueError("GIT_FAILED")
+        for row in out.splitlines():
+            parts=row.split("\t",2)
+            if len(parts)==3 and parts[0] in wanted and re.fullmatch(r"[a-f0-9]{40,64}",parts[1]):
+                rows.append(row)
+    return list(dict.fromkeys(rows))
+
+
 def ref_page(prefix,root,env,offset):
     """Bounded streaming page, not a cap on the repository's total refs."""
     if type(offset) is not int or offset<0:raise ValueError('BAD_OFFSET')
@@ -204,7 +235,7 @@ def inspect(root,home=HOME,git=None,branches=False,branch_offset=0):
                 for ref in preferred:
                     code,row=call(['log','-1','--format=%H%x09%cI',ref,'--'])
                     if code==0:pinned.append(ref+'\t'+row)
-            for row in dict.fromkeys(pinned+raw):
+            for row in paired_ref_rows(pinned+raw,call):
                 parts=row.split('\t')
                 if len(parts)!=3 or not re.fullmatch('[0-9a-f]{40,64}',parts[1]):continue
                 ref,sha,date=parts

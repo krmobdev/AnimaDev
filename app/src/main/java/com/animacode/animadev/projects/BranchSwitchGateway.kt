@@ -20,9 +20,9 @@ class BranchSwitchGateway(private val context:Context) {
         if(pending() || RepoStore(context).blocked() || ReleaseStore(context).busy()
            || CatalogGateway(context).prefs.getBoolean("pending",false))return
         if(!project.supported || project.worktree || !ProjectPolicy.validId(project.id,project.path)
-           || target.active || target.local==null || target.remote==null
-           || target.local.sha!=target.remote.sha || !currentSha.matches(Regex("[a-f0-9]{40,64}"))) {
-            prefs.edit().putString("message","Нужна локальная ветка с одинаковыми SHA у local и origin. Сначала обновите список.").apply()
+           || !BranchPolicy.maySwitch(target)
+           || !currentSha.matches(Regex("[a-f0-9]{40,64}"))) {
+            prefs.edit().putString("message","Выбери ветку, подтверждённую в origin. Сначала обнови origin с GitHub.").apply()
             return
         }
         val id=UUID.randomUUID().toString().replace("-","")
@@ -33,8 +33,8 @@ class BranchSwitchGateway(private val context:Context) {
         }
         if(!prefs.edit().putBoolean("pending",true).putString("id",id)
                 .putString("project",project.id).putString("path",project.path)
-                .putString("branch",target.name).putString("sha",target.local.sha)
-                .putString("message","Проверяю GitHub и чистоту рабочего дерева…").commit())return
+                .putString("branch",target.name).putString("sha",target.remote!!.sha)
+                .putString("message","Проверяю GitHub SHA, origin и чистоту дерева…").commit())return
         val callback=PendingIntent.getBroadcast(context,id.hashCode(),
             Intent(context,BranchSwitchReceiver::class.java).apply {
                 action="com.animacode.animadev.BRANCH_SWITCH"
@@ -43,7 +43,7 @@ class BranchSwitchGateway(private val context:Context) {
         val intent=Intent("com.termux.RUN_COMMAND").apply {
             setClassName("com.termux","com.termux.app.RunCommandService")
             putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
-            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",code,id,project.path,project.remote,target.name,currentSha,target.local.sha))
+            putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf("-c",code,id,project.path,project.remote,target.name,currentSha,target.remote!!.sha,"GITHUB"))
             putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
             putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
             putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
@@ -77,6 +77,9 @@ class BranchSwitchReceiver:BroadcastReceiver() {
                     "WORKTREE_DIRTY"->"Есть локальные изменения. Переключение отменено без удаления файлов."
                     "SOURCE_CHANGED"->"Активная ветка изменилась после снимка. Обновите список."
                     "LOCAL_BRANCH_CHANGED"->"Выбранная ветка изменилась. Обновите список."
+                    "ORIGIN_STALE"->"Origin устарел. Обновите origin с GitHub, затем выберите ветку."
+                    "LOCAL_DIVERGED"->"Локальная и GitHub-ветки разошлись. Локальные коммиты сохранены; автоматический reset запрещён."
+                    "LOCAL_BEHIND_OR_DIVERGED"->"Текущая ветка отличается от GitHub. Сначала проверьте обновления."
                     "GITHUB_SHA_MISMATCH"->"SHA GitHub отличается от локального. Переключение отменено."
                     "REMOTE_DENIED"->"Origin не соответствует доверенному GitHub-репозиторию."
                     "GIT_REJECTED"->"Git отказал в переключении. Возможно, ветка открыта в другом worktree."
@@ -99,7 +102,7 @@ class BranchSwitchReceiver:BroadcastReceiver() {
             }
             CatalogGateway(context).prefs.edit().remove("branches").commit()
             prefs.edit().putBoolean("pending",false).remove("id")
-                .putString("message","Активная ветка: "+branch+" · "+sha.take(12)+". Обновите список и проверьте GitHub SHA в разделе Git.").commit()
+                .putString("message","Активная ветка: "+branch+" · "+sha.take(12)+". Локальная ветка соответствует GitHub. Обновите список и проверьте статус перед сборкой.").commit()
         } catch(_:Exception) {
             prefs.edit().putBoolean("pending",false).remove("id").putString("message",
                 "Результат переключения не подтверждён. Проверьте ветку в Git перед сборкой.").commit()

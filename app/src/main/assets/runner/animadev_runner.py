@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 
-VERSION = '0.4.0'
+VERSION = '0.4.1'
 MONITOR_SHA = 'f95d91e7170ab96df4ad9731e48e3f8bae77a23055424ed834d4a0299c55e5e5'
 GRADLE_SHA = '1138c9eb85e3a49ff455eb4ea07c36332c6090c39ecc75701cdfcc3067af631f'
 PROTOCOL = 2
@@ -87,7 +87,7 @@ MESSAGES = {
  'RUNNER_CHECKSUM_MISMATCH': 'Контрольная сумма runner не совпадает. Операция отменена.',
  'STORAGE_UNAVAILABLE': 'Не удалось сохранить состояние задания.',
  'PROCESS_IDENTITY_UNAVAILABLE': 'Termux не позволяет проверить идентичность процессов. Запуск заблокирован.',
- 'HISTORY_FULL': 'Журнал достиг лимита 100 заданий. Очистка автоматически не выполняется.',
+ 'HISTORY_FULL': 'Журнал достиг лимита 10 000 заданий. Старые записи не удаляются.',
  'BUILD_OUTDATED': 'Локальный SHA устарел: обновите GitHub.',
  'BUILD_PATH_DENIED': 'Небезопасный путь APK.',
  'BUILD_ARTIFACT_MISSING': 'Gradle не создал APK.',
@@ -413,7 +413,10 @@ class Engine:
                     jobs = [json.loads(x[0]) for x in c.execute('SELECT data FROM jobs')]
                     if any(x['state'] not in TERMINAL and x.get('action') in ('TEST', 'TEST_DEVICE', 'BUILD_DEBUG') for x in jobs):
                         raise Denied('JOB_BUSY')
-            if c.execute('SELECT COUNT(*) FROM jobs').fetchone()[0] >= 100:
+            # Preserve previous jobs: no implicit history deletion or rotation.
+            # 100 entries is insufficient for an actively used IDE; raise the
+            # bounded limit without discarding any existing SQLite rows.
+            if c.execute('SELECT COUNT(*) FROM jobs').fetchone()[0] >= 10000:
                 raise Denied('HISTORY_FULL')
             j = {'job_id': jid, 'project_id': project, 'action': action, 'fingerprint': fp,
                 'adb_endpoint': adb_endpoint if action=='TEST_DEVICE' else '',

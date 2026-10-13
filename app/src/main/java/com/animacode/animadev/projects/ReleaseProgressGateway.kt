@@ -87,10 +87,37 @@ class ReleaseProgressReceiver:BroadcastReceiver() {
             val updated=response.optLong("updated_at")
             if(updated<record.optLong("progress_updated_at"))return
             val msg=response.optString("last").take(165).ifBlank {"Ожидаем подтверждение Termux"}
+            val received=response.optJSONObject("metrics")
+            val metrics=received?.let {raw->
+                val cpu=raw.optInt("cpu_percent",-1)
+                val total=raw.optInt("mem_total_mb",-1)
+                val available=raw.optInt("mem_available_mb",-1)
+                val sampled=raw.optLong("sampled_at",0L)
+                val safe=JSONObject()
+                if(sampled>0 && sampled<=System.currentTimeMillis()+60_000L)
+                    safe.put("sampled_at",sampled)
+                if(cpu in 0..100) {
+                    safe.put("cpu_percent",cpu)
+                    val cores=raw.optInt("cpu_cores",-1)
+                    if(cores in 1..512)safe.put("cpu_cores",cores)
+                    val process=raw.optInt("cpu_process_percent",-1)
+                    if(process in 0..51_200)safe.put("cpu_process_percent",process)
+                }
+                if(total in 1..1_048_576 && available in 0..total) {
+                    safe.put("mem_total_mb",total)
+                    safe.put("mem_available_mb",available)
+                    safe.put("mem_used_mb",total-available)
+                }
+                val swap=raw.optInt("swap_used_mb",-1)
+                if(swap in 0..1_048_576)safe.put("swap_used_mb",swap)
+                safe.takeIf {it.has("cpu_percent") || it.has("mem_total_mb")}
+            }
             if(record.optString("phase")==phase && record.optString("message")==msg &&
-               record.optString("progress_lines")==excerpt)return
+               record.optString("progress_lines")==excerpt &&
+               (metrics==null || record.optJSONObject("metrics")?.toString()==metrics.toString()))return
             record.put("phase",phase).put("message",msg)
                 .put("progress_lines",excerpt).put("progress_updated_at",updated)
+            if(metrics!=null)record.put("metrics",metrics)
             store.write(record)
         } catch(_:Exception) {
             // Failed reads must never change the trusted release result state.

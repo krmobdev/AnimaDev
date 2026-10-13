@@ -1,10 +1,16 @@
 package com.animacode.animadev.repos
 
 object RepoPolicy {
+    /** A confirmed HISTORY_FULL refusal occurs before a job is reserved. */
+    fun journalCapacityRejected(state:String, transportExit:Int, termuxErr:Int,
+                                error:String, success:Boolean):Boolean =
+        state=="UNKNOWN" && transportExit==0 && termuxErr == -1 &&
+            error=="HISTORY_FULL" && !success
     // The Termux device runner verifies Git and ADB itself on each launch.
     // Only local JVM tests still use the stored UI snapshot gate.
     fun requiresPreparedSnapshot(action: String): Boolean = action == "TEST"
     fun runnerVersion(sha: String, current: String): String = when (sha) {
+        "33e2668e27ed92ac12b0ea6170dfcf91fff4ea0af5d08380a1038679bf549507" -> "0.4.0"
         "e96b432836ff0fb1f23f9455a1440a73fbcb7a675720871d323c4209bb178a4e" -> "0.2.0"
         "7239fd9dd4979342bdfec98f0a10ef198358e8f8e6ecc8b3696be6ca0df5b0b2" -> "0.2.1"
         "bcca823e689fd56e05993fe9e61d8b2f7d904c054eb34964d39b3828cd24fa4b" -> "0.3.0"
