@@ -36,6 +36,7 @@ import com.animacode.animadev.termux.TermuxGateway
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         if(neon)item {NeonSection("Termux",AppIcons.Terminal,
             "Linux terminal & development environment for Android")}
+        item { ShizukuConnectionCard(context) }
         item {Surface(
             color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.primaryContainer,
             shape=androidx.compose.foundation.shape.RoundedCornerShape(23.dp),
@@ -54,7 +55,20 @@ import com.animacode.animadev.termux.TermuxGateway
                 "Check environment","Read actual package and SDK versions",AppIcons.Refresh,
                 enabled=permitted && version!=null && !data.optBoolean("pending"),
                 onClick={gateway.read("ENV")})
-            else com.animacode.animadev.projects.ActionButton(onClick={gateway.read("ENV")},enabled=permitted && version!=null && !data.optBoolean("pending")){Icon(AppIcons.Refresh,null);Spacer(Modifier.width(8.dp));Text("Проверить окружение")}
+            else Button(
+                onClick={gateway.read("ENV")},
+                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),
+                enabled=permitted && version!=null && !data.optBoolean("pending"),
+                colors=ButtonDefaults.buttonColors(
+                    disabledContainerColor=MaterialTheme.colorScheme.primaryContainer,
+                    disabledContentColor=MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+            ) {
+                Icon(AppIcons.Refresh,null)
+                Spacer(Modifier.width(8.dp))
+                Text("Проверить окружение",maxLines=1,softWrap=false,
+                    overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
         }} }
         if(data.optBoolean("pending"))item {LinearProgressIndicator(Modifier.fillMaxWidth())}
         if(data.optString("message").isNotEmpty())item {Text(data.optString("message"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}

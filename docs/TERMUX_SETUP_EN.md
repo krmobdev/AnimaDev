@@ -1,5 +1,12 @@
 # Termux — local Android build setup
 
+## Complete GitHub branch fetch in dev.47 (candidate)
+The **Refresh origin from GitHub** action fetches all `refs/heads/*` regardless of the local `remote.origin.fetch` setting. This does not reset or clean the worktree, prune remote-tracking refs, or check out another branch. Switching still verifies the live GitHub SHA before acting.
+
+## Optional Shizuku
+AnimaDev dev.43 connects directly to a running Shizuku service using the official Android Binder API. On the **Termux → Shizuku** card, request access and approve it in the Shizuku manager. This connection requires no `rish`, root, remote server or persistent ADB connection. The owner must start Shizuku separately; non-root installations usually need a restart after phone reboot. Existing Termux tools continue working independently.
+
+
 ## Background Release AAB in AnimaDev dev.41
 The background worker uses the existing `~/android-sdk` if RUN_COMMAND does not provide ANDROID_HOME, without writing project files.
 Release progress contains allowlisted Gradle task names and fixed diagnostic summaries only. Signing secrets are never logged. Prime missing dependencies using one unsigned online AAB build before an offline build.

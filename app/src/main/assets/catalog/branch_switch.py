@@ -1,7 +1,8 @@
 """Explicit, guarded local-branch switch for verified Termux Git projects.
 
-No force, reset, clean, checkout of remote-only refs, merge or push.
-Queries GitHub using ls-remote before switching. Fails closed for dirty worktrees.
+GitHub is authoritative. Support fetched origin-only branches and fast-forward
+existing local branches, but never reset, force, clean, push or merge divergences.
+Checks GitHub SHA again before switching; refuses dirty worktrees.
 """
 import json, os, pathlib, re, subprocess, sys
 HOME=pathlib.Path("/data/data/com.termux/files/home")
@@ -71,16 +72,31 @@ def switch(target,expected_current,expected_target,expected_remote="github.com/k
         raise SwitchDenied("SOURCE_CHANGED")
     if run(["status","--porcelain=v1","--untracked-files=all"]):
         raise SwitchDenied("WORKTREE_DIRTY")
-    if not run(["show-ref","--verify","refs/heads/"+target]) or run(["rev-parse","refs/heads/"+target])!=expected_target:
-        raise SwitchDenied("LOCAL_BRANCH_CHANGED")
+    # Both the remote-tracking ref and authoritative GitHub ref must match
+    # the selected SHA; no implicit fetch/push or stale origin snapshots.
+    if run(["rev-parse","--verify","refs/remotes/origin/"+target])!=expected_target:
+        raise SwitchDenied("ORIGIN_STALE")
     raw=run(["ls-remote","--heads","origin","refs/heads/"+target],timeout=60)
-    line=raw.splitlines()
-    if len(line)!=1 or line[0]!=expected_target+"\trefs/heads/"+target:
+    if raw.splitlines()!=[expected_target+"\trefs/heads/"+target]:
         raise SwitchDenied("GITHUB_SHA_MISMATCH")
+    ref="refs/heads/"+target
+    lines=run(["for-each-ref","--format=%(refname)%09%(objectname)",ref]).splitlines()
+    local_sha=next((s for row in lines if "\t" in row
+                    for name,s in [row.split("\t",1)] if name==ref),"")
     if target==current:
+        if local_sha!=expected_target:raise SwitchDenied("LOCAL_BEHIND_OR_DIVERGED")
         return {"branch":target,"commit":expected_target,"unchanged":True}
-    # Refuse branches checked out elsewhere; git switch will enforce it without --ignore-other-worktrees.
-    run(["switch","--no-guess",target],timeout=90)
+    if local_sha and local_sha!=expected_target:
+        # Existing local history must be a strict ancestor, never overwritten.
+        try:run(["merge-base","--is-ancestor",ref,"refs/remotes/origin/"+target])
+        except SwitchDenied:raise SwitchDenied("LOCAL_DIVERGED")
+    if local_sha:
+        run(["switch","--no-guess",target],timeout=90)
+        if local_sha!=expected_target:
+            run(["merge","--ff-only","refs/remotes/origin/"+target],timeout=90)
+    else:
+        # No local branch? Create a tracking branch for the GitHub ref.
+        run(["switch","--no-guess","--track","-c",target,"origin/"+target],timeout=90)
     if run(["symbolic-ref","--quiet","--short","HEAD"])!=target or run(["rev-parse","HEAD"])!=expected_target:
         raise SwitchDenied("SWITCH_RESULT_UNCONFIRMED")
     if run(["status","--porcelain=v1","--untracked-files=all"]):
@@ -91,8 +107,9 @@ def main():
     global ROOT
     request=""
     try:
-        if len(sys.argv)!=7:raise SwitchDenied("INVALID_INPUT")
-        request,project_path,remote,target,current,selected=sys.argv[1:]
+        if len(sys.argv)!=8:raise SwitchDenied("INVALID_INPUT")
+        request,project_path,remote,target,current,selected,mode=sys.argv[1:]
+        if mode!="GITHUB":raise SwitchDenied("INVALID_INPUT")
         if not re.fullmatch(r"[a-f0-9]{32}",request):raise SwitchDenied("INVALID_INPUT")
         ROOT=validate_project(project_path,remote)
         outcome=switch(target,current,selected,remote)

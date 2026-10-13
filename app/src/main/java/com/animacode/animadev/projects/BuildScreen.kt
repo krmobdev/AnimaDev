@@ -5,8 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -101,8 +100,7 @@ import com.animacode.animadev.termux.TermuxGateway
     var fallbackBuildTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
     val buildTab=selectedBuildTab ?: fallbackBuildTab
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
-    val releaseResultFocus=remember {BringIntoViewRequester()}
-    val debugResultFocus=remember {BringIntoViewRequester()}
+    val buildListState=rememberLazyListState()
     LaunchedEffect(releaseState.optString("id"),releaseBusy,permitted) {
         val id=releaseState.optString("id")
         if(permitted && releaseBusy && releaseForProject && id.matches(Regex("[a-f0-9]{32}"))) {
@@ -115,17 +113,17 @@ import com.animacode.animadev.termux.TermuxGateway
     LaunchedEffect(buildTab,releaseState.optString("id")) {
         if(buildTab==1 && releaseForProject && releaseState.optString("id").isNotBlank()) {
             delay(300)
-            releaseResultFocus.bringIntoView()
+            buildListState.scrollToItem((buildListState.layoutInfo.totalItemsCount-1).coerceAtLeast(0))
         }
     }
     LaunchedEffect(buildTab,record.optString("job_id")) {
         if(buildTab==0 && belongs && record.optString("action")=="BUILD_DEBUG" &&
            record.optString("job_id").isNotBlank()) {
             delay(300)
-            debugResultFocus.bringIntoView()
+            buildListState.scrollToItem((buildListState.layoutInfo.totalItemsCount-1).coerceAtLeast(0))
         }
     }
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
+    LazyColumn(Modifier.fillMaxSize(),state=buildListState,contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
         item {
             if(neon) NeonPanel(Modifier.fillMaxWidth(),glowing=true) {
                 Text(if(buildTab==0)"Debug APK Build" else "Release AAB Build",
@@ -206,7 +204,7 @@ import com.animacode.animadev.termux.TermuxGateway
             }
         }}
         if(buildTab==0)item {
-            Box(Modifier.fillMaxWidth().bringIntoViewRequester(debugResultFocus)) {
+            Box(Modifier.fillMaxWidth()) {
                 DebugBuildResult(context,record,project,permitted,onJournal)
             }
         }
@@ -335,7 +333,7 @@ import com.animacode.animadev.termux.TermuxGateway
         if(buildTab==1 && releaseForProject)item {
             val state=releaseState.optString("state")
             OutlinedCard(shape=RoundedCornerShape(22.dp),
-                modifier=Modifier.fillMaxWidth().bringIntoViewRequester(releaseResultFocus),
+                modifier=Modifier.fillMaxWidth(),
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp),
                     verticalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -397,6 +395,8 @@ import com.animacode.animadev.termux.TermuxGateway
                         val started=releaseState.optLong("started_at")
                         if(started>0)Text("Прошло: "+(maxOf(0L,now-started)/60_000)+
                             " мин "+(maxOf(0L,now-started)/1000%60)+" с")
+                        HorizontalDivider()
+                        ReleaseResourceMetrics(releaseState.optJSONObject("metrics"),now)
                         Text("Другие сборки заблокированы до подтверждения результата.",
                             style=MaterialTheme.typography.bodySmall)
                         if(releaseState.optString("phase")=="EXPORTING")

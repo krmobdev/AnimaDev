@@ -1,5 +1,47 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-13 07:03 GMT+03:00 · 0.4.0-beta.10-dev.47 (61) — кандидат / candidate
+- RU: «Обновить origin с GitHub» явно получает все refs/heads/* независимо от узкого remote.origin.fetch. Показ веток начинается с origin, поэтому новые GitHub-ветки доступны на первых страницах даже при множестве локальных веток.
+- RU: Сохраняются незакоммиченные файлы, локальные коммиты, журнал и все worktree. Без reset, clean, push, переключения текущей ветки при fetch и удаления remote-tracking refs. Перед checkout SHA повторно сверяется с GitHub.
+- RU: Добавлены автономные проверки списка из 115 веток и refspec при ограниченной конфигурации. Реальная Android-приёмка и установка APK ещё не выполнялись.
+- EN: Fetch explicitly discovers all GitHub branch heads regardless of a narrow fetch refspec. Origin branches are paged first; 115-ref fixture tests cover pagination, with no reset/clean/prune/push or worktree deletion.
+- EN: Candidate only. Device installation, Android integration tests and owner acceptance remain pending.
+
+- RU: 13.10.2026: на Realme проверены 4/4 Python-теста новых веток, 150 реальных Git-ссылок (106 origin + 44 local) за 5 страниц без дубликатов и отдельная временная SQLite-база из 10 000 записей. На следующем запросе получен HISTORY_FULL без потери истории. Это не заменяет сборку APK и инструментальные Android-тесты.
+- EN: Realme offline checks passed: 4/4 new catalog tests, 150 actual refs across 5 pages with no duplicates, and a 10,000-row temporary SQLite boundary check preserving all records. Android APK/build/instrumentation acceptance is still pending.
+
+
+## 2026-10-13 · 0.4.0-beta.10-dev.46 (60)
+- RU: Исправлен GitHub-first выбор ветки: после обновления origin доступны ветки, существующие только на GitHub. Termux проверяет текущую чистоту дерева, SHA локальной/удалённой ссылки и серверный SHA, создаёт отслеживающую ветку или обновляет отстающую строго через fast-forward.
+- RU: Разошедшиеся истории, локальные ветки без origin, изменившийся GitHub SHA и незакоммиченные файлы блокируются с понятной причиной. Никаких force, reset, clean, удалений или push.
+- EN: Remote-only branches can now be tracked and checked out from freshly fetched GitHub refs. Existing local branches are only fast-forwarded; divergent histories and uncommitted changes remain protected.
+
+
+## 2026-10-13 · 0.4.0-beta.10-dev.45 (59)
+- RU: Исправлена блокировка Git CHECK после 100 заданий (HISTORY_FULL): расширена ёмкость долговременного SQLite-журнала до 10 000 без удаления ранее записанных результатов. Android распознаёт подтверждённый отказ, предлагает обновить Termux runner и позволяет безопасно уточнить прежний Job ID новым runner. Никаких автоматических повторов Git, Gradle или принудительной очистки.
+- EN: Fixed Git CHECK stuck in UNKNOWN after the 100-job limit. The persistent SQLite job capacity is raised to 10,000 without deleting existing records; Android offers a safe runner-upgrade and exact-ID recovery path.
+- RU: Разрешено явное переключение на существующие локальные ветки без upstream, только с повторной проверкой чистоты дерева и SHA. Нет fetch, push, reset, merge, принудительного checkout или удаления. Разошедшиеся SHA по-прежнему блокируются.
+- EN: Existing local-only Git branches can now be selected after strict worktree/SHA verification, with no network access or destructive Git operations.
+- RU: Новый embedded runner 0.4.1; сохранена совместимость с историей заданий старого runner 0.4.0.
+- EN: Runner 0.4.1 preserves old job history and exact-ID recovery for 0.4.0.
+
+
+## 2026-10-12 · 0.4.0-beta.10-dev.44 (58)
+- RU: Исправлена автопрокрутка к статусу после запуска Debug APK, Release AAB, unit- и инструментальных тестов — теперь через позиции LazyColumn вместо неинициализированного bringIntoView.
+- EN: Build/test actions reliably jump to the job card; lazy lists scroll to the target item even when it was not composed yet.
+- RU: Release AAB отображает обновляемые каждые ~5 секунд CPU-процентов процессов Termux по всем ядрам, свободную и занятую RAM и zRAM. Цифры читаются локально без секретов.
+- EN: Release AAB shows sanitized live Termux CPU, available/used RAM and swap/zRAM readings.
+- RU: Shizuku проверяет Binder в фоне, показывает индикатор проверки и обновляемый пинг (мс); без блокировки интерфейса.
+- EN: Responsive Shizuku Binder refresh with spinner and automatically updated latency.
+
+
+## 2026-10-12 22:30 GMT+03:00 · 0.4.0-beta.10-dev.43 (57)
+- RU: В разделе Termux появилась отдельная карточка Shizuku: подключение к работающей Android Binder-службе, запрос разрешения по нажатию и отображение состояния, API/UID. Никаких новых серверов или обязательного ADB.
+- EN: New Shizuku card inside Termux: direct Binder connection to an existing service, user-initiated permission request, live service/UID/API status. No new server or mandatory ADB.
+- RU: Старые данные Git, сборок и журналов остаются без изменений; функции Termux работают без Shizuku. Добавлены unit-проверки состояний разрешений.
+- EN: Existing Git, build and journal data are preserved; Termux works without Shizuku. New permission-state unit tests.
+
+
 ## 2026-10-12 12:15 GMT+03:00 · 0.4.0-beta.10-dev.42 (56)
 - RU: В разделе «Ветки» добавлена отдельная кнопка «Обновить origin с GitHub»: по явному нажатию выполняется ограниченный безопасный fetch без checkout, merge, reset, prune, удаления файлов и submodule-запросов.
 - EN: Branches offers explicit guarded GitHub origin refresh: remote-tracking references only, without checkout, merge, reset, prune, file removal or submodule fetch.

@@ -14,12 +14,23 @@ import java.util.UUID
 
 class RepoGateway(private val context: Context) {
     companion object {
-        const val VERSION = "0.4.0"
+        const val VERSION = "0.4.1"
         const val LEGACY_SHA = "e96b432836ff0fb1f23f9455a1440a73fbcb7a675720871d323c4209bb178a4e"
         const val PROTOCOL = 2
         const val PROJECT = "animaquiz"
         const val RUNNER_ROOT = "/data/data/com.termux/files/home/.local/share/animadev"
         const val CALLBACK = "com.animacode.animadev.REPO_RESULT"
+        /** Evidence of a rejected job, never a license to cancel a running one. */
+        fun historyCapacityFailure(record: JSONObject): Boolean {
+            if(record.optBoolean("history_full_recovery"))return true
+            val reply=runCatching {JSONObject(record.optString("transport_stdout"))}.getOrNull()
+                ?:return false
+            return RepoPolicy.journalCapacityRejected(
+                record.optString("state"),record.optInt("callback_exit",-99),
+                record.optInt("termux_err",-99),reply.optString("error_code"),
+                reply.optBoolean("ok",true))
+        }
+
     }
     private val store = RepoStore(context)
     private fun id() = UUID.randomUUID().toString().replace("-", "")
@@ -28,7 +39,7 @@ class RepoGateway(private val context: Context) {
     init {
         val r = store.read()
         if (r.optBoolean("ready") && r.optString("installed_sha").isEmpty()) r.put("installed_sha", LEGACY_SHA)
-        if (r.optBoolean("ready") && r.optString("installed_sha") != sha() && !r.optBoolean("pending") && !store.blocked()) {
+        if (r.optBoolean("ready") && r.optString("installed_sha") != sha() && !r.optBoolean("pending") && (!store.blocked() || historyCapacityFailure(r))) {
             r.put("ready", false).put("message", "Обновите локальный помощник кнопкой ниже. История заданий сохранена.")
         }
         store.write(r)
@@ -36,7 +47,7 @@ class RepoGateway(private val context: Context) {
 
     fun install() {
         val r = store.read()
-        if (r.optBoolean("pending") || store.blocked() || com.animacode.animadev.projects.ReleaseStore(context).busy()) return
+        if (r.optBoolean("pending") || (store.blocked() && !historyCapacityFailure(r)) || com.animacode.animadev.projects.ReleaseStore(context).busy()) return
         val request = id()
         val hash = sha()
         val bytes = context.assets.open("runner/animadev_runner.py").use { it.readBytes() }
@@ -84,6 +95,7 @@ class RepoGateway(private val context: Context) {
                 print(json.dumps({'protocol_version':2,'runner_version':'$VERSION','request_id':request_id,'ok':False,'error_code':str(e) if isinstance(e,ValueError) else 'STORAGE_UNAVAILABLE','message':'Не удалось установить локальный runner.'}))
                 sys.exit(1)
         """.trimIndent()
+        if(historyCapacityFailure(r))r.put("history_full_recovery",true)
         r.put("transport_id", request).put("mode", "INSTALL").put("pending", true)
             .put("transport_runner_version", VERSION)
             .put("sent_at", System.currentTimeMillis()).put("message", "Устанавливаем локальный помощник вне Git-репозиториев…")
@@ -207,7 +219,10 @@ class RepoGateway(private val context: Context) {
     }
     private fun dispatch(mode: String, target: String = "", targetAction: String = "", offset: Long = 0, view: String = "ALL") {
         val r = store.read(); val request = id()
-        val hash = if (mode in setOf("LOG","HISTORY")) sha() else RepoPolicy.runnerForQuery(mode, sha(), r.optString("job_runner_sha"), r.optString("installed_sha"), LEGACY_SHA)
+        val usingCurrentRunner=mode=="QUERY" && historyCapacityFailure(r) &&
+            r.optString("installed_sha")==sha()
+        val hash = if (mode in setOf("LOG","HISTORY") || usingCurrentRunner) sha()
+            else RepoPolicy.runnerForQuery(mode, sha(), r.optString("job_runner_sha"), r.optString("installed_sha"), LEGACY_SHA)
         if (!hash.matches(Regex("[a-f0-9]{64}"))) return
         val runnerVersion = RepoPolicy.runnerVersion(hash, VERSION)
         val payload = JSONObject().put("request_id", request).put("mode", mode)

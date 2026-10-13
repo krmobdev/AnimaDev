@@ -1,5 +1,24 @@
 # AnimaDev — User Guide
 
+## GitHub-first in dev.47 (candidate)
+After an explicit **Refresh origin from GitHub**, Termux fetches **all GitHub heads** even when the repository has a single-branch `remote.origin.fetch` refspec. Origin branches are paged before local-only branches; use **Load more** to see subsequent pages. Search covers loaded pages only. A stale origin ref cannot authorize switching: the live GitHub SHA is verified again. Fetch does not switch branches, reset worktrees or prune refs. Device acceptance is still pending.
+
+## GitHub-first branch switching in dev.46
+GitHub is the source of truth. In **Branches**, tap **Refresh origin from GitHub**, then select a remote branch. Termux creates a local tracking branch when none exists; existing local branches may only advance with fast-forward. A clean worktree, current HEAD, fetched origin SHA and live GitHub SHA are checked again immediately before switching. Divergent histories, local-only branches and uncommitted files are protected; no forced reset or deletion.
+
+
+## Git recovery and local branches in dev.45
+If Git CHECK is stuck in UNKNOWN due to the old 100-job limit, open Git/Tests, tap **Update local helper**, then **Check status in Termux** for the original job ID. The new runner accepts 10,000 job records while preserving the complete SQLite history. An unstarted request becomes confirmed NOT_STARTED, allowing a new check. Never clear the private Termux journal manually.
+Local-only branches are not eligible for GitHub-first switching. Remote-only GitHub branches can be selected after an origin refresh, and divergence is denied without force or reset.
+
+
+## New in dev.44
+Debug APK, Release AAB, unit and device test launches automatically jump to the job result card. During Release, the app updates Termux process CPU usage across all cores, available/used RAM and zRAM around every five seconds. The Shizuku **Refresh** control checks Binder in the background and shows a spinner with automatically refreshed ping latency in milliseconds.
+
+## Shizuku in dev.43
+Open the **Termux → Shizuku** card. AnimaDev detects a running Shizuku service through Android Binder. Tap **Allow access** and approve in Shizuku. A connected session shows the API version and effective UID (typically **2000 / shell** when started through wireless debugging). **Refresh** rechecks the status; **Open Shizuku** opens its manager. AnimaDev never grants permission or starts the service automatically. No Render, VPN or ongoing `adb connect` is required. This version adds the connection and diagnostics; privileged Android operations are a separate next step.
+
+
 ## Improvements in dev.41
 Pin a repository via its overflow menu → Pin to top. This only changes AnimaDev's display order.
 Branch switching supports registered ordinary Git repositories when the worktree is clean, local and GitHub SHA agree and another worktree does not own the target branch. Use the explicit Refresh origin from GitHub action when local remote-tracking refs are stale; its guarded fetch never checks out, merges, resets, prunes, deletes worktree files or fetches submodules.
