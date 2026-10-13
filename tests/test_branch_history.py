@@ -126,7 +126,8 @@ class CatalogPageTests(unittest.TestCase):
             local_refs=["refs/heads/local/%03d" % i for i in range(45)]
             default_ref=subprocess.check_output([git,"-C",directory,
                 "symbolic-ref","HEAD"],text=True).strip()
-            refs=remote+local_refs+[default_ref]
+            refs=remote+local_refs
+            expected_refs=refs+[default_ref]
             instructions="".join("create %s %s\n" % (name,commit) for name in refs)
             subprocess.run([git,"-C",directory,"update-ref","--stdin"],
                 input=instructions,text=True,check=True)
@@ -144,8 +145,8 @@ class CatalogPageTests(unittest.TestCase):
                 offset=next_offset
             else:self.fail("Pagination did not terminate")
             names=[row.split("\t",1)[0] for row in all_rows]
-            self.assertEqual(len(names),len(refs))
-            self.assertEqual(set(names),set(refs))
+            self.assertEqual(len(names),len(expected_refs))
+            self.assertEqual(set(names),set(expected_refs))
             self.assertEqual(len(names),len(set(names)))
 
     def test_refresh_fetches_all_origin_heads_even_with_narrow_refspec(self):
