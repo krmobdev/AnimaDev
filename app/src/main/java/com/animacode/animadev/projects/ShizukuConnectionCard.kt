@@ -51,13 +51,16 @@ fun ShizukuConnectionCard(context: Context) {
     var checking by remember {mutableStateOf(false)}
     var pingMs by remember {mutableStateOf<Long?>(null)}
     var checked by remember {mutableStateOf(false)}
-    suspend fun checkService() {
+    suspend fun checkService(showFeedback: Boolean = false) {
         if(checking)return
         checking=true
         try {
             pingMs=withTimeoutOrNull(2500L) {connection.pingMillis()}
             checked=true
             connection.refresh()
+            // The Binder ping often completes in 1 ms; leave enough time for
+            // a visible spinner on manual refresh without slowing auto checks.
+            if (showFeedback) delay(550L)
         } finally {checking=false}
     }
     LaunchedEffect(connection,active) {
@@ -139,7 +142,7 @@ fun ShizukuConnectionCard(context: Context) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Button(
-                    onClick = { scope.launch { checkService() } },
+                    onClick = { scope.launch { checkService(showFeedback = true) } },
                     enabled = !checking,
                     modifier = Modifier.weight(1f).heightIn(min = 52.dp)
                         .testTag("shizuku_refresh"),
