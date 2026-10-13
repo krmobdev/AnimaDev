@@ -24,6 +24,32 @@ class HistoryTests(unittest.TestCase):
                 self.assertEqual(c.execute("SELECT COUNT(*) FROM jobs").fetchone()[0],105)
                 self.assertEqual(e.store.get(c,jobs[0])["job_id"],jobs[0])
 
+
+    def test_10000_job_limit_preserves_existing_history(self):
+        """Capacity exhaustion must not delete or corrupt the prior 10k rows."""
+        import json
+        runner=load("anima_jobs_capacity","app/src/main/assets/runner/animadev_runner.py")
+        with tempfile.TemporaryDirectory() as directory:
+            engine=runner.Engine(root=pathlib.Path(directory))
+            first_id=uuid.uuid4().hex
+            sample=engine.query(first_id,"animaquiz","CHECK")
+            def records():
+                for i in range(9999):
+                    entry=dict(sample,job_id=uuid.uuid4().hex,
+                               created_at=sample["created_at"]+i*.001)
+                    yield (entry["job_id"],entry["project_id"],
+                           entry["fingerprint"],json.dumps(entry))
+            with engine.store.transaction() as conn:
+                conn.executemany("INSERT INTO jobs VALUES (?,?,?,?)",records())
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0],10000)
+            self.assertEqual(engine.query(first_id,"animaquiz","CHECK")["job_id"],first_id)
+            with self.assertRaises(runner.Denied) as error:
+                engine.query(uuid.uuid4().hex,"animaquiz","CHECK")
+            self.assertEqual(error.exception.code,"HISTORY_FULL")
+            with engine.store.transaction() as conn:
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0],10000)
+                self.assertEqual(engine.store.get(conn,first_id)["job_id"],first_id)
+
 class GithubFirstTests(unittest.TestCase):
     def setUp(self):
         self.m=load("branch_switch_test","app/src/main/assets/catalog/branch_switch.py")
