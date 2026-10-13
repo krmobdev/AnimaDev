@@ -129,37 +129,53 @@ def paired_ref_rows(rows,call):
 
 
 def ref_page(prefix,root,env,offset):
-    """Bounded streaming page, not a cap on the repository's total refs."""
+    """Stream all fetched GitHub branches first, then local-only branches.
+
+    A single monotonically increasing offset covers both namespaces.
+    No fixed total branch count, no implicit network operation or checkout.
+    """
     if type(offset) is not int or offset<0:raise ValueError('BAD_OFFSET')
-    args=['for-each-ref','--sort=refname','--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)','refs/heads','refs/remotes/origin']
-    p=subprocess.Popen(prefix+args,cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,start_new_session=True)
-    selector=selectors.DefaultSelector();selector.register(p.stdout,selectors.EVENT_READ)
-    deadline=time.monotonic()+2;pending=bytearray();rows=[];seen=0;more=False;budget=0
-    try:
-        while selector.get_map() and not more:
-            if time.monotonic()>deadline:raise ValueError('READ_TIMEOUT')
-            for key,_ in selector.select(.1):
-                chunk=os.read(key.fileobj.fileno(),4096)
-                if not chunk:selector.unregister(key.fileobj);continue
-                pending.extend(chunk)
-                while b'\n' in pending:
-                    line,_,rest=pending.partition(b'\n');pending=bytearray(rest)
-                    if len(line)>2048:raise ValueError('REF_BYTES_LIMIT')
-                    seen+=1
-                    if seen<=offset:continue
-                    if len(rows)==BRANCH_PAGE_SIZE:more=True;break
-                    budget+=len(line)
-                    if budget>16000:raise ValueError('PAGE_BYTES_LIMIT')
-                    rows.append(line.decode('utf-8','strict'))
-                if len(pending)>4096:raise ValueError('REF_BYTES_LIMIT')
-                if more:break
-        if not more and p.wait(timeout=max(.1,deadline-time.monotonic()))!=0:raise ValueError('GIT_FAILED')
-        return rows,offset+len(rows),more
-    finally:
-        if p.poll() is None:
-            try:os.killpg(p.pid,signal.SIGKILL)
-            except ProcessLookupError:pass
-        p.wait();selector.close();p.stdout.close()
+    deadline=time.monotonic()+4
+    rows=[];seen=0;more=False;budget=0
+    for namespace in ('refs/remotes/origin','refs/heads'):
+        args=['for-each-ref','--sort=refname',
+              '--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)',namespace]
+        p=subprocess.Popen(prefix+args,cwd=root,env=env,stdout=subprocess.PIPE,
+                           stderr=subprocess.DEVNULL,start_new_session=True)
+        selector=selectors.DefaultSelector();selector.register(p.stdout,selectors.EVENT_READ)
+        pending=bytearray()
+        try:
+            while selector.get_map() and not more:
+                remaining=deadline-time.monotonic()
+                if remaining<=0:raise ValueError('READ_TIMEOUT')
+                for key,_ in selector.select(min(.1,remaining)):
+                    chunk=os.read(key.fileobj.fileno(),4096)
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                        if pending:raise ValueError('REF_BYTES_LIMIT')
+                        continue
+                    pending.extend(chunk)
+                    while b'\n' in pending:
+                        line,_,rest=pending.partition(b'\n');pending=bytearray(rest)
+                        if len(line)>2048:raise ValueError('REF_BYTES_LIMIT')
+                        seen+=1
+                        if seen<=offset:continue
+                        if len(rows)==BRANCH_PAGE_SIZE:
+                            more=True;break
+                        budget+=len(line)
+                        if budget>16000:raise ValueError('PAGE_BYTES_LIMIT')
+                        rows.append(line.decode('utf-8','strict'))
+                    if len(pending)>4096:raise ValueError('REF_BYTES_LIMIT')
+                    if more:break
+            if not more and p.wait(timeout=max(.1,deadline-time.monotonic()))!=0:
+                raise ValueError('GIT_FAILED')
+        finally:
+            if p.poll() is None:
+                try:os.killpg(p.pid,signal.SIGKILL)
+                except ProcessLookupError:pass
+            p.wait();selector.close();p.stdout.close()
+        if more:break
+    return rows,offset+len(rows),more
 
 def inspect(root,home=HOME,git=None,branches=False,branch_offset=0):
     root=pathlib.Path(root)
@@ -280,7 +296,8 @@ def refresh_origin(path,home=HOME,git=None):
           '-c','core.fsmonitor=false','-c','gc.auto=0',
           '-c','maintenance.auto=false','-c','credential.helper=',
           '-c','protocol.file.allow=never',
-          'fetch','--no-tags','--no-recurse-submodules','--no-write-fetch-head','origin']
+          'fetch','--no-tags','--no-recurse-submodules','--no-write-fetch-head',
+          '--no-prune','origin','+refs/heads/*:refs/remotes/origin/*']
     try:
         p=subprocess.run(args,cwd=root,env=env,stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=70,check=False)

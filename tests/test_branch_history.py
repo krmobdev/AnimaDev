@@ -24,6 +24,32 @@ class HistoryTests(unittest.TestCase):
                 self.assertEqual(c.execute("SELECT COUNT(*) FROM jobs").fetchone()[0],105)
                 self.assertEqual(e.store.get(c,jobs[0])["job_id"],jobs[0])
 
+
+    def test_10000_job_limit_preserves_existing_history(self):
+        """Capacity exhaustion must not delete or corrupt the prior 10k rows."""
+        import json
+        runner=load("anima_jobs_capacity","app/src/main/assets/runner/animadev_runner.py")
+        with tempfile.TemporaryDirectory() as directory:
+            engine=runner.Engine(root=pathlib.Path(directory))
+            first_id=uuid.uuid4().hex
+            sample=engine.query(first_id,"animaquiz","CHECK")
+            def records():
+                for i in range(9999):
+                    entry=dict(sample,job_id=uuid.uuid4().hex,
+                               created_at=sample["created_at"]+i*.001)
+                    yield (entry["job_id"],entry["project_id"],
+                           entry["fingerprint"],json.dumps(entry))
+            with engine.store.transaction() as conn:
+                conn.executemany("INSERT INTO jobs VALUES (?,?,?,?)",records())
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0],10000)
+            self.assertEqual(engine.query(first_id,"animaquiz","CHECK")["job_id"],first_id)
+            with self.assertRaises(runner.Denied) as error:
+                engine.query(uuid.uuid4().hex,"animaquiz","CHECK")
+            self.assertEqual(error.exception.code,"HISTORY_FULL")
+            with engine.store.transaction() as conn:
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0],10000)
+                self.assertEqual(engine.store.get(conn,first_id)["job_id"],first_id)
+
 class GithubFirstTests(unittest.TestCase):
     def setUp(self):
         self.m=load("branch_switch_test","app/src/main/assets/catalog/branch_switch.py")
@@ -104,5 +130,66 @@ class CatalogPageTests(unittest.TestCase):
         local="refs/heads/local-only\t"+"a"*40+"\t2026-10-07T10:00:00+00:00"
         self.assertEqual(c.paired_ref_rows([local],lambda _: (0,"")),[local])
 
+
+
+    def test_remote_first_pagination_covers_both_namespaces(self):
+        """Remote-only branches must not wait behind dozens of local refs."""
+        import os
+        import shutil
+        import subprocess
+        git=shutil.which("git")
+        self.assertIsNotNone(git)
+        catalog=load("catalog_remote_first","app/src/main/assets/catalog/catalog.py")
+        with tempfile.TemporaryDirectory() as directory:
+            subprocess.run([git,"init","-q",directory],check=True)
+            subprocess.run([git,"-C",directory,"-c","user.name=Fixture",
+                "-c","user.email=fixture@example.invalid","-c","commit.gpgsign=false",
+                "commit","--allow-empty","-m","fixture"],check=True,
+                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            commit=subprocess.check_output([git,"-C",directory,"rev-parse","HEAD"],
+                                           text=True).strip()
+            remote=["refs/remotes/origin/topic/%03d" % i for i in range(70)]
+            local_refs=["refs/heads/local/%03d" % i for i in range(45)]
+            default_ref=subprocess.check_output([git,"-C",directory,
+                "symbolic-ref","HEAD"],text=True).strip()
+            refs=remote+local_refs
+            expected_refs=refs+[default_ref]
+            instructions="".join("create %s %s\n" % (name,commit) for name in refs)
+            subprocess.run([git,"-C",directory,"update-ref","--stdin"],
+                input=instructions,text=True,check=True)
+            offset=0;all_rows=[]
+            for page_number in range(10):
+                rows,next_offset,more=catalog.ref_page(
+                    [git],pathlib.Path(directory),dict(os.environ),offset)
+                if page_number==0:
+                    self.assertEqual(len(rows),catalog.BRANCH_PAGE_SIZE)
+                    self.assertTrue(all(row.startswith("refs/remotes/origin/")
+                                        for row in rows))
+                all_rows.extend(rows)
+                self.assertEqual(next_offset,offset+len(rows))
+                if not more:break
+                offset=next_offset
+            else:self.fail("Pagination did not terminate")
+            names=[row.split("\t",1)[0] for row in all_rows]
+            self.assertEqual(len(names),len(expected_refs))
+            self.assertEqual(set(names),set(expected_refs))
+            self.assertEqual(len(names),len(set(names)))
+
+    def test_refresh_fetches_all_origin_heads_even_with_narrow_refspec(self):
+        """Do not rely on remote.origin.fetch being configured with a wildcard."""
+        from types import SimpleNamespace
+        catalog=load("catalog_refspec","app/src/main/assets/catalog/catalog.py")
+        project={"error":"","worktree":False,"dirty":False,
+                 "remote":"github.com/krmobdev/quizapp"}
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(catalog,"permitted",return_value=True), \
+                 patch.object(catalog,"inspect",side_effect=[dict(project),dict(project)]), \
+                 patch.object(catalog.subprocess,"run",
+                              return_value=SimpleNamespace(returncode=0)) as command:
+                result=catalog.refresh_origin(directory,home=pathlib.Path(directory))
+                self.assertTrue(result["projects"][0]["refs_refreshed"])
+                self.assertIn("+refs/heads/*:refs/remotes/origin/*",
+                              command.call_args.args[0])
+                self.assertNotIn("--prune",command.call_args.args[0])
 
 if __name__=="__main__":unittest.main()

@@ -1,5 +1,8 @@
 # AnimaDev — User Guide
 
+## GitHub-first in dev.47 (candidate)
+After an explicit **Refresh origin from GitHub**, Termux fetches **all GitHub heads** even when the repository has a single-branch `remote.origin.fetch` refspec. Origin branches are paged before local-only branches; use **Load more** to see subsequent pages. Search covers loaded pages only. A stale origin ref cannot authorize switching: the live GitHub SHA is verified again. Fetch does not switch branches, reset worktrees or prune refs. Device acceptance is still pending.
+
 ## GitHub-first branch switching in dev.46
 GitHub is the source of truth. In **Branches**, tap **Refresh origin from GitHub**, then select a remote branch. Termux creates a local tracking branch when none exists; existing local branches may only advance with fast-forward. A clean worktree, current HEAD, fetched origin SHA and live GitHub SHA are checked again immediately before switching. Divergent histories, local-only branches and uncommitted files are protected; no forced reset or deletion.
 
