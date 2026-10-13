@@ -124,7 +124,9 @@ class CatalogPageTests(unittest.TestCase):
                                            text=True).strip()
             remote=["refs/remotes/origin/topic/%03d" % i for i in range(70)]
             local_refs=["refs/heads/local/%03d" % i for i in range(45)]
-            refs=remote+local_refs
+            default_ref=subprocess.check_output([git,"-C",directory,
+                "symbolic-ref","HEAD"],text=True).strip()
+            refs=remote+local_refs+[default_ref]
             instructions="".join("create %s %s\n" % (name,commit) for name in refs)
             subprocess.run([git,"-C",directory,"update-ref","--stdin"],
                 input=instructions,text=True,check=True)
