@@ -1,5 +1,13 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-13 07:03 GMT+03:00 · 0.4.0-beta.10-dev.47 (61) — кандидат / candidate
+- RU: «Обновить origin с GitHub» явно получает все refs/heads/* независимо от узкого remote.origin.fetch. Показ веток начинается с origin, поэтому новые GitHub-ветки доступны на первых страницах даже при множестве локальных веток.
+- RU: Сохраняются незакоммиченные файлы, локальные коммиты, журнал и все worktree. Без reset, clean, push, переключения текущей ветки при fetch и удаления remote-tracking refs. Перед checkout SHA повторно сверяется с GitHub.
+- RU: Добавлены автономные проверки списка из 115 веток и refspec при ограниченной конфигурации. Реальная Android-приёмка и установка APK ещё не выполнялись.
+- EN: Fetch explicitly discovers all GitHub branch heads regardless of a narrow fetch refspec. Origin branches are paged first; 115-ref fixture tests cover pagination, with no reset/clean/prune/push or worktree deletion.
+- EN: Candidate only. Device installation, Android integration tests and owner acceptance remain pending.
+
+
 ## 2026-10-13 · 0.4.0-beta.10-dev.46 (60)
 - RU: Исправлен GitHub-first выбор ветки: после обновления origin доступны ветки, существующие только на GitHub. Termux проверяет текущую чистоту дерева, SHA локальной/удалённой ссылки и серверный SHA, создаёт отслеживающую ветку или обновляет отстающую строго через fast-forward.
 - RU: Разошедшиеся истории, локальные ветки без origin, изменившийся GitHub SHA и незакоммиченные файлы блокируются с понятной причиной. Никаких force, reset, clean, удалений или push.
