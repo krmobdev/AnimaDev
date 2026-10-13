@@ -105,4 +105,62 @@ class CatalogPageTests(unittest.TestCase):
         self.assertEqual(c.paired_ref_rows([local],lambda _: (0,"")),[local])
 
 
+
+    def test_remote_first_pagination_covers_both_namespaces(self):
+        """Remote-only branches must not wait behind dozens of local refs."""
+        import os
+        import shutil
+        import subprocess
+        git=shutil.which("git")
+        self.assertIsNotNone(git)
+        catalog=load("catalog_remote_first","app/src/main/assets/catalog/catalog.py")
+        with tempfile.TemporaryDirectory() as directory:
+            subprocess.run([git,"init","-q",directory],check=True)
+            subprocess.run([git,"-C",directory,"-c","user.name=Fixture",
+                "-c","user.email=fixture@example.invalid","-c","commit.gpgsign=false",
+                "commit","--allow-empty","-m","fixture"],check=True,
+                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            commit=subprocess.check_output([git,"-C",directory,"rev-parse","HEAD"],
+                                           text=True).strip()
+            remote=["refs/remotes/origin/topic/%03d" % i for i in range(70)]
+            local_refs=["refs/heads/local/%03d" % i for i in range(45)]
+            refs=remote+local_refs
+            instructions="".join("create %s %s\n" % (name,commit) for name in refs)
+            subprocess.run([git,"-C",directory,"update-ref","--stdin"],
+                input=instructions,text=True,check=True)
+            offset=0;all_rows=[]
+            for page_number in range(10):
+                rows,next_offset,more=catalog.ref_page(
+                    [git],pathlib.Path(directory),dict(os.environ),offset)
+                if page_number==0:
+                    self.assertEqual(len(rows),catalog.BRANCH_PAGE_SIZE)
+                    self.assertTrue(all(row.startswith("refs/remotes/origin/")
+                                        for row in rows))
+                all_rows.extend(rows)
+                self.assertEqual(next_offset,offset+len(rows))
+                if not more:break
+                offset=next_offset
+            else:self.fail("Pagination did not terminate")
+            names=[row.split("\t",1)[0] for row in all_rows]
+            self.assertEqual(len(names),len(refs))
+            self.assertEqual(set(names),set(refs))
+            self.assertEqual(len(names),len(set(names)))
+
+    def test_refresh_fetches_all_origin_heads_even_with_narrow_refspec(self):
+        """Do not rely on remote.origin.fetch being configured with a wildcard."""
+        from types import SimpleNamespace
+        catalog=load("catalog_refspec","app/src/main/assets/catalog/catalog.py")
+        project={"error":"","worktree":False,"dirty":False,
+                 "remote":"github.com/krmobdev/quizapp"}
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(catalog,"permitted",return_value=True), \
+                 patch.object(catalog,"inspect",side_effect=[dict(project),dict(project)]), \
+                 patch.object(catalog.subprocess,"run",
+                              return_value=SimpleNamespace(returncode=0)) as command:
+                result=catalog.refresh_origin(directory,home=pathlib.Path(directory))
+                self.assertTrue(result["projects"][0]["refs_refreshed"])
+                self.assertIn("+refs/heads/*:refs/remotes/origin/*",
+                              command.call_args.args[0])
+                self.assertNotIn("--prune",command.call_args.args[0])
+
 if __name__=="__main__":unittest.main()
