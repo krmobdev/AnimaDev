@@ -48,7 +48,7 @@ class CatalogReceiver:BroadcastReceiver() {
                 val a=data.getJSONArray("projects");require(a.length()<=1)
                 if(a.length()==1) {
                     val page=a.getJSONObject(0);val offset=prefs.getLong("branch_offset",0)
-                    require(page.getString("path")==prefs.getString("path","") && (page.optJSONArray("branches")?.length() ?: 0)<=34)
+                    require(page.getString("path")==prefs.getString("path","") && (page.optJSONArray("branches")?.length() ?: 0)<=80)
                     if(page.optString("error").isNotEmpty() ||
                        (j.getString("mode")=="BRANCHES_FETCH" && !page.optBoolean("refs_refreshed"))) {
                         editor.putString("message",page.optString("error").ifBlank {

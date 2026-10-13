@@ -1,5 +1,11 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-13 · 0.4.0-beta.10-dev.46 (60)
+- RU: Исправлен GitHub-first выбор ветки: после обновления origin доступны ветки, существующие только на GitHub. Termux проверяет текущую чистоту дерева, SHA локальной/удалённой ссылки и серверный SHA, создаёт отслеживающую ветку или обновляет отстающую строго через fast-forward.
+- RU: Разошедшиеся истории, локальные ветки без origin, изменившийся GitHub SHA и незакоммиченные файлы блокируются с понятной причиной. Никаких force, reset, clean, удалений или push.
+- EN: Remote-only branches can now be tracked and checked out from freshly fetched GitHub refs. Existing local branches are only fast-forwarded; divergent histories and uncommitted changes remain protected.
+
+
 ## 2026-10-13 · 0.4.0-beta.10-dev.45 (59)
 - RU: Исправлена блокировка Git CHECK после 100 заданий (HISTORY_FULL): расширена ёмкость долговременного SQLite-журнала до 10 000 без удаления ранее записанных результатов. Android распознаёт подтверждённый отказ, предлагает обновить Termux runner и позволяет безопасно уточнить прежний Job ID новым runner. Никаких автоматических повторов Git, Gradle или принудительной очистки.
 - EN: Fixed Git CHECK stuck in UNKNOWN after the 100-job limit. The persistent SQLite job capacity is raised to 10,000 without deleting existing records; Android offers a safe runner-upgrade and exact-ID recovery path.

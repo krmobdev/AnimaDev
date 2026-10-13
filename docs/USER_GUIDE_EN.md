@@ -1,8 +1,12 @@
 # AnimaDev — User Guide
 
+## GitHub-first branch switching in dev.46
+GitHub is the source of truth. In **Branches**, tap **Refresh origin from GitHub**, then select a remote branch. Termux creates a local tracking branch when none exists; existing local branches may only advance with fast-forward. A clean worktree, current HEAD, fetched origin SHA and live GitHub SHA are checked again immediately before switching. Divergent histories, local-only branches and uncommitted files are protected; no forced reset or deletion.
+
+
 ## Git recovery and local branches in dev.45
 If Git CHECK is stuck in UNKNOWN due to the old 100-job limit, open Git/Tests, tap **Update local helper**, then **Check status in Termux** for the original job ID. The new runner accepts 10,000 job records while preserving the complete SQLite history. An unstarted request becomes confirmed NOT_STARTED, allowing a new check. Never clear the private Termux journal manually.
-The **Branches** screen also supports deliberate switching to existing local-only refs: a clean worktree and exact SHA are rechecked on device, without a remote query, reset, merge or push. Diverged local/origin references remain denied.
+Local-only branches are not eligible for GitHub-first switching. Remote-only GitHub branches can be selected after an origin refresh, and divergence is denied without force or reset.
 
 
 ## New in dev.44

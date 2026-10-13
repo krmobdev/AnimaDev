@@ -3,15 +3,15 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.time.ZoneId
 class BranchPolicyTest {
-    @Test fun localOnlyBranchIsSelectableButDivergenceRemainsBlocked() {
+    @Test fun githubRemoteOnlySelectableAndLocalOnlyDenied() {
         val sha="a".repeat(40)
         val local=BranchRow("archive/snapshot",BranchRef("archive/snapshot",sha,"",true),null)
-        assertTrue(BranchPolicy.localOnly(local))
-        assertTrue(BranchPolicy.maySwitch(local))
-        val diverged=local.copy(remote=BranchRef("archive/snapshot","b".repeat(40),"",false))
-        assertFalse(BranchPolicy.maySwitch(diverged))
-        assertFalse(BranchPolicy.maySwitch(local.copy(local=null)))
-        assertFalse(BranchPolicy.maySwitch(local.copy(local=local.local?.copy(active=true))))
+        assertFalse(BranchPolicy.maySwitch(local))
+        val remote=BranchRow("feature/github",null,BranchRef("feature/github",sha,"",false))
+        assertTrue(BranchPolicy.remoteOnly(remote))
+        assertTrue(BranchPolicy.maySwitch(remote))
+        assertTrue(BranchPolicy.maySwitch(remote.copy(local=BranchRef("feature/github","b".repeat(40),"",true))))
+        assertFalse(BranchPolicy.maySwitch(remote.copy(local=BranchRef("feature/github",sha,"",true,active=true))))
     }
     @Test fun cleanWorkingTreeIsExplicit(){assertEquals("Чисто",BranchPolicy.workingTree(false))}
     @Test fun localChangesAreSeparateFromBranchComparison(){assertEquals("Есть локальные изменения",BranchPolicy.workingTree(true))}
