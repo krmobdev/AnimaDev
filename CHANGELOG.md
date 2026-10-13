@@ -7,6 +7,9 @@
 - EN: Fetch explicitly discovers all GitHub branch heads regardless of a narrow fetch refspec. Origin branches are paged first; 115-ref fixture tests cover pagination, with no reset/clean/prune/push or worktree deletion.
 - EN: Candidate only. Device installation, Android integration tests and owner acceptance remain pending.
 
+- RU: 13.10.2026: на Realme проверены 4/4 Python-теста новых веток, 150 реальных Git-ссылок (106 origin + 44 local) за 5 страниц без дубликатов и отдельная временная SQLite-база из 10 000 записей. На следующем запросе получен HISTORY_FULL без потери истории. Это не заменяет сборку APK и инструментальные Android-тесты.
+- EN: Realme offline checks passed: 4/4 new catalog tests, 150 actual refs across 5 pages with no duplicates, and a 10,000-row temporary SQLite boundary check preserving all records. Android APK/build/instrumentation acceptance is still pending.
+
 
 ## 2026-10-13 · 0.4.0-beta.10-dev.46 (60)
 - RU: Исправлен GitHub-first выбор ветки: после обновления origin доступны ветки, существующие только на GitHub. Termux проверяет текущую чистоту дерева, SHA локальной/удалённой ссылки и серверный SHA, создаёт отслеживающую ветку или обновляет отстающую строго через fast-forward.
