@@ -5,13 +5,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -114,35 +119,84 @@ fun ShizukuConnectionCard(context: Context) {
                 },
                 style = MaterialTheme.typography.bodyMedium
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (info.state == ShizukuState.PERMISSION_REQUIRED) {
-                    Button(onClick = connection::requestPermission) {
-                        Text(if (english) "Allow access" else "Разрешить доступ")
-                    }
-                }
-                OutlinedButton(
-                    onClick = { scope.launch {checkService()} },
-                    enabled = !checking,
-                    modifier = Modifier.testTag("shizuku_refresh")
+            // Permission needs its own row: two buttons, a spinner and the ping
+            // must never compete for unconstrained space on narrow devices.
+            if (info.state == ShizukuState.PERMISSION_REQUIRED) {
+                Button(
+                    onClick = connection::requestPermission,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 ) {
-                    Text(if (english) "Check" else "Проверить")
+                    Text(
+                        if (english) "Allow access" else "Разрешить доступ",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                if(checking) CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text(when {
-                    !checked -> if(english) "Waiting for ping" else "Ожидаем пинг"
-                    pingMs != null -> "Пинг: ${pingMs} мс"
-                    else -> if(english) "No response" else "Нет ответа"
-                },style=MaterialTheme.typography.labelMedium,
-                  modifier=Modifier.testTag("shizuku_ping"))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    onClick = { scope.launch { checkService() } },
+                    enabled = !checking,
+                    modifier = Modifier.weight(1f).heightIn(min = 52.dp)
+                        .testTag("shizuku_refresh"),
+                    colors = ButtonDefaults.buttonColors(
+                        disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                ) {
+                    Text(
+                        if (english) "Check" else "Проверить",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row(
+                    modifier = Modifier.widthIn(min = 104.dp, max = 145.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+                ) {
+                    if (checking) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp).testTag("shizuku_checking"),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Text(
+                        when {
+                            !checked -> if (english) "Waiting for ping" else "Ожидаем пинг"
+                            pingMs != null -> if (english) "Ping: ${pingMs} ms" else "Пинг: ${pingMs} мс"
+                            else -> if (english) "No response" else "Нет ответа"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("shizuku_ping"),
+                    )
+                }
             }
             if (info.state == ShizukuState.NOT_INSTALLED ||
                 info.state == ShizukuState.SERVICE_STOPPED ||
                 info.state == ShizukuState.PERMISSION_DENIED) {
                 val manager = connection.managerIntent()
                 if (manager != null) {
-                    OutlinedButton(onClick = { context.startActivity(manager) }) {
-                        Text(if (english) "Open Shizuku" else "Открыть Shizuku")
+                    Button(
+                        onClick = { context.startActivity(manager) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    ) {
+                        Text(
+                            if (english) "Open Shizuku" else "Открыть Shizuku",
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }
