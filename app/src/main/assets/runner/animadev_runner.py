@@ -59,6 +59,9 @@ def validate_profile(p):
             'branch':branch,'dynamic':True,'local_only':not bool(p['remote'])}
 
 TERMINAL = {'SUCCEEDED', 'FAILED', 'TIMED_OUT', 'INTERRUPTED', 'NOT_STARTED'}
+# Bound retained on-device history without ever purging existing owner records.
+# The previous 100-entry cap stranded legitimate local Git checks.
+MAX_JOBS = 4096
 HEX_ID = re.compile(r'^[0-9a-f]{32}$')
 SHA = re.compile(r'^[0-9a-f]{40,64}$')
 MESSAGES = {
@@ -87,7 +90,7 @@ MESSAGES = {
  'RUNNER_CHECKSUM_MISMATCH': 'Контрольная сумма runner не совпадает. Операция отменена.',
  'STORAGE_UNAVAILABLE': 'Не удалось сохранить состояние задания.',
  'PROCESS_IDENTITY_UNAVAILABLE': 'Termux не позволяет проверить идентичность процессов. Запуск заблокирован.',
- 'HISTORY_FULL': 'Журнал достиг лимита 100 заданий. Очистка автоматически не выполняется.',
+ 'HISTORY_FULL': 'Журнал достиг лимита 4096 заданий. Очистка автоматически не выполняется.',
  'BUILD_OUTDATED': 'Локальный SHA устарел: обновите GitHub.',
  'BUILD_PATH_DENIED': 'Небезопасный путь APK.',
  'BUILD_ARTIFACT_MISSING': 'Gradle не создал APK.',
@@ -423,7 +426,7 @@ class Engine:
                     jobs = [json.loads(x[0]) for x in c.execute('SELECT data FROM jobs')]
                     if any(x['state'] not in TERMINAL and x.get('action') in ('TEST', 'TEST_DEVICE', 'BUILD_DEBUG') for x in jobs):
                         raise Denied('JOB_BUSY')
-            if c.execute('SELECT COUNT(*) FROM jobs').fetchone()[0] >= 100:
+            if c.execute('SELECT COUNT(*) FROM jobs').fetchone()[0] >= MAX_JOBS:
                 raise Denied('HISTORY_FULL')
             j = {'job_id': jid, 'project_id': project, 'action': action, 'fingerprint': fp,
                 'adb_endpoint': adb_endpoint if action=='TEST_DEVICE' else '',

@@ -52,7 +52,7 @@ object RepoPolicy {
     /** Versioned helper installation does not start Git or mutate project state. */
     fun mayUpgradeUnknownLocalCheck(pending:Boolean, blocked:Boolean, state:String,
                                     action:String, projectId:String, localProfile:Boolean):Boolean =
-        !pending && blocked && state=="UNKNOWN" && action=="CHECK" &&
+        !pending && blocked && state=="UNKNOWN" && action in setOf("CHECK","STATUS") &&
             projectId!="animaquiz" && localProfile
     /** Reconcile by the same durable ID with a newly installed reader, never by START. */
     fun useCurrentForLocalQuery(mode:String, state:String, installedSha:String,

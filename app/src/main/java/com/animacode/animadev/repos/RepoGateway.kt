@@ -34,12 +34,15 @@ class RepoGateway(private val context: Context) {
     }
     private val store = RepoStore(context)
     private fun id() = UUID.randomUUID().toString().replace("-", "")
-    /** A catalog-validated, local-only project may identify an orphaned CHECK.
+    /** A catalog-validated local-only project can identify an orphaned STATUS or CHECK.
      * Retain the original branch/profile on reconciliation: QUERY is not a
      * retry or a reason to reset the on-device journal.
      */
     private fun localRecoveryProfile(r: JSONObject): JSONObject? {
-        if(r.optString("state")!="UNKNOWN" || r.optString("action")!="CHECK")return null
+        val recoverable = r.optString("state")=="UNKNOWN" ||
+            (r.optString("state")=="FAILED" && r.optString("error_code")=="HISTORY_FULL" &&
+                r.optBoolean("history_full_recovery"))
+        if(!recoverable || r.optString("action") !in setOf("STATUS","CHECK"))return null
         val pid=r.optString("project_id")
         if(pid.isBlank() || pid==PROJECT || !r.optString("job_id").matches(Regex("[a-f0-9]{32}")))return null
         val project=com.animacode.animadev.projects.ProjectStore(context).all()
@@ -58,7 +61,7 @@ class RepoGateway(private val context: Context) {
     }
     fun isLocalCheckRecovery(r:JSONObject,projectId:String):Boolean =
         r.optString("project_id")==projectId && r.optString("state")=="UNKNOWN" &&
-            r.optString("action")=="CHECK" && localRecoveryProfile(r)!=null
+            r.optString("action") in setOf("STATUS","CHECK") && localRecoveryProfile(r)!=null
     fun needsLocalRecoveryUpgrade(r:JSONObject,projectId:String):Boolean =
         isLocalCheckRecovery(r,projectId) &&
             com.animacode.animadev.projects.LocalCheckRecoveryPolicy.needsUpgrade(
@@ -269,7 +272,7 @@ class RepoGateway(private val context: Context) {
             .put("job_id", target.ifEmpty { r.getString("job_id") }).put("action", targetAction.ifEmpty { r.getString("action") })
             .put("project_id", r.optString("project_id",PROJECT))
         if (mode=="START" && r.has("profile")) payload.put("profile",r.getJSONObject("profile"))
-        if (mode=="QUERY" && useCurrentLocalQuery && localProfile!=null)
+        if (mode=="QUERY" && (useCurrentLocalQuery || usingCurrentRunner) && localProfile!=null)
             payload.put("profile",localProfile)
         if (mode=="START" && r.optString("action")=="BUILD_DEBUG")
             payload.put("output_dir",r.optString("output_dir","/storage/emulated/0/Download"))

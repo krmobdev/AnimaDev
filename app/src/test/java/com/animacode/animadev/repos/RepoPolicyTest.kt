@@ -23,6 +23,7 @@ class RepoPolicyTest {
     @Test fun orphanedLocalCheckAllowsSafeVersionedHelperAndQueryOnly() {
         val sha="a".repeat(64)
         assertTrue(RepoPolicy.mayUpgradeUnknownLocalCheck(false,true,"UNKNOWN","CHECK","flylife",true))
+        assertTrue(RepoPolicy.mayUpgradeUnknownLocalCheck(false,true,"UNKNOWN","STATUS","flylife",true))
         assertFalse(RepoPolicy.mayUpgradeUnknownLocalCheck(true,true,"UNKNOWN","CHECK","flylife",true))
         assertFalse(RepoPolicy.mayUpgradeUnknownLocalCheck(false,true,"RUNNING","CHECK","flylife",true))
         assertFalse(RepoPolicy.mayUpgradeUnknownLocalCheck(false,true,"UNKNOWN","BUILD_DEBUG","flylife",true))
@@ -31,6 +32,8 @@ class RepoPolicyTest {
         assertTrue(RepoPolicy.useCurrentForLocalQuery("QUERY","UNKNOWN",sha,sha,true))
         assertFalse(RepoPolicy.useCurrentForLocalQuery("START","UNKNOWN",sha,sha,true))
         assertFalse(RepoPolicy.useCurrentForLocalQuery("QUERY","UNKNOWN",sha,sha,false))
+        // The actual owner-device bug was an UNKNOWN STATUS, not a CHECK.
+        assertTrue(RepoPolicy.useCurrentForLocalQuery("QUERY","UNKNOWN",sha,sha,true))
         assertFalse(RepoPolicy.useCurrentForLocalQuery("QUERY","UNKNOWN","b".repeat(64),sha,true))
         assertFalse(RepoPolicy.useCurrentForLocalQuery("QUERY","RUNNING",sha,sha,true))
     }

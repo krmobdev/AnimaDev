@@ -22,9 +22,9 @@ class OrphanQuery(unittest.TestCase):
             "remote":"","branch":base.BRANCH
         }
 
-    def reply(self,engine,jid,profile=None):
+    def reply(self,engine,jid,profile=None,action='CHECK'):
         payload={"request_id":uuid.uuid4().hex,"mode":"QUERY",
-            "job_id":jid,"project_id":self.local_profile["id"],"action":"CHECK"}
+            "job_id":jid,"project_id":self.local_profile["id"],"action":action}
         if profile is not False:
             payload["profile"]=self.local_profile if profile is None else profile
         stdout=io.StringIO()
@@ -35,6 +35,53 @@ class OrphanQuery(unittest.TestCase):
              contextlib.redirect_stdout(stdout):
             code=runner.main()
         return code,json.loads(stdout.getvalue())
+
+    def test_retained_100_jobs_do_not_block_status_or_new_checks(self):
+        engine=runner.Engine(self.base/"state2",{})
+        pid=self.local_profile["id"]
+        with patch.object(runner,"HOME",self.base):
+            engine.register_profile(pid,self.local_profile)
+            for i in range(100):
+                jid=format(i+1,"032x")
+                previous=dict(job_id=jid,project_id=pid,
+                    action="CHECK",state="SUCCEEDED",fingerprint=runner.fingerprint(pid,"CHECK"),
+                    created_at=1,pid=None,child_pid=None,ended_at=1,
+                    message="retained test record")
+                with engine.store.transaction() as c:engine.store.save(c,previous)
+            with engine.store.transaction() as c:
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM jobs").fetchone()[0],100)
+            old_jid=uuid.uuid4().hex
+            reconciled=engine.query(old_jid,pid,"STATUS")
+            self.assertEqual(reconciled["state"],"NOT_STARTED")
+            new_jid=uuid.uuid4().hex
+            queued=engine.start(new_jid,pid,"CHECK",spawn=False)
+            self.assertEqual(queued["state"],"QUEUED")
+            with engine.store.transaction() as c:
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM jobs").fetchone()[0],102)
+                self.assertEqual(sum(json.loads(row[0])["state"]=="SUCCEEDED"
+                    for row in c.execute("SELECT data FROM jobs")),100)
+
+    def test_bounded_history_still_enforced_after_limit(self):
+        engine=runner.Engine(self.base/"state2",{})
+        pid=self.local_profile["id"]
+        with patch.object(runner,"HOME",self.base):
+            engine.register_profile(pid,self.local_profile)
+            with patch.object(runner,"MAX_JOBS",0):
+                with self.assertRaises(runner.Denied) as denied:
+                    engine.query(uuid.uuid4().hex,pid,"STATUS")
+                self.assertEqual(denied.exception.code,"HISTORY_FULL")
+
+    def test_owner_device_orphaned_status_reconciles_with_profile(self):
+        # FlyLife actually failed with UNKNOWN STATUS, not UNKNOWN CHECK.
+        engine=runner.Engine(self.base/"state2",{})
+        jid=uuid.uuid4().hex
+        code,reply=self.reply(engine,jid,action='STATUS')
+        self.assertEqual(code,0,reply)
+        self.assertTrue(reply["ok"],reply)
+        self.assertEqual(reply["job"]["action"],"STATUS")
+        self.assertEqual(reply["job"]["state"],"NOT_STARTED")
+        with patch.object(runner,"HOME",self.base):
+            self.assertEqual(engine.query(jid,self.local_profile["id"],"STATUS")["state"],"NOT_STARTED")
 
     def test_orphan_gets_tombstone_and_unblocks_not_start(self):
         engine=runner.Engine(self.base/"state2",{})

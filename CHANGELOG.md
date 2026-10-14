@@ -1,5 +1,15 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-14 · 0.4.0-beta.10-dev.56 (70) — журналы без удаления / retained history
+- RU: Диагностика устройства подтвердила вторую причину блокировки FlyLife: после исправления регистрации STATUS Termux ответил HISTORY_FULL. Жёсткий предел 100 записей блокировал даже восстановление прежнего Job ID.
+- RU: Допускается до 4096 сохранённых заданий. Ни одна существующая запись или журнал не удаляются и не мигрируют; при достижении нового предела по-прежнему срабатывает отказ HISTORY_FULL. Регрессионные тесты проверяют сохранность 100 старых записей, QUERY и новый CHECK.
+- EN: Raise bounded durable journal capacity from 100 to 4096; preserve existing SQLite rows, journal files, old job IDs and fail-closed admission on the new limit. Covers real FlyLife STATUS recovery after HISTORY_FULL.
+
+## 2026-10-14 · 0.4.0-beta.10-dev.55 (69) — проверка исправления / verification
+- RU: Фактическая диагностика установленного приложения: у FlyLife сохранялся UNKNOWN Git/STATUS с PROJECT_NOT_FOUND. Причина: при QUERY локальный профиль повторно регистрировался только для CHECK, не для STATUS.
+- RU: Теперь STATUS и CHECK передают проверенный локальный профиль при восстановлении по тому же Job ID. Никакой повторной отправки START, автоматической сборки, сброса Git или истории. Общая карточка восстановления охватывает STATUS.
+- EN: Fix actual owner-device PROJECT_NOT_FOUND for an UNKNOWN local Git STATUS by registering the verified FlyLife profile during QUERY, as already done for CHECK. Preserve exact job ID, Git history and fail-closed execution rules.
+
 ## 2026-10-14 · 0.4.0-beta.10-dev.54 (68) — кандидат / candidate
 - RU: На экране Debug APK FlyLife теперь появляется реальная кнопка восстановления старого Git CHECK вместо двух заблокированных кнопок. Сначала обновление устаревшего Termux runner, затем проверка прежнего Job ID; новый CHECK и сборка не повторяются автоматически.
 - RU: Исправлена недоступность обновления помощника, если сохранено ready=true, но installed_sha уже устарел. В обоих экранах теперь одна общая карточка; исправлен приоритет диагностического сообщения для UNKNOWN. Старое текстовое значение Origin нормализуется без изменения исходников.

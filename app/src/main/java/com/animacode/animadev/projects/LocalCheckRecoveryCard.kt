@@ -31,11 +31,11 @@ fun LocalCheckRecoveryCard(context:Context,project:LocalProject,record:JSONObjec
     Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.fillMaxWidth().padding(18.dp),
             verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Text("Восстановление прежней проверки Git",
+            Text("Восстановление прежнего Git-задания",
                  style=MaterialTheme.typography.titleMedium)
-            Text("Прежний CHECK: результат неизвестен. Job ID: "+
+            Text("Прежний "+record.optString("action")+": результат неизвестен. Job ID: "+
                  record.optString("job_id").take(12))
-            Text("Не запускаем новый CHECK или сборку, пока не получим подтверждение "+
+            Text("Не запускаем новую проверку или сборку, пока не получим подтверждение " +
                  "прежнего задания. Его история и исходники не удаляются.")
             if(needsUpgrade) {
                 Button(onClick={gateway.install()},enabled=canInstall,
