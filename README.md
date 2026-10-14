@@ -1,4 +1,4 @@
-# AnimaDev · 0.4.0-beta.10-dev.48
+# AnimaDev · 0.4.0-beta.10-dev.49
 
 **AnimaDev** — Android-приложение для тех, кто разрабатывает и собирает проекты **прямо на телефоне через Termux**. Оно объединяет Git и worktree, Gradle-тесты, сборку Debug APK и подписанных Release AAB, мониторинг задач, журналы и историю операций. Требуется Android 13+; интерфейс написан на Kotlin и Jetpack Compose.
 
@@ -95,6 +95,9 @@ Real Android UI/device acceptance requires on-device tests, not just successful 
 For older stage reports and design notes, see the [docs/](docs/) directory. Old beta constraints are historical and superseded by the current `AGENTS.md` owner authorization.
 
 ## Offline local Git projects / Локальные Git-проекты
+
+dev.49 corrects an overlooked mismatch: the catalog previously stored the Russian UI label `Origin не настроен` as the machine-readable remote value. It now stores an empty remote field, and previously saved projects with this legacy label are migrated when loaded. The FlyLife no-origin, dirty-worktree case is covered by regression tests.
+
 
 A local Git repository in Termux without an \`origin\` is valid. AnimaDev supports
 local Git CHECK/STATUS, Debug APK, JVM unit tests and isolated instrumentation

@@ -11,7 +11,7 @@ data class LocalProject(val id:String,val name:String,val path:String,val branch
     companion object {
         fun parse(j:JSONObject):LocalProject {
             val id=j.getString("id");val path=j.getString("path");require(ProjectPolicy.validId(id,path))
-            return LocalProject(id,j.getString("name").take(80),path,j.optString("branch").take(200),j.optString("commit").take(64),j.optString("remote").take(200),if(j.isNull("dirty"))null else j.optBoolean("dirty"),j.optString("error").take(200),j.optBoolean("worktree"),j.optString("repository_path").takeIf {ProjectPolicy.permittedPath(it)} ?: "",if(j.isNull("changes_count") || !j.has("changes_count"))null else j.optInt("changes_count").takeIf {it in 0..100000})
+            return LocalProject(id,j.getString("name").take(80),path,j.optString("branch").take(200),j.optString("commit").take(64),ProjectPolicy.normalizeRemote(j.optString("remote").take(200)),if(j.isNull("dirty"))null else j.optBoolean("dirty"),j.optString("error").take(200),j.optBoolean("worktree"),j.optString("repository_path").takeIf {ProjectPolicy.permittedPath(it)} ?: "",if(j.isNull("changes_count") || !j.has("changes_count"))null else j.optInt("changes_count").takeIf {it in 0..100000})
         }
     }
 }

@@ -1,5 +1,10 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-14 07:43 GMT+0300 · 0.4.0-beta.10-dev.49 (63) — кандидат / candidate
+- RU: Исправлен реальный случай FlyLife: каталог ошибочно передавал «Origin не настроен» как значение remote, поэтому локальный Git-проект оставался «Только просмотр».
+- RU: Отсутствующий origin теперь кодируется пустым значением; сохранённые старые записи мигрируются при чтении. Рабочие изменения разрешены в локальной Debug-сборке; неподтверждённый внешний remote по-прежнему отклоняется. Добавлены регрессионные тесты по каталогу и миграции.
+- EN: Fix the actual FlyLife no-origin bug: a localized display label was stored as the remote value, leaving local projects in read-only mode. Catalog now uses an empty remote for no-origin, and existing persisted labels are migrated on load; security checks for unexpected remotes remain intact.
+
 ## 2026-10-14 07:29 GMT+0300 · 0.4.0-beta.10-dev.48 (62) — кандидат / candidate
 - RU: Локальные Git-проекты без \`origin\` теперь поддерживают диагностику, проверку локального HEAD, Debug APK, unit и инструментальные тесты. Незакоммиченные исходники допускаются в локальном режиме и явно отмечаются. Никакого обращения к GitHub для этих операций.
 - RU: GitHub-проекты сохраняют строгую проверку SHA/чистого дерева. Локальная синхронизация и подписание Release AAB пока отключены, без скрытых обходов. Только зарегистрированный корневой Git-репозиторий; внешние пути и worktree не поддерживаются для запуска.

@@ -97,38 +97,85 @@ def remote_label(value):
 
 BRANCH_PAGE_SIZE=32
 
+def paired_ref_rows(rows,call):
+    """Show a local ref together with its matching fetched origin ref per page.
+
+    Paging walks local and remote namespaces separately, so a matching origin
+    can otherwise sit on a later page and incorrectly look absent in Android.
+    Query only the counterpart names (one bounded Git call); never fetch.
+    """
+    rows=list(dict.fromkeys(rows))
+    known=set()
+    wanted=set()
+    for row in rows:
+        pieces=row.split("\t",2)
+        if len(pieces)!=3:continue
+        ref=pieces[0]
+        known.add(ref)
+        if ref.startswith("refs/heads/"):
+            wanted.add("refs/remotes/origin/"+ref[len("refs/heads/"):])
+        elif ref.startswith("refs/remotes/origin/") and ref!="refs/remotes/origin/HEAD":
+            wanted.add("refs/heads/"+ref[len("refs/remotes/origin/"):])
+    wanted.difference_update(known)
+    if wanted:
+        args=["for-each-ref","--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)",*sorted(wanted)]
+        code,out=call(args)
+        if code:raise ValueError("GIT_FAILED")
+        for row in out.splitlines():
+            parts=row.split("\t",2)
+            if len(parts)==3 and parts[0] in wanted and re.fullmatch(r"[a-f0-9]{40,64}",parts[1]):
+                rows.append(row)
+    return list(dict.fromkeys(rows))
+
+
 def ref_page(prefix,root,env,offset):
-    """Bounded streaming page, not a cap on the repository's total refs."""
+    """Stream all fetched GitHub branches first, then local-only branches.
+
+    A single monotonically increasing offset covers both namespaces.
+    No fixed total branch count, no implicit network operation or checkout.
+    """
     if type(offset) is not int or offset<0:raise ValueError('BAD_OFFSET')
-    args=['for-each-ref','--sort=refname','--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)','refs/heads','refs/remotes/origin']
-    p=subprocess.Popen(prefix+args,cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,start_new_session=True)
-    selector=selectors.DefaultSelector();selector.register(p.stdout,selectors.EVENT_READ)
-    deadline=time.monotonic()+2;pending=bytearray();rows=[];seen=0;more=False;budget=0
-    try:
-        while selector.get_map() and not more:
-            if time.monotonic()>deadline:raise ValueError('READ_TIMEOUT')
-            for key,_ in selector.select(.1):
-                chunk=os.read(key.fileobj.fileno(),4096)
-                if not chunk:selector.unregister(key.fileobj);continue
-                pending.extend(chunk)
-                while b'\n' in pending:
-                    line,_,rest=pending.partition(b'\n');pending=bytearray(rest)
-                    if len(line)>2048:raise ValueError('REF_BYTES_LIMIT')
-                    seen+=1
-                    if seen<=offset:continue
-                    if len(rows)==BRANCH_PAGE_SIZE:more=True;break
-                    budget+=len(line)
-                    if budget>16000:raise ValueError('PAGE_BYTES_LIMIT')
-                    rows.append(line.decode('utf-8','strict'))
-                if len(pending)>4096:raise ValueError('REF_BYTES_LIMIT')
-                if more:break
-        if not more and p.wait(timeout=max(.1,deadline-time.monotonic()))!=0:raise ValueError('GIT_FAILED')
-        return rows,offset+len(rows),more
-    finally:
-        if p.poll() is None:
-            try:os.killpg(p.pid,signal.SIGKILL)
-            except ProcessLookupError:pass
-        p.wait();selector.close();p.stdout.close()
+    deadline=time.monotonic()+4
+    rows=[];seen=0;more=False;budget=0
+    for namespace in ('refs/remotes/origin','refs/heads'):
+        args=['for-each-ref','--sort=refname',
+              '--format=%(refname)%09%(objectname)%09%(committerdate:iso-strict)',namespace]
+        p=subprocess.Popen(prefix+args,cwd=root,env=env,stdout=subprocess.PIPE,
+                           stderr=subprocess.DEVNULL,start_new_session=True)
+        selector=selectors.DefaultSelector();selector.register(p.stdout,selectors.EVENT_READ)
+        pending=bytearray()
+        try:
+            while selector.get_map() and not more:
+                remaining=deadline-time.monotonic()
+                if remaining<=0:raise ValueError('READ_TIMEOUT')
+                for key,_ in selector.select(min(.1,remaining)):
+                    chunk=os.read(key.fileobj.fileno(),4096)
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                        if pending:raise ValueError('REF_BYTES_LIMIT')
+                        continue
+                    pending.extend(chunk)
+                    while b'\n' in pending:
+                        line,_,rest=pending.partition(b'\n');pending=bytearray(rest)
+                        if len(line)>2048:raise ValueError('REF_BYTES_LIMIT')
+                        seen+=1
+                        if seen<=offset:continue
+                        if len(rows)==BRANCH_PAGE_SIZE:
+                            more=True;break
+                        budget+=len(line)
+                        if budget>16000:raise ValueError('PAGE_BYTES_LIMIT')
+                        rows.append(line.decode('utf-8','strict'))
+                    if len(pending)>4096:raise ValueError('REF_BYTES_LIMIT')
+                    if more:break
+            if not more and p.wait(timeout=max(.1,deadline-time.monotonic()))!=0:
+                raise ValueError('GIT_FAILED')
+        finally:
+            if p.poll() is None:
+                try:os.killpg(p.pid,signal.SIGKILL)
+                except ProcessLookupError:pass
+            p.wait();selector.close();p.stdout.close()
+        if more:break
+    return rows,offset+len(rows),more
 
 def inspect(root,home=HOME,git=None,branches=False,branch_offset=0):
     root=pathlib.Path(root)
@@ -184,7 +231,7 @@ def inspect(root,home=HOME,git=None,branches=False,branch_offset=0):
         code,sha=call(['rev-parse','--verify','HEAD^{commit}'])
         result['commit']=sha if code==0 and re.fullmatch(r'[0-9a-f]{40,64}',sha) else ''
         code,url=call(['config','--local','--no-includes','--get','remote.origin.url'])
-        result['remote']=remote_label(url)[:200] if code==0 else 'Origin не настроен'
+        result['remote']=remote_label(url)[:200] if code==0 else ''  # Raw no-origin is empty; UI adds the label
         code,changes=call(['status','--porcelain=v1','-z','--untracked-files=all'])
         if code:raise ValueError('GIT_FAILED')
         result['dirty']=bool(changes)
@@ -204,7 +251,7 @@ def inspect(root,home=HOME,git=None,branches=False,branch_offset=0):
                 for ref in preferred:
                     code,row=call(['log','-1','--format=%H%x09%cI',ref,'--'])
                     if code==0:pinned.append(ref+'\t'+row)
-            for row in dict.fromkeys(pinned+raw):
+            for row in paired_ref_rows(pinned+raw,call):
                 parts=row.split('\t')
                 if len(parts)!=3 or not re.fullmatch('[0-9a-f]{40,64}',parts[1]):continue
                 ref,sha,date=parts
@@ -249,7 +296,8 @@ def refresh_origin(path,home=HOME,git=None):
           '-c','core.fsmonitor=false','-c','gc.auto=0',
           '-c','maintenance.auto=false','-c','credential.helper=',
           '-c','protocol.file.allow=never',
-          'fetch','--no-tags','--no-recurse-submodules','--no-write-fetch-head','origin']
+          'fetch','--no-tags','--no-recurse-submodules','--no-write-fetch-head',
+          '--no-prune','origin','+refs/heads/*:refs/remotes/origin/*']
     try:
         p=subprocess.run(args,cwd=root,env=env,stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=70,check=False)

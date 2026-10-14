@@ -12,6 +12,18 @@ class ProjectPolicyTest {
         assertFalse(ProjectPolicy.canExecute(id,path,"TEST",false,"https://evil.invalid/thing"))
         assertFalse(ProjectPolicy.canExecute("a".repeat(32),path,"TEST",false,"github.com/krmobdev/AnimaNotes"))
     }
+    @Test fun previousCatalogNoOriginLabelIsMigratedIntoExecutableLocalProject() {
+        val path=ProjectPolicy.HOME+"/anima-workspace/FlyLife"
+        val id=ProjectPolicy.stableId(path)
+        val legacyRemote="Origin не настроен"
+        val restored=LocalProject(id,"FlyLife",path,"feature/fly-movement-and-creatures",
+            "a".repeat(40),ProjectPolicy.normalizeRemote(legacyRemote),true)
+        assertEquals("",restored.remote)
+        assertTrue(restored.localOnly)
+        assertTrue(restored.supported)
+        assertTrue(ProjectPolicy.canExecute(restored.id,restored.path,"BUILD_DEBUG",
+            restored.worktree,restored.remote))
+    }
     @Test fun localProjectAllowsFixedJobsWithoutOriginButNeverSync() {
         val path=ProjectPolicy.HOME+"/anima-workspace/FlyLife"
         val id=ProjectPolicy.stableId(path)

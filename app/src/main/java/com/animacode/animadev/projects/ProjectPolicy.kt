@@ -10,6 +10,7 @@ object ProjectPolicy {
         return parts.size in 1..6 && parts.none { it.isBlank() || it.startsWith('.') || it in excluded }
     }
     private val originLabel=Regex("github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+    fun normalizeRemote(remote:String):String = if(remote=="Origin не настроен") "" else remote
     fun localOnly(id:String,path:String,remote:String=""):Boolean =
         path!=QUIZ && validId(id,path) && remote.isBlank()
     fun supported(id:String,path:String,remote:String=""):Boolean =

@@ -24,6 +24,14 @@ class CatalogTests(unittest.TestCase):
     def test_real_branch_metadata(self):
         r=catalog.inspect(self.repo,self.home,self.git)
         self.assertEqual(r['id'],'animaquiz');self.assertEqual(r['branch'],'test/decomposition-v1');self.assertFalse(r['dirty']);self.assertEqual(r['remote'],'github.com/krmobdev/quizapp')
+    def test_local_without_origin_reports_empty_remote_even_if_dirty(self):
+        self.run_git('remote','remove','origin')
+        (self.repo/'work-in-progress').write_text('local edits')
+        item=catalog.inspect(self.repo,self.home,self.git)
+        self.assertEqual(item['remote'],'')
+        self.assertTrue(item['dirty'])
+        self.assertEqual(item['branch'],'test/decomposition-v1')
+        self.assertEqual(item['error'],'')
     def test_dirty_is_reported_without_mutation(self):
         (self.repo/'user-file').write_text('local change')
         sha=self.run_git('rev-parse','HEAD');r=catalog.inspect(self.repo,self.home,self.git)
@@ -183,7 +191,7 @@ class CatalogTests(unittest.TestCase):
         offset=0;seen=set()
         while True:
             r=catalog.inspect(self.repo,self.home,self.git,branches=True,branch_offset=offset)
-            self.assertFalse(r['error']);self.assertLessEqual(len(r['branches']),34)
+            self.assertFalse(r['error']);self.assertLessEqual(len(r['branches']),2*catalog.BRANCH_PAGE_SIZE+2)  # paired local/origin counterparts
             seen.update((b['name'],b['local']) for b in r['branches'])
             if not r['branches_more']:break
             self.assertGreater(r['branches_next'],offset);offset=r['branches_next']

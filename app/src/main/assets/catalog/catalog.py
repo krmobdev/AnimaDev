@@ -231,7 +231,7 @@ def inspect(root,home=HOME,git=None,branches=False,branch_offset=0):
         code,sha=call(['rev-parse','--verify','HEAD^{commit}'])
         result['commit']=sha if code==0 and re.fullmatch(r'[0-9a-f]{40,64}',sha) else ''
         code,url=call(['config','--local','--no-includes','--get','remote.origin.url'])
-        result['remote']=remote_label(url)[:200] if code==0 else 'Origin не настроен'
+        result['remote']=remote_label(url)[:200] if code==0 else ''  # Raw no-origin is empty; UI adds the label
         code,changes=call(['status','--porcelain=v1','-z','--untracked-files=all'])
         if code:raise ValueError('GIT_FAILED')
         result['dirty']=bool(changes)
