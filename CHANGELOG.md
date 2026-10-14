@@ -1,5 +1,10 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-14 · 0.4.0-beta.10-dev.58 (72) — исправления установки и прокрутки сборки
+- RU: Исправлен поток установки APK: Android на целевом телефоне не разрешал установку приложений из AnimaDev (canRequestPackageInstalls=false), а созданный Termux APK невозможно было напрямую прочитать из Downloads без SAF. При нажатии показывается понятный диалог, переход в настройки, после возврата — автоматический переход к выбору файла и проверке SHA-256 перед штатным установщиком. Пользователь видит индикатор чтения большой APK и сообщение при отмене.
+- RU: После принятого BUILD_DEBUG экран сразу прокручивается к блоку задания по стабильному индексу LazyColumn вместо количества элементов на момент перерисовки. Проверяется фактическое создание нового Job ID. Git и проект FlyLife не изменяются.
+- EN: Resume APK install from unknown-app-source Settings with a guided Downloads document picker and verified copy; deterministic scroll to Debug job after accepted build request.
+
 ## 2026-10-14 · 0.4.0-beta.10-dev.57 (71) — Android SDK для локальных Gradle-заданий
 - RU: Исправлена реальная ошибка BUILD_DEBUG FlyLife (GRADLE_FAILED: SDK location not found). Сервис Termux RUN_COMMAND не наследует ANDROID_HOME интерактивной оболочки. Все операции Gradle (Debug APK, unit-тесты, инструментальные тесты) теперь автоматически используют проверенный SDK /data/data/com.termux/files/home/android-sdk. Не создаётся и не изменяется local.properties проекта.
 - RU: Проверяется наличие настоящих platforms и build-tools, запрещены символические ссылки на корень SDK; переменные окружения устанавливаются только у дочернего Gradle-процесса. Добавлены регрессионные тесты отсутствующего SDK в окружении Termux.

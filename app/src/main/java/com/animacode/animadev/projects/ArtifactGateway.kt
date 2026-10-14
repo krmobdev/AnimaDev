@@ -43,6 +43,16 @@ object ArtifactGateway {
     private const val INSTALL_CACHE="shared_apk"
     private const val MIME_APK="application/vnd.android.package-archive"
 
+    /** Prefer the actual Downloads folder, not a MIME-filtered media gallery.
+     * File selection is needed only when Android has not granted source access.
+     */
+    fun pickerIntent(initialFolder:Uri):Intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type="*/*"
+        putExtra(DocumentsContract.EXTRA_INITIAL_URI,initialFolder)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+    }
+
     /** A document picked with OpenDocument can be used again without Termux. */
     fun rememberedUri(context:Context,artifact:JSONObject):Uri? {
         val sha=artifact.optString("sha256")

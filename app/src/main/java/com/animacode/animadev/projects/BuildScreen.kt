@@ -103,6 +103,21 @@ import com.animacode.animadev.termux.TermuxGateway
     val buildTab=selectedBuildTab ?: fallbackBuildTab
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     val buildListState=rememberLazyListState()
+    val debugBuildScope=rememberCoroutineScope()
+    fun startDebugAndFocusResult() {
+        val previousId=RepoStore(context).read().optString("job_id")
+        gateway.start("BUILD_DEBUG",project.id,project.path)
+        val current=RepoStore(context).read()
+        if(BuildNavigationPolicy.accepted(previousId,current.optString("job_id"),
+            current.optString("project_id"),current.optString("action"),
+            current.optString("state"),project.id)) {
+            debugBuildScope.launch {
+                delay(120)
+                buildListState.animateScrollToItem(
+                    BuildNavigationPolicy.debugResultIndex(neon,recoveringLocalCheck))
+            }
+        }
+    }
     LaunchedEffect(releaseState.optString("id"),releaseBusy,permitted) {
         val id=releaseState.optString("id")
         if(permitted && releaseBusy && releaseForProject && id.matches(Regex("[a-f0-9]{32}"))) {
@@ -122,7 +137,7 @@ import com.animacode.animadev.termux.TermuxGateway
         if(buildTab==0 && belongs && record.optString("action")=="BUILD_DEBUG" &&
            record.optString("job_id").isNotBlank()) {
             delay(300)
-            buildListState.scrollToItem((buildListState.layoutInfo.totalItemsCount-1).coerceAtLeast(0))
+            buildListState.scrollToItem(BuildNavigationPolicy.debugResultIndex(neon,recoveringLocalCheck))
         }
     }
     LazyColumn(Modifier.fillMaxSize(),state=buildListState,contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
@@ -191,8 +206,8 @@ import com.animacode.animadev.termux.TermuxGateway
                 if(neon) NeonPrimaryAction("Собрать Debug APK · полная пересборка",
                     "Generate verified Debug APK",AppIcons.Build,
                     enabled=canDebug,modifier=Modifier.fillMaxWidth(),
-                    onClick={tap();gateway.start("BUILD_DEBUG",project.id,project.path)})
-                else Button(onClick={tap();gateway.start("BUILD_DEBUG",project.id,project.path)},enabled=canDebug,
+                    onClick={tap();startDebugAndFocusResult()})
+                else Button(onClick={tap();startDebugAndFocusResult()},enabled=canDebug,
                     modifier=Modifier.fillMaxWidth()){Icon(AppIcons.Build,null);Spacer(Modifier.width(8.dp));Text("Собрать Debug APK · полная пересборка")}
                 Text("Gradle выполняется с --rerun-tasks: старые результаты задач не используются. Кэш зависимостей и файлы проектов не удаляются.",
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)

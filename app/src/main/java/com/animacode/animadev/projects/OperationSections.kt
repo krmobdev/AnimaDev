@@ -1,6 +1,11 @@
 package com.animacode.animadev.projects
 
 import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
+import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.launch
@@ -123,11 +128,46 @@ object OperationResultPolicy {
 }
 
 @Composable fun BuildArtifactCard(context:Context,artifact:JSONObject) {
-    var details by remember(artifact.optString("sha256")) {mutableStateOf(false)}
+    val sha=artifact.optString("sha256")
+    var details by remember(sha) {mutableStateOf(false)}
+    var needsInstallPermission by remember(sha) {mutableStateOf(false)}
+    var installing by remember(sha) {mutableStateOf(false)}
+    var installNotice by remember(sha) {mutableStateOf("")}
     val scope=rememberCoroutineScope()
     val destination=remember(context) {ExportDestination(context)}
-    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {uri->
-        if(uri!=null)scope.launch {ArtifactGateway.install(context,artifact,uri)}
+    val picker=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {result->
+        val uri=result.data?.data
+        if(uri==null)installNotice="Выбор APK отменён. Файл сборки не изменён."
+        else scope.launch {
+            installing=true
+            installNotice="Проверяем APK перед открытием системного установщика…"
+            val launched=ArtifactGateway.install(context,artifact,uri)
+            installing=false
+            installNotice=if(launched)"" else "Установщик не открылся. Проверьте выбранный APK или разрешение Android."
+        }
+    }
+    fun chooseApk() {
+        val direct=destination.artifactUri(artifact.optString("path"))
+            ?: ArtifactGateway.rememberedUri(context,artifact)
+        if(direct!=null)scope.launch {
+            installing=true
+            installNotice="Проверяем APK перед открытием системного установщика…"
+            val ok=ArtifactGateway.install(context,artifact,direct)
+            installing=false
+            if(!ok) {
+                installNotice="Нужно повторно выбрать APK в системном проводнике."
+                picker.launch(ArtifactGateway.pickerIntent(destination.folderUri()))
+            } else installNotice=""
+        } else {
+            installNotice="Выберите файл "+artifact.optString("path").substringAfterLast('/')+" в папке Загрузки."
+            picker.launch(ArtifactGateway.pickerIntent(destination.folderUri()))
+        }
+    }
+    val requestInstallGrant=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if(Build.VERSION.SDK_INT<26 || context.packageManager.canRequestPackageInstalls()) {
+            installNotice=""
+            chooseApk()
+        } else installNotice="Разрешение на установку APK не выдано. Нажмите «Установить APK», чтобы повторить."
     }
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -137,22 +177,22 @@ object OperationResultPolicy {
             Text(artifact.optString("path").substringAfterLast('/'),style=MaterialTheme.typography.bodyMedium)
             Text("Размер: ${artifact.optLong("size")/1024/1024} МБ · Git ${artifact.optString("commit").take(12)}",
                 style=MaterialTheme.typography.bodySmall)
-            ActionButton(onClick={
+            ActionButton(enabled=!installing,onClick={
                 if(apk) {
-                    val direct=destination.artifactUri(artifact.optString("path"))
-                        ?: ArtifactGateway.rememberedUri(context,artifact)
-                    if(direct!=null)scope.launch {
-                        if(!ArtifactGateway.install(context,artifact,direct))
-                            picker.launch(arrayOf("*/*"))
-                    }
-                    else picker.launch(arrayOf("*/*"))
+                    if(Build.VERSION.SDK_INT>=26 && !context.packageManager.canRequestPackageInstalls())
+                        needsInstallPermission=true
+                    else chooseApk()
                 } else ArtifactGateway.openFolder(context,artifact)
             }) {
-                Text(if(apk)"Установить APK" else "Открыть папку")
+                Text(if(installing)"Проверка APK…" else if(apk)"Установить APK" else "Открыть папку")
             }
+            if(installing)LinearProgressIndicator(Modifier.fillMaxWidth())
+            if(installNotice.isNotBlank())
+                Text(installNotice,style=MaterialTheme.typography.bodySmall)
             if(apk && destination.artifactUri(artifact.optString("path"))==null &&
                 ArtifactGateway.rememberedUri(context,artifact)==null)
-                Text("При первом нажатии выберите этот APK в системном проводнике. Затем откроется установщик Android.",
+                Text("После разрешения Android выберите этот APK в Загрузках. "+
+                    "Файл проверяется перед установкой; повторно нажимать кнопку не нужно.",
                     style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             ActionButton(onClick={details=!details}) {Text(if(details)"Скрыть сведения о файле" else "Сведения о файле")}
             if(details) {
@@ -163,4 +203,17 @@ object OperationResultPolicy {
                 style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+    if(needsInstallPermission)AlertDialog(
+        onDismissRequest={needsInstallPermission=false},
+        title={Text("Разрешить установку APK")},
+        text={Text("Android запрещает AnimaDev открывать установщик. Разреши установку "+
+            "приложений из AnimaDev в системных настройках. После возвращения "+
+            "я сразу открою выбор APK и продолжу без повторного нажатия.")},
+        confirmButton={TextButton(onClick={
+            needsInstallPermission=false
+            requestInstallGrant.launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:"+context.packageName)))
+        }) {Text("Открыть настройки")}},
+        dismissButton={TextButton(onClick={needsInstallPermission=false}) {Text("Не сейчас")}}
+    )
 }

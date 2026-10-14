@@ -1,4 +1,4 @@
-# AnimaDev · 0.4.0-beta.10-dev.57
+# AnimaDev · 0.4.0-beta.10-dev.58
 
 **AnimaDev** — Android-приложение для тех, кто разрабатывает и собирает проекты **прямо на телефоне через Termux**. Оно объединяет Git и worktree, Gradle-тесты, сборку Debug APK и подписанных Release AAB, мониторинг задач, журналы и историю операций. Требуется Android 13+; интерфейс написан на Kotlin и Jetpack Compose.
 
