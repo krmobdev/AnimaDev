@@ -12,6 +12,14 @@ class RepoPolicyTest {
         assertEquals("0.4.0",RepoPolicy.runnerVersion(
             "33e2668e27ed92ac12b0ea6170dfcf91fff4ea0af5d08380a1038679bf549507","0.4.1"))
     }
+    @Test fun installedDev49CheckCanBeRecoveredWithItsTrueRunnerVersion() {
+        val old="4127f6f52b0995b113869702ef9fb0dd98f4d229bd5028a283a027dceae8a9c2"
+        assertEquals("0.4.0",RepoPolicy.runnerVersion(old,"0.4.1"))
+        assertEquals(old,RepoPolicy.runnerForQuery("QUERY","b".repeat(64),old,old,""))
+        assertTrue(RepoPolicy.canRecoverJob(false,"a".repeat(32),old,old))
+        assertEquals("0.4.1",RepoPolicy.runnerVersion("b".repeat(64),"0.4.1"))
+        assertEquals("b".repeat(64),RepoPolicy.runnerForQuery("START","b".repeat(64),old,old,""))
+    }
     @Test fun staleJobCanBeQueriedAfterHelperUpdate() {
         val id="a".repeat(32)
         val original="b".repeat(64)

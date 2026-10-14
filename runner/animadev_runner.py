@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 
-VERSION = '0.4.0'
+VERSION = '0.4.1'  # Must equal RepoGateway.VERSION: Android verifies every callback envelope.
 MONITOR_SHA = 'f95d91e7170ab96df4ad9731e48e3f8bae77a23055424ed834d4a0299c55e5e5'
 GRADLE_SHA = '0b9f53db3705819af747b6e3a2a971773653a94b9a08667463756043e4368205'
 PROTOCOL = 2

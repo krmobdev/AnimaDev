@@ -1,5 +1,10 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-14 · 0.4.0-beta.10-dev.50 (64) — кандидат / candidate
+- RU: Исправлен фактический сбой FlyLife CHECK: Android ожидал runner_version 0.4.1, встроенный Termux runner dev.49 выдавал 0.4.0. Корректный ответ отвергался как RESULT_MALFORMED, сохраняя UNKNOWN и блокируя Debug APK.
+- RU: Новый runner отправляет 0.4.1, строго по протоколу. Старые задания dev.49 доступны через QUERY с точным SHA старого runner и ожидаемой версией 0.4.0; ни Git CHECK, ни сборка автоматически не повторяются.
+- EN: Align Termux runner JSON wire version with Android (0.4.1). Map the known dev.49 runner SHA to its true legacy wire version so an UNKNOWN CHECK can be queried by ID without replaying START. No data deletion or unsafe job reset.
+
 ## 2026-10-14 07:43 GMT+0300 · 0.4.0-beta.10-dev.49 (63) — кандидат / candidate
 - RU: Исправлен реальный случай FlyLife: каталог ошибочно передавал «Origin не настроен» как значение remote, поэтому локальный Git-проект оставался «Только просмотр».
 - RU: Отсутствующий origin теперь кодируется пустым значением; сохранённые старые записи мигрируются при чтении. Рабочие изменения разрешены в локальной Debug-сборке; неподтверждённый внешний remote по-прежнему отклоняется. Добавлены регрессионные тесты по каталогу и миграции.

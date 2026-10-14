@@ -10,6 +10,9 @@ object RepoPolicy {
     // Only local JVM tests still use the stored UI snapshot gate.
     fun requiresPreparedSnapshot(action: String): Boolean = action == "TEST"
     fun runnerVersion(sha: String, current: String): String = when (sha) {
+        // dev.48/dev.49 shipped a 0.4.0 runner while Android expected 0.4.1.
+        // Old CHECK results must remain queryable by their original SHA, never restarted.
+        "4127f6f52b0995b113869702ef9fb0dd98f4d229bd5028a283a027dceae8a9c2" -> "0.4.0"
         "33e2668e27ed92ac12b0ea6170dfcf91fff4ea0af5d08380a1038679bf549507" -> "0.4.0"
         "e96b432836ff0fb1f23f9455a1440a73fbcb7a675720871d323c4209bb178a4e" -> "0.2.0"
         "7239fd9dd4979342bdfec98f0a10ef198358e8f8e6ecc8b3696be6ca0df5b0b2" -> "0.2.1"
