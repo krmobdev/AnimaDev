@@ -187,8 +187,10 @@ def process(root, env, log, on_process, identity, redact, timeout=TIMEOUT, obser
         on_process(None,None)
 
 def execute(guard, log, on_process, identity, redact, timeout=TIMEOUT, jid=''):
-    snapshot=guard.snapshot();guard.require(snapshot, clean=bool(guard.project.get('dynamic')))
-    if guard.project.get('dynamic'):
+    local_only=bool(guard.project.get('local_only'))
+    snapshot=guard.snapshot();guard.require(snapshot,clean=bool(guard.project.get('dynamic')) and not local_only)
+    if local_only: snapshot=guard.execute('CHECK',jid)
+    if guard.project.get('dynamic') and not local_only:
         if not jid: return dict(state='FAILED',error_code='TEST_STATE_CHANGED',exit_code=None,snapshot=snapshot,tests=None)
         remote=guard.fetch(jid)
         checked=guard.snapshot();guard.require(checked,clean=True)
@@ -212,7 +214,8 @@ def execute(guard, log, on_process, identity, redact, timeout=TIMEOUT, jid=''):
     try:result['tests']=summary(before,reports(guard.root),redact=redact)
     except ReportError as e:
         if code==0:result['error_code']=e.code
-    after=guard.snapshot();guard.require(after,clean=bool(guard.project.get('dynamic')))
+    after=guard.snapshot();guard.require(after,clean=bool(guard.project.get('dynamic')) and not local_only)
+    if local_only: after=guard.execute('CHECK',jid)
     result['snapshot']=after
     if after['branch']!=snapshot['branch'] or after['local_commit']!=snapshot['local_commit']:
         result['error_code']='TEST_STATE_CHANGED'
@@ -228,18 +231,23 @@ DEBUG_APK = 'app/build/outputs/apk/debug/app-debug.apk'
 DOWNLOADS = pathlib.Path('/storage/emulated/0/Download')
 
 def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT, output_dir=None):
-    """Build only clean exact GitHub SHA and persist a verified fresh APK."""
+    """Build exact GitHub SHA or explicitly local working tree; verify fresh APK."""
     import zipfile
+    local_only = bool(guard.project.get('local_only'))
     initial = guard.snapshot()
-    guard.require(initial, clean=True)
-    remote = guard.fetch(jid)
-    checked = guard.snapshot()
-    guard.require(checked, clean=True)
-    if checked['branch'] != initial['branch'] or checked['local_commit'] != initial['local_commit']:
-        return dict(state='FAILED', error_code='TEST_STATE_CHANGED', exit_code=None, snapshot=checked)
-    checked = guard.compare(checked, remote)
-    if checked['local_commit'] != remote or checked['ahead'] or checked['behind']:
-        return dict(state='FAILED', error_code='BUILD_OUTDATED', exit_code=None, snapshot=checked)
+    guard.require(initial, clean=not local_only)
+    if local_only:
+        checked = guard.execute('CHECK',jid)
+        reference = checked['local_commit']
+    else:
+        reference = guard.fetch(jid)
+        checked = guard.snapshot()
+        guard.require(checked, clean=True)
+        if checked['branch'] != initial['branch'] or checked['local_commit'] != initial['local_commit']:
+            return dict(state='FAILED', error_code='TEST_STATE_CHANGED', exit_code=None, snapshot=checked)
+        checked = guard.compare(checked, reference)
+        if checked['local_commit'] != reference or checked['ahead'] or checked['behind']:
+            return dict(state='FAILED', error_code='BUILD_OUTDATED', exit_code=None, snapshot=checked)
     wrapper = guard.root / 'gradlew'
     if not wrapper.is_file() or wrapper.is_symlink():
         return dict(state='FAILED', error_code='GRADLE_MISSING', exit_code=None, snapshot=checked)
@@ -253,14 +261,15 @@ def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT
         stamp = (s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
     env = dict(guard.env)
     for key in ('JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','GRADLE_OPTS','JAVA_OPTS'): env.pop(key,None)
-    log('event','Проверен GitHub SHA '+remote[:12])
+    log('event',('Локальный режим: GitHub не используется; HEAD '+reference[:12]+'; исходники могут содержать локальные правки' if local_only else 'Проверен GitHub SHA '+reference[:12]))
     log('command','bash ./gradlew :app:assembleDebug --offline --no-daemon --rerun-tasks --console=plain')
     code, unknown = process(guard.root,env,log,on_process,identity,redact,
                             timeout,getattr(guard,'observe',lambda:None),DEBUG_COMMAND)
     if unknown: return dict(state='UNKNOWN',unresolved=True,error_code='TEST_TIMEOUT_UNKNOWN',exit_code=None,snapshot=checked)
     after = guard.snapshot()
-    guard.require(after,clean=True)
-    if after['branch'] != checked['branch'] or after['local_commit'] != remote:
+    guard.require(after,clean=not local_only)
+    if local_only: after=guard.execute('CHECK',jid)
+    if after['branch'] != checked['branch'] or after['local_commit'] != reference:
         return dict(state='FAILED',error_code='TEST_STATE_CHANGED',exit_code=code,snapshot=after)
     if code != 0: return dict(state='FAILED',error_code='GRADLE_FAILED',exit_code=code,snapshot=after)
     if not apk.is_file() or apk.is_symlink() or apk.parent.resolve() != apk.parent.absolute():
@@ -288,7 +297,7 @@ def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT
     if not folder.is_dir() or folder.is_symlink() or folder.resolve()!=folder.absolute():
         return dict(state='FAILED',error_code='DOWNLOADS_UNAVAILABLE',exit_code=code,snapshot=after)
     stem = re.sub(r'[^A-Za-z0-9_-]+','_',guard.project['name'])[:40].strip('_') or 'AndroidProject'
-    target = folder / (stem+'_'+remote[:12]+'_'+jid[:8]+'_debug.apk')
+    target = folder / (stem+'_'+('LOCAL_' if local_only else '')+reference[:12]+'_'+jid[:8]+'_debug.apk')
     tmp = folder / ('.animadev-'+jid+'.part')
     digest=hashlib.sha256()
     try:
@@ -307,7 +316,8 @@ def execute_debug(guard, log, on_process, identity, redact, jid, timeout=TIMEOUT
         return dict(state='FAILED',error_code='ARTIFACT_EXPORT_FAILED',exit_code=code,snapshot=after)
     return dict(state='SUCCEEDED',error_code='',exit_code=0,snapshot=after,
                 artifact={'kind':'DEBUG_APK','path':str(target),'size':s.st_size,
-                          'sha256':digest.hexdigest(),'commit':remote,'branch':checked['branch']})
+                          'sha256':digest.hexdigest(),'commit':reference,'branch':checked['branch'],
+                          'local_only':local_only,'dirty':checked['dirty']})
 
 
 # Device instrumentation stays in Termux: never invokes GitHub Actions or CI.
@@ -422,9 +432,11 @@ def device_reports(root,jid=''):
     return result
 
 def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT,adb_endpoint=''):
+    local_only=bool(guard.project.get('local_only'))
     snapshot=guard.snapshot()
-    guard.require(snapshot,clean=True)
-    if guard.project.get('dynamic'):
+    guard.require(snapshot,clean=not local_only)
+    if local_only: snapshot=guard.execute('CHECK',jid)
+    if guard.project.get('dynamic') and not local_only:
         if not jid: return dict(state='FAILED',error_code='TEST_STATE_CHANGED',exit_code=None,snapshot=snapshot,tests=None)
         remote=guard.fetch(jid)
         checked=guard.snapshot()
@@ -481,7 +493,8 @@ def execute_device(guard,log,on_process,identity,redact,jid='',timeout=TIMEOUT,a
         return dict(state='FAILED',error_code='ADB_NOT_READY',exit_code=code,
                     snapshot=snapshot,tests=None)
     after=guard.snapshot()
-    guard.require(after,clean=True)
+    guard.require(after,clean=not local_only)
+    if local_only: after=guard.execute('CHECK',jid)
     result['snapshot']=after
     if after['branch']!=snapshot['branch'] or after['local_commit']!=snapshot['local_commit']:
         result['error_code']='TEST_STATE_CHANGED'

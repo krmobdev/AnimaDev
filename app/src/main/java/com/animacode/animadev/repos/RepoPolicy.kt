@@ -18,17 +18,21 @@ object RepoPolicy {
         else -> current
     }
     fun mayTest(branch: String, remote: Boolean, ready: Boolean, blocked: Boolean,
-                projectId: String = "animaquiz"): Boolean =
+                projectId: String = "animaquiz", localOnly: Boolean=false,
+                checked: Boolean=false, commit: String=""): Boolean =
         branch.isNotBlank() && branch != "Detached HEAD" &&
             (projectId != "animaquiz" || branch in setOf("main","test/decomposition-v1")) &&
-            remote && ready && !blocked
+            (if(localOnly) checked && commit.matches(Regex("[a-f0-9]{40,64}")) else remote) &&
+            ready && !blocked
     fun mayBuild(branch: String, dirty: Boolean, remoteOk: Boolean, ready: Boolean, blocked: Boolean,
                  checked: Boolean, ahead: Int, behind: Int, local: String, remote: String,
-                 projectId: String = "animaquiz"): Boolean =
+                 projectId: String = "animaquiz", localOnly: Boolean=false): Boolean =
         branch.isNotBlank() && branch != "Detached HEAD" &&
             (projectId != "animaquiz" || branch in setOf("main","test/decomposition-v1")) &&
-            !dirty && remoteOk && ready && !blocked && checked &&
-            ahead == 0 && behind == 0 && local.isNotBlank() && local == remote
+            ready && !blocked && checked &&
+            (if(localOnly) projectId!="animaquiz" && local.matches(Regex("[a-f0-9]{40,64}"))
+             else !dirty && remoteOk && ahead==0 && behind==0 &&
+                  local.isNotBlank() && local==remote)
     fun validCounts(total: Long, passed: Long, failed: Long, skipped: Long, duration: Long): Boolean =
         listOf(total, passed, failed, skipped, duration).all { it >= 0 && it <= 1_000_000_000L } &&
             passed + failed + skipped == total

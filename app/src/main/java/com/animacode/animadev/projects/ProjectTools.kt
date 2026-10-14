@@ -17,6 +17,10 @@ import com.animacode.animadev.repos.*
     selectedTestTab:Int?=null,onTestTabChange:((Int)->Unit)?=null) {
     val locale=androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val neon=LocalNeonSkin.current
+    if(project.localOnly && tool=="git") {
+        LocalOnlyGitTools(context,project,permitted,termuxVersion)
+        return
+    }
     if(!project.supported) {
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             item {Text(project.name,style=MaterialTheme.typography.titleMedium);Text(if(project.worktree)"Worktree · только просмотр" else "Только просмотр",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary)}
@@ -339,13 +343,13 @@ import com.animacode.animadev.repos.*
                                 style=MaterialTheme.typography.bodyMedium,
                                 color=MaterialTheme.colorScheme.onSurfaceVariant)
                         } else if(needStatus) {
-                            Text("Для unit-тестов сначала проверьте ветку и origin. " +
+                            Text((if(project.localOnly) "Для unit-тестов сначала проверьте локальный Git. " else "Для unit-тестов сначала проверьте ветку и origin. ") +
                                 "Инструментальные тесты проверяют Git автоматически.",
                                 style=MaterialTheme.typography.bodyMedium)
                         } else if(!prepared) {
                             Text(when {
                                 blocked->"Предыдущее задание ещё выполняется или его статус неизвестен."
-                                !snap.optBoolean("remote_ok")->"Origin не подтверждён для этого проекта."
+                                !project.localOnly && !snap.optBoolean("remote_ok")->"Origin не подтверждён для этого проекта."
                                 else->"Состояние проекта изменилось. Обновите локальный снимок."
                             },style=MaterialTheme.typography.bodyMedium)
                         }
@@ -464,7 +468,7 @@ import com.animacode.animadev.repos.*
                                 "перед Gradle Termux самостоятельно проверит устройство.",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("GitHub, ветка и чистота проекта проверяются автоматически "+
+                        Text((if(project.localOnly) "Локальная ветка и рабочие файлы проверяются " else "GitHub, ветка и чистота проекта проверяются автоматически ") +
                             "при запуске. Переходить в Unit-тесты не нужно.",
                             style=MaterialTheme.typography.bodySmall,
                             color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -492,4 +496,45 @@ import com.animacode.animadev.repos.*
         "Termux повторно проверит ветку, origin, SHA и чистоту рабочего дерева. "+
         "Только fast-forward. Push, reset и удаление файлов не выполняются.")},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmSync=false;gateway.start("SYNC",project.id,project.path)}){Text("Получить")}},dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmSync=false}){Text("Отложить")}})
     if(changedFiles)AlertDialog(onDismissRequest={changedFiles=false},title={Text("Изменённые файлы")},text={Column {Text((if(belongs)r.optJSONObject("snapshot") else null)?.optJSONArray("changed_files")?.let {a->(0 until a.length()).joinToString("\n"){a.optString(it)}} ?: "Список недоступен");Text("Просмотр содержимого diff пока не подключён.",style=MaterialTheme.typography.bodySmall)}},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={changedFiles=false}){Text("Закрыть")}})
+}
+
+
+@Composable private fun LocalOnlyGitTools(context:Context,project:LocalProject,
+                                           permitted:Boolean,termuxVersion:String?) {
+    val gateway=remember {RepoGateway(context)}
+    val record=rememberRepoRecord(context)
+    val belongs=record.optString("project_id","animaquiz")==project.id
+    val snapshot=if(belongs)record.optJSONObject("snapshot") else null
+    val blocked=RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
+    val ready=HelperPolicy.mayRun(permitted,termuxVersion!=null,record.optBoolean("ready"),
+                                  record.optBoolean("pending"),blocked)
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),
+               verticalArrangement=Arrangement.spacedBy(16.dp)) {
+        item {Text("Локальный Git",style=MaterialTheme.typography.titleLarge)}
+        item {Card {Column(Modifier.fillMaxWidth().padding(18.dp),
+               verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            Text(project.name,style=MaterialTheme.typography.titleMedium)
+            Text("Ветка: "+project.branch)
+            Text("HEAD: "+project.commit.take(12))
+            Text("Origin не настроен. Это нормальный локальный проект.")
+            Text("Изменения: "+when(project.dirty){true->"Есть локальные правки";
+                false->"Чистое дерево";else->"Не проверено"})
+            Text("GitHub-синхронизация недоступна. Никакие файлы не отправляются и не сбрасываются.")
+        }}}
+        item {Button(onClick={gateway.start("CHECK",project.id,project.path)},
+                     enabled=ready,modifier=Modifier.fillMaxWidth()) {
+            Text("Проверить локальный Git")
+        }}
+        item {OutlinedButton(onClick={gateway.start("STATUS",project.id,project.path)},
+                             enabled=ready,modifier=Modifier.fillMaxWidth()) {
+            Text("Обновить состояние")
+        }}
+        if(snapshot!=null)item {Card {Column(Modifier.fillMaxWidth().padding(18.dp)) {
+            Text(if(snapshot.optBoolean("checked")) "Локальный Git подтверждён"
+                 else "Снимок проекта получен")
+            Text("SHA: "+snapshot.optString("local_commit").take(12))
+            Text(if(snapshot.optBoolean("dirty")) "Локальные изменения входят в Debug APK и тесты."
+                 else "Рабочее дерево чистое.")
+        }}}
+    }
 }

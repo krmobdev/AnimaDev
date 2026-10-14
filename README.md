@@ -1,10 +1,10 @@
-# AnimaDev · 0.4.0-beta.10-dev.47
+# AnimaDev · 0.4.0-beta.10-dev.48
 
 **AnimaDev** — Android-приложение для тех, кто разрабатывает и собирает проекты **прямо на телефоне через Termux**. Оно объединяет Git и worktree, Gradle-тесты, сборку Debug APK и подписанных Release AAB, мониторинг задач, журналы и историю операций. Требуется Android 13+; интерфейс написан на Kotlin и Jetpack Compose.
 
 **English:** An Android 13+ companion for local Git, Gradle tests, APK/AAB builds and job history in Termux. No mandatory PC, VPS, AnimaBridge or GitHub API token is required by the installed app.
 
-**Статус / Status:** `0.4.0-beta.10-dev.47`. Владелец подтвердил ручное тестирование приложения на устройстве 11.10.2026; автоматизированная UI-проверка Emerald ещё не завершена. Публичный GitHub Release с готовым APK пока не опубликован — см. [инструкцию по подготовке Termux](docs/TERMUX_SETUP.md) и раздел разработки ниже.
+**Статус / Status:** `0.4.0-beta.10-dev.48`. Владелец подтвердил ручное тестирование приложения на устройстве 11.10.2026; автоматизированная UI-проверка Emerald ещё не завершена. Публичный GitHub Release с готовым APK пока не опубликован — см. [инструкцию по подготовке Termux](docs/TERMUX_SETUP.md) и раздел разработки ниже.
 
 **dev.47 candidate (not installed or device-accepted):** GitHub-first branch enumeration now fetches every remote head even when the local fetch refspec is restricted, and pages origin branches before local-only branches. Existing worktree, local commits and job history remain untouched. / Кандидат dev.47: полный охват веток GitHub и приоритет origin при постраничной загрузке; установка и испытания на Android ожидаются.
 
@@ -93,3 +93,14 @@ The guides and change log are bundled offline into the APK from these **same Git
 Real Android UI/device acceptance requires on-device tests, not just successful compilation.
 
 For older stage reports and design notes, see the [docs/](docs/) directory. Old beta constraints are historical and superseded by the current `AGENTS.md` owner authorization.
+
+## Offline local Git projects / Локальные Git-проекты
+
+A local Git repository in Termux without an \`origin\` is valid. AnimaDev supports
+local Git CHECK/STATUS, Debug APK, JVM unit tests and isolated instrumentation
+tests. In local mode CHECK inspects the actual HEAD and worktree without GitHub
+or network activity. Uncommitted files are included in local Debug builds;
+these artifacts are **not** verified against a remote commit. SYNC and signed
+Release AAB remain disabled for local-only profiles. Worktrees, symlinked paths
+and unexpected origin configurations remain execution-blocked. GitHub projects
+continue to require exact verified remote SHA and a clean worktree.

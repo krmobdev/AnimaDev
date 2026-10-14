@@ -73,3 +73,14 @@ Open Settings → Appearance → Language to choose System default, Russian or E
 
 ## Data safety
 Do not delete Termux or Git directories to clear app cache. AnimaDev cache cleaning does not remove sources, job journals, SQLite, keystores or saved credentials.
+
+## Offline local Git repositories
+
+Add an existing ordinary Git repository inside Termux HOME even if it has no
+GitHub remote. On its Git screen select **Check local Git**, then run Debug APK,
+unit tests or device instrumentation. Dirty working trees are allowed in this
+local development mode; output APK names indicate LOCAL and are not claimed to
+match a published commit. Local Git checks do not fetch or modify branches.
+GitHub-backed repositories retain strict remote SHA checks. Sync and signed
+Release AAB are disabled for local-only projects. Linked worktrees remain
+read-only.

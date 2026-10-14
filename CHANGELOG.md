@@ -1,5 +1,13 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-14 07:29 GMT+0300 · 0.4.0-beta.10-dev.48 (62) — кандидат / candidate
+- RU: Локальные Git-проекты без \`origin\` теперь поддерживают диагностику, проверку локального HEAD, Debug APK, unit и инструментальные тесты. Незакоммиченные исходники допускаются в локальном режиме и явно отмечаются. Никакого обращения к GitHub для этих операций.
+- RU: GitHub-проекты сохраняют строгую проверку SHA/чистого дерева. Локальная синхронизация и подписание Release AAB пока отключены, без скрытых обходов. Только зарегистрированный корневой Git-репозиторий; внешние пути и worktree не поддерживаются для запуска.
+- RU: Обновлён встроенный Termux runner с контрольными суммами, добавлены unit- и Python-регрессии. Android-приёмка ещё требуется.
+- EN: True local Git repositories without origin can now run offline local HEAD checks, Debug APK builds, unit and device tests, including uncommitted sources with honest provenance. No GitHub fetch is invoked in local mode.
+- EN: GitHub-backed profiles keep strict remote SHA and clean-tree validation. Local SYNC and signed Release AAB remain unavailable; no implicit Git mutations, path bypasses or acceptance claims.
+
+
 ## 2026-10-13 07:03 GMT+03:00 · 0.4.0-beta.10-dev.47 (61) — кандидат / candidate
 - RU: «Обновить origin с GitHub» явно получает все refs/heads/* независимо от узкого remote.origin.fetch. Показ веток начинается с origin, поэтому новые GitHub-ветки доступны на первых страницах даже при множестве локальных веток.
 - RU: Сохраняются незакоммиченные файлы, локальные коммиты, журнал и все worktree. Без reset, clean, push, переключения текущей ветки при fetch и удаления remote-tracking refs. Перед checkout SHA повторно сверяется с GitHub.

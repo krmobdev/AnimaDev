@@ -12,6 +12,20 @@ class ProjectPolicyTest {
         assertFalse(ProjectPolicy.canExecute(id,path,"TEST",false,"https://evil.invalid/thing"))
         assertFalse(ProjectPolicy.canExecute("a".repeat(32),path,"TEST",false,"github.com/krmobdev/AnimaNotes"))
     }
+    @Test fun localProjectAllowsFixedJobsWithoutOriginButNeverSync() {
+        val path=ProjectPolicy.HOME+"/anima-workspace/FlyLife"
+        val id=ProjectPolicy.stableId(path)
+        assertTrue(ProjectPolicy.localOnly(id,path))
+        assertTrue(ProjectPolicy.canExecute(id,path,"STATUS"))
+        assertTrue(ProjectPolicy.canExecute(id,path,"CHECK"))
+        assertTrue(ProjectPolicy.canExecute(id,path,"TEST"))
+        assertTrue(ProjectPolicy.canExecute(id,path,"TEST_DEVICE"))
+        assertTrue(ProjectPolicy.canExecute(id,path,"BUILD_DEBUG"))
+        assertFalse(ProjectPolicy.canExecute(id,path,"SYNC"))
+        assertFalse(ProjectPolicy.canExecute(id,path,"TEST",true))
+        assertFalse(ProjectPolicy.canExecute(id,path,"TEST",false,"https://untrusted.invalid/repo"))
+        assertFalse(ProjectPolicy.canExecute("bad",path,"BUILD_DEBUG"))
+    }
     @Test fun onlyRegisteredQuizCanExecute() { listOf("STATUS","CHECK","SYNC","TEST","TEST_DEVICE").forEach { assertTrue(ProjectPolicy.canExecute("animaquiz",ProjectPolicy.QUIZ,it)) } }
     @Test fun instrumentationRequiresTrustedProjectButNotOtherPrivilege() {
         assertTrue(ProjectPolicy.canExecute("animaquiz",ProjectPolicy.QUIZ,"TEST_DEVICE"))

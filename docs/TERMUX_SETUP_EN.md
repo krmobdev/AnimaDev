@@ -38,3 +38,14 @@ Allow RUN_COMMAND in Termux and grant the requested Android permission. In the a
 
 ## 5. Security
 Keep JKS, passwords and SSH private keys out of shared Downloads. Do not blindly execute untrusted repository scripts. This guide does not change repositories or install anything automatically.
+
+## Offline local Git repositories
+
+Add an existing ordinary Git repository inside Termux HOME even if it has no
+GitHub remote. On its Git screen select **Check local Git**, then run Debug APK,
+unit tests or device instrumentation. Dirty working trees are allowed in this
+local development mode; output APK names indicate LOCAL and are not claimed to
+match a published commit. Local Git checks do not fetch or modify branches.
+GitHub-backed repositories retain strict remote SHA checks. Sync and signed
+Release AAB are disabled for local-only projects. Linked worktrees remain
+read-only.

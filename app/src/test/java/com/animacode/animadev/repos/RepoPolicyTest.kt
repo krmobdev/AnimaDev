@@ -27,6 +27,21 @@ class RepoPolicyTest {
         assertTrue(RepoPolicy.mayBuild("feature/development",false,true,true,false,true,0,0,"abc","abc","another-project"))
         assertFalse(RepoPolicy.mayBuild("feature/development",true,true,true,false,true,0,0,"abc","abc","another-project"))
     }
+    @Test fun localBuildAndTestsUseCheckedLocalHeadEvenWhenDirty() {
+        val local="a".repeat(40)
+        assertTrue(RepoPolicy.mayTest("feature/local",false,true,false,
+            projectId="local",localOnly=true,checked=true,commit=local))
+        assertTrue(RepoPolicy.mayBuild("feature/local",true,false,true,false,true,
+            -1,-1,local,"",projectId="local",localOnly=true))
+        assertFalse(RepoPolicy.mayBuild("feature/local",true,false,true,false,false,
+            -1,-1,local,"",projectId="local",localOnly=true))
+        assertFalse(RepoPolicy.mayTest("feature/local",false,true,false,
+            projectId="local",localOnly=true,checked=false,commit=local))
+        assertFalse(RepoPolicy.mayBuild("Detached HEAD",false,false,true,false,true,
+            0,0,local,"",projectId="local",localOnly=true))
+        assertFalse(RepoPolicy.mayBuild("feature/local",false,false,true,false,true,
+            0,0,local,"",projectId="animaquiz",localOnly=true))
+    }
     @Test fun validFastForwardAllowed() { assertTrue(sync()) }
     @Test fun mainAllowedAfterVerifiedFastForward() { assertTrue(sync(branch="main"));assertFalse(sync(branch="main",checked=false)) }
     @Test fun masterBlocked() { assertFalse(sync(branch="master")) }

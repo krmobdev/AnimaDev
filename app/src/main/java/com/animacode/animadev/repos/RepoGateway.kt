@@ -285,14 +285,17 @@ class RepoGateway(private val context: Context) {
         if(r.optString("project_id",PROJECT)!=projectId)return false
         val snapshot = r.optJSONObject("snapshot") ?: return false
         return RepoPolicy.mayTest(snapshot.optString("branch"), snapshot.optBoolean("remote_ok"),
-            r.optBoolean("ready"), store.blocked() || r.optBoolean("pending"),projectId)
+            r.optBoolean("ready"), store.blocked() || r.optBoolean("pending"),projectId,
+            snapshot.optBoolean("local_only"),snapshot.optBoolean("checked"),
+            snapshot.optString("local_commit"))
     }
     fun mayBuild(r: JSONObject, projectId:String=PROJECT): Boolean {
         if(r.optString("project_id",PROJECT)!=projectId)return false
         val s = r.optJSONObject("snapshot") ?: return false
         return RepoPolicy.mayBuild(s.optString("branch"),s.optBoolean("dirty",true),s.optBoolean("remote_ok"),
             r.optBoolean("ready"),store.blocked() || r.optBoolean("pending"),s.optBoolean("checked"),
-            s.optInt("ahead",-1),s.optInt("behind",-1),s.optString("local_commit"),s.optString("remote_commit"),projectId)
+            s.optInt("ahead",-1),s.optInt("behind",-1),s.optString("local_commit"),s.optString("remote_commit"),projectId,
+            s.optBoolean("local_only"))
     }
     fun maySync(r: JSONObject, projectId:String=PROJECT): Boolean {
         if(r.optString("project_id",PROJECT)!=projectId)return false

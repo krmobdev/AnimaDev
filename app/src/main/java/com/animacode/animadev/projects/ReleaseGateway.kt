@@ -73,6 +73,7 @@ class ReleaseGateway(private val context:Context) {
     suspend fun launch(project:LocalProject,storePassword:String,keyPassword:String):String {
         val repo=RepoStore(context).read()
         if(store.busy())return "Release AAB уже выполняется или его результат неизвестен."
+        if(project.localOnly)return "Для локального Git доступна Debug APK; подписание Release AAB требует GitHub-профиля."
         if(!project.supported || !RepoGateway(context).mayBuild(repo,project.id)
            || repo.optBoolean("pending") || RepoStore(context).blocked() || context.checkSelfPermission(TermuxGateway.PERMISSION)!=android.content.pm.PackageManager.PERMISSION_GRANTED
            || TermuxGateway(context).installedVersion()==null) {

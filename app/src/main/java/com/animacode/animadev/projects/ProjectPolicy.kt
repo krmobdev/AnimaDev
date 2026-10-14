@@ -10,13 +10,19 @@ object ProjectPolicy {
         return parts.size in 1..6 && parts.none { it.isBlank() || it.startsWith('.') || it in excluded }
     }
     private val originLabel=Regex("github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+    fun localOnly(id:String,path:String,remote:String=""):Boolean =
+        path!=QUIZ && validId(id,path) && remote.isBlank()
     fun supported(id:String,path:String,remote:String=""):Boolean =
-        (id=="animaquiz" && path==QUIZ) || (validId(id,path) && originLabel.matches(remote))
+        (id=="animaquiz" && path==QUIZ) ||
+            (validId(id,path) && (remote.isBlank() || originLabel.matches(remote)))
     fun stableId(path:String):String {
         val bytes=java.security.MessageDigest.getInstance("SHA-256").digest(path.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it.toInt() and 0xff) }.take(32)
     }
-    fun canExecute(id: String,path: String,action: String,worktree:Boolean=false,remote:String="")=!worktree && supported(id,path,remote) && action in setOf("STATUS","CHECK","SYNC","TEST","TEST_DEVICE","BUILD_DEBUG")
+    fun canExecute(id: String,path: String,action: String,worktree:Boolean=false,remote:String="")=
+        !worktree && supported(id,path,remote) &&
+        action in setOf("STATUS","CHECK","SYNC","TEST","TEST_DEVICE","BUILD_DEBUG") &&
+        !(localOnly(id,path,remote) && action=="SYNC")
     fun validId(id: String,path: String)=permittedPath(path) && (if(path==QUIZ) id=="animaquiz" else id==stableId(path))
     fun nextSelection(ids: List<String>,selected: String)=selected.takeIf { it in ids } ?: ""
 }

@@ -72,13 +72,14 @@ import com.animacode.animadev.termux.TermuxGateway
         !outputReady -> "Выбранная папка недоступна для Termux. В настройках выберите папку в основной памяти телефона или обычные Загрузки."
         busyOwner!=null -> BuildConcurrencyPolicy.waitingMessage(busyOwner,project.name)
         catalogRefresh -> "Проверяем фактическую активную ветку в Termux. Дождитесь ответа."
-        !snapshotMatches -> "Ветка или SHA изменились после последней проверки. Обновите GitHub SHA."
+        !snapshotMatches -> if(project.localOnly) "Ветка или SHA изменились. Проверьте локальный Git." else "Ветка или SHA изменились после последней проверки. Обновите GitHub SHA."
         blocked -> "Предыдущее задание Termux не завершено или его результат неизвестен. Откройте журнал и уточните статус."
         record.optBoolean("pending") -> "Termux ещё обрабатывает предыдущий запрос. Дождитесь ответа."
         !permitted -> "Разрешите AnimaDev выполнять команды в Termux."
         termuxVersion==null -> "Termux не найден. Проверьте подключение."
         !record.optBoolean("ready") -> "Локальный помощник Termux не готов; обновите его."
-        snapshot==null || !snapshot.optBoolean("checked") -> "Не выполнена актуальная проверка GitHub SHA."
+        snapshot==null || !snapshot.optBoolean("checked") -> if(project.localOnly) "Не выполнена проверка локального Git." else "Не выполнена актуальная проверка GitHub SHA."
+        project.localOnly -> "Локальный Git: Debug APK собирается без origin из текущих рабочих файлов."
         snapshot.optBoolean("dirty") -> "В рабочем дереве есть локальные изменения — сборка запрещена."
         !snapshot.optBoolean("remote_ok") -> "Адрес origin не соответствует выбранному проекту."
         snapshot.optInt("ahead",-1)!=0 || snapshot.optInt("behind",-1)!=0 -> "Локальный Git SHA и GitHub не совпадают. Синхронизируйте через Git."
@@ -95,7 +96,7 @@ import com.animacode.animadev.termux.TermuxGateway
     var cacheNotice by remember {mutableStateOf("")}
     var showReleaseJournal by remember(project.id){mutableStateOf(false)}
     val releaseScope=rememberCoroutineScope()
-    val canRelease=canDebug && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseOrDebugBusy
+    val canRelease=canDebug && !project.localOnly && hasSigningKey && signing.alias(project.id).isNotBlank() && !releaseOrDebugBusy
     val effectivePasswordPresent=releasePassword.isNotEmpty() || storedCredentials?.storePassword?.isNotEmpty()==true
     var fallbackBuildTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
     val buildTab=selectedBuildTab ?: fallbackBuildTab
@@ -198,7 +199,7 @@ import com.animacode.animadev.termux.TermuxGateway
                     Text(blockReason,style=MaterialTheme.typography.bodySmall)
                     OutlinedButton(onClick={tap();gateway.start("CHECK",project.id,project.path)},
                         enabled=canCheck,modifier=Modifier.fillMaxWidth()) {
-                        Text("Проверить GitHub SHA")
+                        Text(if(project.localOnly) "Проверить локальный Git" else "Проверить GitHub SHA")
                     }
                 }
             }
@@ -302,10 +303,11 @@ import com.animacode.animadev.termux.TermuxGateway
                     }
                     OutlinedButton(onClick={tap();gateway.start("CHECK",project.id,project.path)},
                         enabled=canCheck,modifier=Modifier.fillMaxWidth()) {
-                        Text("Проверить GitHub SHA")
+                        Text(if(project.localOnly) "Проверить локальный Git" else "Проверить GitHub SHA")
                     }
                     if(!canRelease || !effectivePasswordPresent)Text(when {
-                        !canDebug -> blockReason
+                        project.localOnly -> "Release AAB для локальных проектов пока недоступен. Debug APK и тесты работают без GitHub."
+        !canDebug -> blockReason
                         !hasSigningKey -> "Выберите файл JKS в настройках."
                         signing.alias(project.id).isBlank() -> "Укажите alias ключа."
                         else -> "Введите пароль JKS или сохраните его на телефоне."

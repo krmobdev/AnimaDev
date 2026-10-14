@@ -6,6 +6,7 @@ import org.json.JSONObject
 
 data class LocalProject(val id:String,val name:String,val path:String,val branch:String="",val commit:String="",val remote:String="",val dirty:Boolean?=null,val error:String="",val worktree:Boolean=false,val repositoryPath:String="",val changesCount:Int?=null) {
     val supported get()=!worktree && ProjectPolicy.supported(id,path,remote)
+    val localOnly get()=!worktree && ProjectPolicy.localOnly(id,path,remote)
     fun json()=JSONObject().put("id",id).put("name",name).put("path",path).put("branch",branch).put("commit",commit).put("remote",remote).put("dirty",dirty ?: JSONObject.NULL).put("error",error).put("worktree",worktree).put("repository_path",repositoryPath).put("changes_count",changesCount ?: JSONObject.NULL)
     companion object {
         fun parse(j:JSONObject):LocalProject {

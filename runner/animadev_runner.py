@@ -16,7 +16,7 @@ import time
 
 VERSION = '0.4.0'
 MONITOR_SHA = 'f95d91e7170ab96df4ad9731e48e3f8bae77a23055424ed834d4a0299c55e5e5'
-GRADLE_SHA = '1138c9eb85e3a49ff455eb4ea07c36332c6090c39ecc75701cdfcc3067af631f'
+GRADLE_SHA = '0b9f53db3705819af747b6e3a2a971773653a94b9a08667463756043e4368205'
 PROTOCOL = 2
 HOME = pathlib.Path('/data/data/com.termux/files/home')
 STATE_ROOT = HOME / '.local/share/animadev'
@@ -49,14 +49,14 @@ def validate_profile(p):
     except (OSError, ValueError): raise Denied('PATH_DENIED')
     if p['id'] != hashlib.sha256(str(root).encode()).hexdigest()[:32]:
         raise Denied('PROJECT_NOT_FOUND')
-    if not DYNAMIC_REMOTE.fullmatch(p['remote']): raise Denied('REMOTE_MISMATCH')
+    if p['remote'] and not DYNAMIC_REMOTE.fullmatch(p['remote']): raise Denied('REMOTE_MISMATCH')
     branch = p['branch']
     if (not DYNAMIC_BRANCH.fullmatch(branch) or branch.startswith('-') or
             branch.endswith(('/', '.', '.lock')) or '//' in branch or '..' in branch):
         raise Denied('BRANCH_DENIED')
     if not 1 <= len(p['name']) <= 80: raise Denied('RESULT_MALFORMED')
     return {'name':p['name'],'root':str(root),'origin':p['remote'],
-            'branch':branch,'dynamic':True}
+            'branch':branch,'dynamic':True,'local_only':not bool(p['remote'])}
 
 TERMINAL = {'SUCCEEDED', 'FAILED', 'TIMED_OUT', 'INTERRUPTED', 'NOT_STARTED'}
 HEX_ID = re.compile(r'^[0-9a-f]{32}$')
@@ -298,7 +298,13 @@ class GitGuard:
         # Read literal origin rather than get-url (URL rewrites are forbidden above).
         code, remote, _ = self.call(['config', '--local', '--no-includes', '--get-all', 'remote.origin.url'], allow_failure=True)
         remote_ok = code == 0 and remote.splitlines() == [self.project['origin']]
-        if self.project.get('dynamic'):
+        local_only = bool(self.project.get('local_only'))
+        if local_only:
+            # Local mode is permitted ONLY if there truly is no origin.
+            # A hidden foreign remote must not silently bypass GitHub policy.
+            if code != 1 or remote.strip(): raise Denied('REMOTE_MISMATCH')
+            remote_ok = False  # Never pretend a GitHub origin was verified.
+        elif self.project.get('dynamic'):
             raw = remote.strip() if code == 0 and len(remote.splitlines()) == 1 else ''
             match = re.fullmatch(r'(?:git@github[.]com:|https://github[.]com/)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:[.]git)?/?', raw)
             remote_ok = bool(match) and 'github.com/'+match.group(1) == self.project['origin']
@@ -308,11 +314,11 @@ class GitGuard:
         allowed = (branch == self.project['branch'] and (self.project.get('dynamic') or branch not in ('main','master'))) or (self.project.get('allow_main') and branch=='main')
         return {'name': self.project['name'], 'branch': branch, 'local_commit': sha,
             'dirty': bool(changes), 'changed_files': names, 'remote_ok': remote_ok,
-            'branch_allowed': allowed, 'remote_commit': '', 'ahead': 0, 'behind': 0,
+            'local_only': local_only, 'branch_allowed': allowed, 'remote_commit': '', 'ahead': 0, 'behind': 0,
             'can_sync': False, 'checked': False}
     def require(self, s, clean=False):
         if not s['branch_allowed']: raise Denied('BRANCH_DENIED')
-        if not s['remote_ok']: raise Denied('REMOTE_MISMATCH')
+        if not s['remote_ok'] and not s.get('local_only'): raise Denied('REMOTE_MISMATCH')
         if clean and s['dirty']: raise Denied('REPO_DIRTY')
     def compare(self, s, target):
         if not SHA.fullmatch(target): raise Denied('RESULT_MALFORMED')
@@ -336,6 +342,10 @@ class GitGuard:
         before = self.snapshot()
         if action == 'STATUS': return before
         self.require(before, clean=action=='SYNC')
+        if before.get('local_only'):
+            if action == 'CHECK':
+                return dict(before, checked=True, can_sync=False)
+            raise Denied('ACTION_DENIED')  # local repositories cannot SYNC
         target = self.fetch(jid)
         current = self.snapshot()
         self.require(current, clean=action=='SYNC')
@@ -547,7 +557,10 @@ class Engine:
             snap = guard.execute(j['action'], jid)
             message = 'Состояние репозитория проверено.'
             if snap['checked']:
-                message = 'Есть обновления: %s коммитов.' % snap['behind'] if snap['behind'] else 'Новых удалённых коммитов нет.'
+                if snap.get('local_only'):
+                    message = 'Локальный Git подтверждён. GitHub не требуется; сборка использует рабочие файлы.'
+                else:
+                    message = 'Есть обновления: %s коммитов.' % snap['behind'] if snap['behind'] else 'Новых удалённых коммитов нет.'
             if j['action']=='SYNC': message = 'Синхронизация завершена.' if snap['local_commit'] else 'Уже актуально.'
             self.store.update(jid, state='SUCCEEDED', exit_code=0, ended_at=time.time(), snapshot=snap, message=message)
         except Denied as e:
