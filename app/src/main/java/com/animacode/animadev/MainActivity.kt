@@ -85,6 +85,19 @@ class MainActivity:ComponentActivity() {
             var supportParent by rememberSaveable { mutableStateOf("list") }
             var menu by remember { mutableStateOf(false) }
             var confirmExit by rememberSaveable { mutableStateOf(false) }
+            // Explain the permission once when entering a Termux-backed tool.
+            // A denial offers Android Settings; never keep reopening the system prompt.
+            var termuxPermissionSkipped by rememberSaveable { mutableStateOf(false) }
+            var termuxPermissionDenied by rememberSaveable { mutableStateOf(false) }
+            val requestTermuxPermission=androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+            ) { granted ->
+                permitted=termux.permitted()
+                termuxPermissionDenied= !granted || !permitted
+            }
+            LaunchedEffect(permitted) {
+                if(permitted) { termuxPermissionSkipped=false;termuxPermissionDenied=false }
+            }
             var projectGeneration by remember { mutableIntStateOf(0) }
             val current=remember(selected,projectGeneration) { projects.all().find { it.id==selected } }
             val store=remember { RepoStore(context) };val gateway=remember { RepoGateway(context) }
@@ -284,6 +297,32 @@ class MainActivity:ComponentActivity() {
                     else->ProjectWorkspace(context,current,onTool={route=it})
                 }
             } }
+            if(TermuxPermissionPromptPolicy.shouldPrompt(
+                resumed,permitted,version!=null,termuxPermissionSkipped,top,route,
+                current?.supported==true)) {
+                AlertDialog(
+                    onDismissRequest={termuxPermissionSkipped=true},
+                    title={Text(if(english)"Allow Termux access?" else "Разрешить доступ к Termux?")},
+                    text={Text(if(termuxPermissionDenied)
+                        "Android не выдал разрешение RUN_COMMAND. Откройте настройки AnimaDev и разрешите запуск команд в Termux. После возвращения доступ будет проверен автоматически."
+                    else
+                        "Для Git, тестов и сборки APK AnimaDev требуется разрешение запускать команды в Termux (RUN_COMMAND). Без него действия недоступны. Само разрешение ничего не запускает.")},
+                    confirmButton={
+                        Button(onClick={
+                            if(termuxPermissionDenied) {
+                                termuxPermissionSkipped=true
+                                context.startActivity(Intent(
+                                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    android.net.Uri.parse("package:"+context.packageName)))
+                            } else requestTermuxPermission.launch(TermuxGateway.PERMISSION)
+                        }) {Text(if(termuxPermissionDenied) "Открыть настройки" else "Разрешить доступ")}
+                    },
+                    dismissButton={
+                        OutlinedButton(onClick={termuxPermissionSkipped=true}) {
+                            Text(if(english)"Not now" else "Позже")
+                        }
+                    })
+            }
             if(destinationMissing)AlertDialog(onDismissRequest={destinationMissing=false},title={Text("Папка сохранения недоступна")},text={Text(destinationError.ifEmpty {"Выберите папку повторно или вернитесь к обычным Загрузкам. История и файлы сохранятся."})},confirmButton={Button(onClick={folderPicker.launch(null)}){Text("Выбрать папку")}},dismissButton={OutlinedButton(onClick={destination.useDownloads();destinationMissing=false}){Text("Использовать Загрузки")}})
             if(confirmExit)AlertDialog(onDismissRequest={confirmExit=false},title={Text("Закрыть AnimaDev?")},text={Text(if(store.blocked())"Задание продолжится в Termux. Состояние и журнал восстановятся при следующем открытии." else "Проекты, результаты и журналы сохранятся.")},confirmButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmExit=false;finishAndRemoveTask()}){Text("Выйти")}},dismissButton={com.animacode.animadev.projects.ActionButton(compact=true,onClick={confirmExit=false}){Text("Отмена")}})
         }

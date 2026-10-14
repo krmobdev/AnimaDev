@@ -18,7 +18,7 @@ import com.animacode.animadev.repos.*
     val locale=androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val neon=LocalNeonSkin.current
     if(project.localOnly && tool=="git") {
-        LocalOnlyGitTools(context,project,permitted,termuxVersion,onJournal)
+        LocalOnlyGitTools(context,project,permitted,termuxVersion,onPermissionUpdated,onJournal)
         return
     }
     if(!project.supported) {
@@ -504,8 +504,15 @@ import com.animacode.animadev.repos.*
 
 @Composable private fun LocalOnlyGitTools(context:Context,project:LocalProject,
                                            permitted:Boolean,termuxVersion:String?,
+                                           onPermissionUpdated:()->Unit,
                                            onJournal:(String)->Unit) {
     val gateway=remember {RepoGateway(context)}
+    var denied by rememberSaveable(project.id) {mutableStateOf(false)}
+    val grant=androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {allowed ->
+        onPermissionUpdated()
+        denied = !allowed
+    }
     val record=rememberRepoRecord(context)
     val belongs=record.optString("project_id","animaquiz")==project.id
     val snapshot=if(belongs)record.optJSONObject("snapshot") else null
@@ -524,6 +531,28 @@ import com.animacode.animadev.repos.*
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),
                verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {Text("Локальный Git",style=MaterialTheme.typography.titleLarge)}
+        if(!permitted && termuxVersion!=null)item {
+            Card {
+                Column(Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Text("Требуется разрешение Termux",
+                        style=MaterialTheme.typography.titleMedium)
+                    Text("Для локального Git, тестов и сборок требуется RUN_COMMAND. Без него AnimaDev не отправляет команды.")
+                    Button(onClick={grant.launch(
+                        com.animacode.animadev.termux.TermuxGateway.PERMISSION)},
+                        modifier=Modifier.fillMaxWidth()) {Text("Разрешить доступ")}
+                    if(denied) {
+                        Text("Android отказал в разрешении. Его можно включить в настройках приложения AnimaDev.",
+                            style=MaterialTheme.typography.bodySmall)
+                        OutlinedButton(onClick={
+                            context.startActivity(android.content.Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.parse("package:"+context.packageName)))
+                        },modifier=Modifier.fillMaxWidth()) {Text("Открыть настройки")}
+                    }
+                }
+            }
+        }
         if(orphaned)item {
             Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.fillMaxWidth().padding(18.dp),
