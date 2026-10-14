@@ -120,7 +120,25 @@ class SafeLines:
         self.suppressed=True
         return '[Длинная строка диагностики пропущена; дальнейший вывод канала скрыт]'
 
+# Termux RUN_COMMAND does not inherit the user's interactive shell profile.
+# The SDK is machine-local, not part of an app's Git checkout.
+TERMUX_SDK_DIR = pathlib.Path('/data/data/com.termux/files/home/android-sdk')
+
+def gradle_environment(source, sdk_dir=None):
+    """Pass the installed local Android SDK to Gradle, without editing projects."""
+    result = dict(source)
+    sdk = pathlib.Path(sdk_dir) if sdk_dir is not None else TERMUX_SDK_DIR
+    if (sdk.is_dir() and not sdk.is_symlink() and
+            sdk.resolve() == sdk.absolute() and
+            (sdk/'platforms').is_dir() and (sdk/'build-tools').is_dir()):
+        result['ANDROID_HOME'] = str(sdk)
+        result['ANDROID_SDK_ROOT'] = str(sdk)
+    return result
+
 def process(root, env, log, on_process, identity, redact, timeout=TIMEOUT, observe=lambda:None, command=COMMAND):
+    # Android's service environment omits shell-defined ANDROID_HOME.
+    # Restore SDK once for unit tests, debug APK and instrumented tests.
+    env = gradle_environment(env)
     # A permission gate records the child before it may execute the fixed command.
     gate = "import os,sys\nif sys.stdin.buffer.read(1)!=b'1': sys.exit(1)\nos.execvpe(sys.argv[1],sys.argv[1:],os.environ)"
     bash = '/data/data/com.termux/files/usr/bin/bash' if sys.platform == 'android' else '/bin/bash'

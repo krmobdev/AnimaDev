@@ -1,4 +1,5 @@
 import multiprocessing
+import os
 import pathlib
 import subprocess
 import tempfile
@@ -62,6 +63,38 @@ class Reports(unittest.TestCase):
         self.assertEqual(lines.feed('possibly sensitive continuation'), '')
     def test_stack_frames_omitted(self):
         self.assertEqual(gt.diagnostic('failure\n  at example.Run(Test.java:1)\nreason',runner.redact),'failure\nreason')
+
+class SdkEnvironment(unittest.TestCase):
+    def test_service_missing_sdk_is_repaired_for_child_process(self):
+        with tempfile.TemporaryDirectory() as temp:
+            sdk=pathlib.Path(temp)/'android-sdk'
+            (sdk/'platforms').mkdir(parents=True)
+            (sdk/'build-tools').mkdir()
+            work=pathlib.Path(temp)/'work'
+            work.mkdir()
+            script=work/'gradlew'
+            script.write_text('#!/bin/sh\nprintf "%s\\n%s\\n" "$ANDROID_HOME" "$ANDROID_SDK_ROOT" > actual-sdk.txt\n')
+            script.chmod(0o700)
+            base_env=dict(os.environ,ANDROID_HOME='',ANDROID_SDK_ROOT='')
+            with patch.object(gt,'TERMUX_SDK_DIR',sdk):
+                exit_code,unknown=gt.process(work,base_env,lambda *a:None,lambda *a:None,
+                    runner.identity,runner.redact,timeout=20)
+            self.assertFalse(unknown)
+            self.assertEqual(exit_code,0)
+            self.assertEqual((work/'actual-sdk.txt').read_text().splitlines(),[str(sdk),str(sdk)])
+            self.assertEqual(base_env['ANDROID_HOME'],'') # No mutation of parent settings
+
+    def test_missing_or_symlinked_sdk_is_not_accepted(self):
+        with tempfile.TemporaryDirectory() as temp:
+            sdk=pathlib.Path(temp)/'sdk'
+            original={'PATH':'/usr/bin'}
+            self.assertEqual(gt.gradle_environment(original,sdk),original)
+            sdk.mkdir()
+            (sdk/'platforms').mkdir()
+            (sdk/'build-tools').mkdir()
+            symlink=pathlib.Path(temp)/'link'
+            symlink.symlink_to(sdk,target_is_directory=True)
+            self.assertEqual(gt.gradle_environment(original,symlink),original)
 
 class DeviceDiscovery(unittest.TestCase):
     def test_paired_but_not_connected_is_not_a_device(self):

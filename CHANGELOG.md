@@ -1,5 +1,10 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-14 · 0.4.0-beta.10-dev.57 (71) — Android SDK для локальных Gradle-заданий
+- RU: Исправлена реальная ошибка BUILD_DEBUG FlyLife (GRADLE_FAILED: SDK location not found). Сервис Termux RUN_COMMAND не наследует ANDROID_HOME интерактивной оболочки. Все операции Gradle (Debug APK, unit-тесты, инструментальные тесты) теперь автоматически используют проверенный SDK /data/data/com.termux/files/home/android-sdk. Не создаётся и не изменяется local.properties проекта.
+- RU: Проверяется наличие настоящих platforms и build-tools, запрещены символические ссылки на корень SDK; переменные окружения устанавливаются только у дочернего Gradle-процесса. Добавлены регрессионные тесты отсутствующего SDK в окружении Termux.
+- EN: Restore validated Android SDK path in Gradle subprocess environment for local-only and GitHub-backed projects; no checkout mutations.
+
 ## 2026-10-14 · 0.4.0-beta.10-dev.56 (70) — журналы без удаления / retained history
 - RU: Диагностика устройства подтвердила вторую причину блокировки FlyLife: после исправления регистрации STATUS Termux ответил HISTORY_FULL. Жёсткий предел 100 записей блокировал даже восстановление прежнего Job ID.
 - RU: Допускается до 4096 сохранённых заданий. Ни одна существующая запись или журнал не удаляются и не мигрируют; при достижении нового предела по-прежнему срабатывает отказ HISTORY_FULL. Регрессионные тесты проверяют сохранность 100 старых записей, QUERY и новый CHECK.
