@@ -1,5 +1,6 @@
 package com.animacode.animadev.projects
 
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.ClipData
@@ -11,6 +12,7 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.animacode.animadev.MainActivity
+import com.animacode.animadev.termux.TermuxGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -18,6 +20,7 @@ import java.security.MessageDigest
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
+import java.util.UUID
 
 object ArtifactPolicy {
     private val name=Regex("[A-Za-z0-9_-]+[.](apk|aab)")
@@ -43,14 +46,61 @@ object ArtifactGateway {
     private const val INSTALL_CACHE="shared_apk"
     private const val MIME_APK="application/vnd.android.package-archive"
 
-    /** Prefer the actual Downloads folder, not a MIME-filtered media gallery.
-     * File selection is needed only when Android has not granted source access.
+    /** Restore the proven original one-tap Android installer path for Downloads APKs.
+     * Termux owns the file and supplies an Android content grant via termux-open.
+     * The user sees Android's ordinary package installer, not a file chooser.
      */
-    fun pickerIntent(initialFolder:Uri):Intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-        addCategory(Intent.CATEGORY_OPENABLE)
-        type="*/*"
-        putExtra(DocumentsContract.EXTRA_INITIAL_URI,initialFolder)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+    fun oneTapEligible(artifact:JSONObject):Boolean {
+        val path=artifact.optString("path")
+        return path.substringBeforeLast('/')=="/storage/emulated/0/Download" &&
+            path.endsWith(".apk") && ArtifactPolicy.valid(path,
+                artifact.optString("sha256"),artifact.optLong("size"))
+    }
+
+    fun open(context:Context,artifact:JSONObject) {
+        if(!oneTapEligible(artifact)) {
+            message(context,"Нет проверенного APK в Загрузках.");return
+        }
+        val termux=TermuxGateway(context)
+        if(!termux.permitted() || termux.installedVersion()==null) {
+            message(context,"Для открытия APK необходимо разрешение RUN_COMMAND в настройках AnimaDev.")
+            return
+        }
+        val id=UUID.randomUUID().toString().replace("-","")
+        val prefs=context.getSharedPreferences("artifact_open_v1",Context.MODE_PRIVATE)
+        val now=System.currentTimeMillis()
+        prefs.edit().apply {
+            prefs.all.forEach {(key,value)->
+                if(value is Long && now-value>60000)remove(key)
+            }
+            putLong(id,now)
+        }.apply()
+        val callback=PendingIntent.getBroadcast(context,id.hashCode(),
+            Intent(context,ArtifactResultReceiver::class.java)
+                .setAction("com.animacode.animadev.ARTIFACT_RESULT")
+                .setData(Uri.parse("animadev://artifact/$id")),
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_MUTABLE)
+        try {
+            val script=context.assets.open("artifact/open_artifact.py")
+                .bufferedReader().use {it.readText()}
+            val command=Intent("com.termux.RUN_COMMAND").apply {
+                setClassName("com.termux","com.termux.app.RunCommandService")
+                putExtra("com.termux.RUN_COMMAND_PATH",TermuxGateway.PYTHON)
+                putExtra("com.termux.RUN_COMMAND_ARGUMENTS",arrayOf(
+                    "-c",script,id,artifact.optString("path"),
+                    artifact.optString("sha256"),artifact.optLong("size").toString()))
+                putExtra("com.termux.RUN_COMMAND_WORKDIR",TermuxGateway.HOME)
+                putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
+                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL","AnimaDev · открыть готовую APK")
+                putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",callback)
+            }
+            check(context.startService(command)!=null)
+            message(context,"Открываем системный установщик Android…")
+        }catch(_:Exception) {
+            callback.cancel()
+            prefs.edit().remove(id).apply()
+            message(context,"Не удалось открыть APK. Проверьте разрешение RUN_COMMAND и доступность Termux.")
+        }
     }
 
     /** A document picked with OpenDocument can be used again without Termux. */
@@ -198,7 +248,25 @@ class ArtifactOpenReceiver:BroadcastReceiver() {
     }
 }
 
-/** Kept for compatibility with older explicit callbacks from installed versions. */
+/** Authenticated per-job callback for Android's legacy one-tap URI grant. */
 class ArtifactResultReceiver:BroadcastReceiver() {
-    override fun onReceive(context:Context,intent:Intent) = Unit
+    override fun onReceive(context:Context,intent:Intent) {
+        if(intent.action!="com.animacode.animadev.ARTIFACT_RESULT" ||
+            intent.data?.scheme!="animadev" || intent.data?.host!="artifact")return
+        val id=intent.data?.lastPathSegment ?:return
+        val prefs=context.getSharedPreferences("artifact_open_v1",Context.MODE_PRIVATE)
+        if(!id.matches(Regex("[a-f0-9]{32}")) || !prefs.contains(id))return
+        prefs.edit().remove(id).apply()
+        val result=intent.getBundleExtra("result")
+        val response=runCatching {JSONObject(result?.getString("stdout").orEmpty())}.getOrNull()
+        val success=result?.containsKey("exitCode")==true &&
+            result.getInt("exitCode")==0 && result.getInt("err",-1)==-1 &&
+            response?.optString("request_id")==id && response.optBoolean("ok")
+        if(success)return // Dispatch confirmed; Android still asks the user to install.
+        ArtifactGateway.message(context,when(response?.optString("error_code")) {
+            "ARTIFACT_CHANGED"->"APK изменена или повреждена. Соберите её заново."
+            "OPENER_MISSING"->"В Termux отсутствует termux-open."
+            else->"Не удалось открыть системный установщик. Проверьте APK в Загрузках."
+        })
+    }
 }
