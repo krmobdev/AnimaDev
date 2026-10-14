@@ -47,12 +47,22 @@ class RepoGateway(private val context: Context) {
         val saved=r.optJSONObject("profile")
         if(saved!=null) {
             if(saved.optString("id")!=pid || saved.optString("root")!=project.path ||
-                saved.optString("remote").isNotBlank())return null
-            return saved
+                com.animacode.animadev.projects.ProjectPolicy.normalizeRemote(
+                    saved.optString("remote")).isNotBlank())return null
+            // An old display label is not a real remote. Read a normalized
+            // COPY; never modify the stored identity or send a Git command.
+            return JSONObject(saved.toString()).put("remote","")
         }
         return JSONObject().put("id",project.id).put("root",project.path)
             .put("remote","").put("name",project.name).put("branch",project.branch)
     }
+    fun isLocalCheckRecovery(r:JSONObject,projectId:String):Boolean =
+        r.optString("project_id")==projectId && r.optString("state")=="UNKNOWN" &&
+            r.optString("action")=="CHECK" && localRecoveryProfile(r)!=null
+    fun needsLocalRecoveryUpgrade(r:JSONObject,projectId:String):Boolean =
+        isLocalCheckRecovery(r,projectId) &&
+            com.animacode.animadev.projects.LocalCheckRecoveryPolicy.needsUpgrade(
+                r.optBoolean("ready"),r.optString("installed_sha"),sha())
     fun mayUpgradeRecoveryHelper(r:JSONObject=store.read()):Boolean =
         RepoPolicy.mayUpgradeUnknownLocalCheck(r.optBoolean("pending"),
             store.blocked(),r.optString("state"),r.optString("action"),
@@ -231,7 +241,7 @@ class RepoGateway(private val context: Context) {
         if (!RepoPolicy.canRecoverJob(r.optBoolean("pending"),
                 r.optString("job_id"),r.optString("job_runner_sha"),
                 r.optString("installed_sha"))) return
-        if (mayUpgradeRecoveryHelper(r) && r.optString("installed_sha") != sha()) {
+        if (mayUpgradeRecoveryHelper(r) && (!r.optBoolean("ready") || r.optString("installed_sha") != sha())) {
             store.edit { it.put("message","Обновите локального помощника, затем проверьте прежний Job ID. Старое задание не запускается повторно.") }
             return
         }

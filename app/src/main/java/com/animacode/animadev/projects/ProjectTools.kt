@@ -518,16 +518,12 @@ import com.animacode.animadev.repos.*
     val snapshot=if(belongs)record.optJSONObject("snapshot") else null
     val pending=record.optBoolean("pending")
     val blocked=RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
-    val recoveryUpgrade=belongs && gateway.mayUpgradeRecoveryHelper(record)
     val helperReady=record.optBoolean("ready")
     val ready=HelperPolicy.mayRun(permitted,termuxVersion!=null,helperReady,
                                   pending,blocked)
     val orphaned=belongs && record.optString("state")=="UNKNOWN" &&
         record.optString("action")=="CHECK" && record.optString("job_id").isNotBlank()
-    val canRecover=RepoPolicy.canRecoverJob(pending,record.optString("job_id"),
-        record.optString("job_runner_sha"),record.optString("installed_sha"))
-    val canInstall=permitted && termuxVersion!=null && !pending &&
-        (!blocked || recoveryUpgrade)
+    val canInstall=permitted && termuxVersion!=null && !pending && !blocked
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),
                verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {Text("Локальный Git",style=MaterialTheme.typography.titleLarge)}
@@ -554,35 +550,7 @@ import com.animacode.animadev.repos.*
             }
         }
         if(orphaned)item {
-            Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(Modifier.fillMaxWidth().padding(18.dp),
-                    verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                    Text("Восстановление прежнего CHECK",
-                        style=MaterialTheme.typography.titleMedium)
-                    Text("Результат прежней проверки пока неизвестен. Job ID: "+
-                        record.optString("job_id").take(12))
-                    if(record.optString("error_code").isNotEmpty())
-                        Text(record.optString("error_code") + ": "+
-                            record.optString("message"),
-                            style=MaterialTheme.typography.bodySmall)
-                    Text("Ни сборка, ни повторная проверка Git не запускаются. "+
-                        "Сначала обновляем локального помощника, затем читаем прежний Job ID.")
-                    if(!helperReady) {
-                        Button(onClick={gateway.install()},enabled=canInstall,
-                            modifier=Modifier.fillMaxWidth()) {
-                            Text(if(pending)"Подключаем…" else "Обновить помощник Termux")
-                        }
-                    }
-                    OutlinedButton(onClick={gateway.query(true)},
-                        enabled=canRecover && helperReady && permitted &&
-                            termuxVersion!=null && !pending,
-                        modifier=Modifier.fillMaxWidth()) {
-                        Text("Проверить прежний Job ID")
-                    }
-                    if(!helperReady)Text("Проверка станет доступна после подтверждения установки помощника.",
-                        style=MaterialTheme.typography.bodySmall)
-                }
-            }
+            LocalCheckRecoveryCard(context,project,record,permitted,termuxVersion)
         }
         if(!helperReady && !orphaned)item {
             Card {

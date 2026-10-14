@@ -35,6 +35,7 @@ import com.animacode.animadev.termux.TermuxGateway
     val belongs=record.optString("project_id","animaquiz")==project.id
     val snapshot=if(belongs)record.optJSONObject("snapshot") else null
     val blocked=RepoPolicy.blocked(record.optString("job_id"),record.optString("state"))
+    val recoveringLocalCheck=project.localOnly && gateway.isLocalCheckRecovery(record,project.id)
     val signing=remember {SigningStore(context)}
     val hasSigningKey=signing.hasDocument(project.id)
     val releaseStore=remember {ReleaseStore(context)}
@@ -72,9 +73,9 @@ import com.animacode.animadev.termux.TermuxGateway
         !outputReady -> "Выбранная папка недоступна для Termux. В настройках выберите папку в основной памяти телефона или обычные Загрузки."
         busyOwner!=null -> BuildConcurrencyPolicy.waitingMessage(busyOwner,project.name)
         catalogRefresh -> "Проверяем фактическую активную ветку в Termux. Дождитесь ответа."
-        !snapshotMatches -> if(project.localOnly) "Ветка или SHA изменились. Проверьте локальный Git." else "Ветка или SHA изменились после последней проверки. Обновите GitHub SHA."
         blocked -> "Предыдущее задание Termux не завершено или его результат неизвестен. Откройте журнал и уточните статус."
         record.optBoolean("pending") -> "Termux ещё обрабатывает предыдущий запрос. Дождитесь ответа."
+        !snapshotMatches -> if(project.localOnly) "Нужна актуальная проверка локального Git." else "Ветка или SHA изменились после последней проверки. Обновите GitHub SHA."
         !permitted -> "Разрешите AnimaDev выполнять команды в Termux."
         termuxVersion==null -> "Termux не найден. Проверьте подключение."
         !record.optBoolean("ready") -> "Локальный помощник Termux не готов; обновите его."
@@ -170,10 +171,13 @@ import com.animacode.animadev.termux.TermuxGateway
             },style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if(!permitted)item {Button(onClick={grant.launch(TermuxGateway.PERMISSION)}){Text("Разрешить Termux")}}
-        if(!record.optBoolean("ready"))item {Card {Column(Modifier.padding(16.dp)) {
+        if(!record.optBoolean("ready") && !recoveringLocalCheck)item {Card {Column(Modifier.padding(16.dp)) {
             Text("Локальный помощник необходимо обновить")
             ActionButton(onClick={gateway.install()},enabled=permitted && termuxVersion!=null && !blocked && !record.optBoolean("pending")){Text("Обновить помощник")}
         }}}
+        if(buildTab==0 && recoveringLocalCheck)item {
+            LocalCheckRecoveryCard(context,project,record,permitted,termuxVersion)
+        }
         if(buildTab==0)item {OutlinedCard(shape=RoundedCornerShape(22.dp),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
             Column(Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),verticalArrangement=Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -197,7 +201,7 @@ import com.animacode.animadev.termux.TermuxGateway
                 if(cacheNotice.isNotBlank())Text(cacheNotice,style=MaterialTheme.typography.bodySmall)
                 if(!canDebug) {
                     Text(blockReason,style=MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick={tap();gateway.start("CHECK",project.id,project.path)},
+                    if(!recoveringLocalCheck) OutlinedButton(onClick={tap();gateway.start("CHECK",project.id,project.path)},
                         enabled=canCheck,modifier=Modifier.fillMaxWidth()) {
                         Text(if(project.localOnly) "Проверить локальный Git" else "Проверить GitHub SHA")
                     }
