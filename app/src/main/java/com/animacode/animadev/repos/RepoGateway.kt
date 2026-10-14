@@ -34,12 +34,35 @@ class RepoGateway(private val context: Context) {
     }
     private val store = RepoStore(context)
     private fun id() = UUID.randomUUID().toString().replace("-", "")
+    /** A catalog-validated, local-only project may identify an orphaned CHECK.
+     * Retain the original branch/profile on reconciliation: QUERY is not a
+     * retry or a reason to reset the on-device journal.
+     */
+    private fun localRecoveryProfile(r: JSONObject): JSONObject? {
+        if(r.optString("state")!="UNKNOWN" || r.optString("action")!="CHECK")return null
+        val pid=r.optString("project_id")
+        if(pid.isBlank() || pid==PROJECT || !r.optString("job_id").matches(Regex("[a-f0-9]{32}")))return null
+        val project=com.animacode.animadev.projects.ProjectStore(context).all()
+            .firstOrNull {it.id==pid && it.localOnly && !it.worktree} ?:return null
+        val saved=r.optJSONObject("profile")
+        if(saved!=null) {
+            if(saved.optString("id")!=pid || saved.optString("root")!=project.path ||
+                saved.optString("remote").isNotBlank())return null
+            return saved
+        }
+        return JSONObject().put("id",project.id).put("root",project.path)
+            .put("remote","").put("name",project.name).put("branch",project.branch)
+    }
+    fun mayUpgradeRecoveryHelper(r:JSONObject=store.read()):Boolean =
+        RepoPolicy.mayUpgradeUnknownLocalCheck(r.optBoolean("pending"),
+            store.blocked(),r.optString("state"),r.optString("action"),
+            r.optString("project_id",PROJECT),localRecoveryProfile(r)!=null)
     private fun sha(): String = context.assets.open("runner/runner.sha256").bufferedReader().use { it.readText().trim() }
     private fun path(hash: String) = "$RUNNER_ROOT/releases/$hash/animadev_runner.py"
     init {
         val r = store.read()
         if (r.optBoolean("ready") && r.optString("installed_sha").isEmpty()) r.put("installed_sha", LEGACY_SHA)
-        if (r.optBoolean("ready") && r.optString("installed_sha") != sha() && !r.optBoolean("pending") && (!store.blocked() || historyCapacityFailure(r))) {
+        if (r.optBoolean("ready") && r.optString("installed_sha") != sha() && !r.optBoolean("pending") && (!store.blocked() || historyCapacityFailure(r) || mayUpgradeRecoveryHelper(r))) {
             r.put("ready", false).put("message", "Обновите локальный помощник кнопкой ниже. История заданий сохранена.")
         }
         store.write(r)
@@ -47,7 +70,7 @@ class RepoGateway(private val context: Context) {
 
     fun install() {
         val r = store.read()
-        if (r.optBoolean("pending") || (store.blocked() && !historyCapacityFailure(r)) || com.animacode.animadev.projects.ReleaseStore(context).busy()) return
+        if (r.optBoolean("pending") || (store.blocked() && !historyCapacityFailure(r) && !mayUpgradeRecoveryHelper(r)) || com.animacode.animadev.projects.ReleaseStore(context).busy()) return
         val request = id()
         val hash = sha()
         val bytes = context.assets.open("runner/animadev_runner.py").use { it.readBytes() }
@@ -208,6 +231,10 @@ class RepoGateway(private val context: Context) {
         if (!RepoPolicy.canRecoverJob(r.optBoolean("pending"),
                 r.optString("job_id"),r.optString("job_runner_sha"),
                 r.optString("installed_sha"))) return
+        if (mayUpgradeRecoveryHelper(r) && r.optString("installed_sha") != sha()) {
+            store.edit { it.put("message","Обновите локального помощника, затем проверьте прежний Job ID. Старое задание не запускается повторно.") }
+            return
+        }
         store.edit { it.put("manual_query", manual) }
         dispatch("QUERY")
     }
@@ -219,9 +246,12 @@ class RepoGateway(private val context: Context) {
     }
     private fun dispatch(mode: String, target: String = "", targetAction: String = "", offset: Long = 0, view: String = "ALL") {
         val r = store.read(); val request = id()
+        val localProfile=if(mode=="QUERY")localRecoveryProfile(r) else null
+        val useCurrentLocalQuery=RepoPolicy.useCurrentForLocalQuery(mode,
+            r.optString("state"),r.optString("installed_sha"),sha(),localProfile!=null)
         val usingCurrentRunner=mode=="QUERY" && historyCapacityFailure(r) &&
             r.optString("installed_sha")==sha()
-        val hash = if (mode in setOf("LOG","HISTORY") || usingCurrentRunner) sha()
+        val hash = if (mode in setOf("LOG","HISTORY") || usingCurrentRunner || useCurrentLocalQuery) sha()
             else RepoPolicy.runnerForQuery(mode, sha(), r.optString("job_runner_sha"), r.optString("installed_sha"), LEGACY_SHA)
         if (!hash.matches(Regex("[a-f0-9]{64}"))) return
         val runnerVersion = RepoPolicy.runnerVersion(hash, VERSION)
@@ -229,6 +259,8 @@ class RepoGateway(private val context: Context) {
             .put("job_id", target.ifEmpty { r.getString("job_id") }).put("action", targetAction.ifEmpty { r.getString("action") })
             .put("project_id", r.optString("project_id",PROJECT))
         if (mode=="START" && r.has("profile")) payload.put("profile",r.getJSONObject("profile"))
+        if (mode=="QUERY" && useCurrentLocalQuery && localProfile!=null)
+            payload.put("profile",localProfile)
         if (mode=="START" && r.optString("action")=="BUILD_DEBUG")
             payload.put("output_dir",r.optString("output_dir","/storage/emulated/0/Download"))
         if (mode=="START" && r.optString("action")=="TEST_DEVICE") {

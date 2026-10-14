@@ -610,14 +610,17 @@ def main():
         p=json.loads(sys.argv[1])
         keys={'request_id','mode','job_id','project_id','action'}
         if p.get('mode') in ('LOG','HISTORY'): keys |= {'offset','view'}
-        if p.get('mode')=='START' and 'profile' in p: keys.add('profile')
+        if p.get('mode') in ('START','QUERY') and 'profile' in p: keys.add('profile')
         if p.get('mode')=='START' and p.get('action')=='TEST_DEVICE' and 'adb_endpoint' in p: keys.add('adb_endpoint')
         if p.get('mode')=='START' and p.get('action')=='BUILD_DEBUG' and 'output_dir' in p: keys.add('output_dir')
         if set(p) != keys: raise Denied('RESULT_MALFORMED')
         request_id=p['request_id']
         if not isinstance(request_id,str) or not HEX_ID.fullmatch(request_id): raise Denied('RESULT_MALFORMED')
         engine=Engine()
-        if p['mode']=='START' and 'profile' in p:
+        if p['mode'] in ('START','QUERY') and 'profile' in p:
+            # QUERY re-registers a catalog-validated identity for an orphaned
+            # job. Reconcile creates a NOT_STARTED tombstone if no START was
+            # durable; it NEVER runs the old START or executes Git.
             engine.register_profile(p['project_id'], p['profile'])
         if p['mode'] in ('LOG','HISTORY'):
             engine.validate(p['job_id'],p['project_id'],p['action'])

@@ -34,8 +34,8 @@ android {
         minSdk = 33
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = if (providers.gradleProperty("animadevDeviceFixture").orNull == "true") 65 else 64
-        versionName = "0.4.0-beta.10-dev.50"
+        versionCode = if (providers.gradleProperty("animadevDeviceFixture").orNull == "true") 66 else 65
+        versionName = "0.4.0-beta.10-dev.51"
     }
     sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
     sourceSets.getByName("main").assets.srcDir(supportAssets.get().asFile)

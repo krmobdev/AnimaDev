@@ -86,6 +86,10 @@ class RepoResultReceiver : BroadcastReceiver() {
                 if(record.optBoolean("manual_query")) record.put("query_result","Состояние задания проверено: ${MonitorPolicy.label(job.getString("state"),false,false)}")
                 record.remove("history_full_recovery")
                 record.remove("error_code")
+                // An orphaned CHECK was not executed. Never reuse a cached
+                // checked snapshot as permission to build before a fresh CHECK.
+                if(job.getString("state")=="NOT_STARTED" && job.getString("action")=="CHECK")
+                    record.remove("snapshot")
                 record.put("state", job.getString("state")).put("job", job)
                     .put("message", job.optString("message")).put("runner_version", j.getString("runner_version"))
                     .put("last_confirmed",System.currentTimeMillis()).put("manual_query",false)

@@ -1,5 +1,10 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-14 · 0.4.0-beta.10-dev.51 (65) — кандидат / candidate
+- RU: Восстановление заблокированного Git/CHECK FlyLife: если старый запрос не успел зарегистрировать локальный проект в Termux, новый runner принимает проверенный профиль в режиме QUERY. При отсутствии задания сохраняет NOT_STARTED, при наличии возвращает реальное состояние. START не повторяется.
+- RU: На экране Git разрешено установить *новую версионированную копию* помощника при UNKNOWN локальном CHECK — даже если прежнее состояние заблокировано. Старые журналы, данные проекта и исходники сохраняются. GitHub-проекты по-прежнему защищены прежней политикой.
+- EN: Recover an orphaned local-only CHECK without retrying START. Allow explicit helper version update while this specific job is UNKNOWN, then a profile-bound QUERY against the same durable ID, yielding existing status or a NOT_STARTED tombstone.
+
 ## 2026-10-14 · 0.4.0-beta.10-dev.50 (64) — кандидат / candidate
 - RU: Исправлен фактический сбой FlyLife CHECK: Android ожидал runner_version 0.4.1, встроенный Termux runner dev.49 выдавал 0.4.0. Корректный ответ отвергался как RESULT_MALFORMED, сохраняя UNKNOWN и блокируя Debug APK.
 - RU: Новый runner отправляет 0.4.1, строго по протоколу. Старые задания dev.49 доступны через QUERY с точным SHA старого runner и ожидаемой версией 0.4.0; ни Git CHECK, ни сборка автоматически не повторяются.

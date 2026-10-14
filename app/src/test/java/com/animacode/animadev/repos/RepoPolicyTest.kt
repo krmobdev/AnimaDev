@@ -20,6 +20,20 @@ class RepoPolicyTest {
         assertEquals("0.4.1",RepoPolicy.runnerVersion("b".repeat(64),"0.4.1"))
         assertEquals("b".repeat(64),RepoPolicy.runnerForQuery("START","b".repeat(64),old,old,""))
     }
+    @Test fun orphanedLocalCheckAllowsSafeVersionedHelperAndQueryOnly() {
+        val sha="a".repeat(64)
+        assertTrue(RepoPolicy.mayUpgradeUnknownLocalCheck(false,true,"UNKNOWN","CHECK","flylife",true))
+        assertFalse(RepoPolicy.mayUpgradeUnknownLocalCheck(true,true,"UNKNOWN","CHECK","flylife",true))
+        assertFalse(RepoPolicy.mayUpgradeUnknownLocalCheck(false,true,"RUNNING","CHECK","flylife",true))
+        assertFalse(RepoPolicy.mayUpgradeUnknownLocalCheck(false,true,"UNKNOWN","BUILD_DEBUG","flylife",true))
+        assertFalse(RepoPolicy.mayUpgradeUnknownLocalCheck(false,true,"UNKNOWN","CHECK","animaquiz",true))
+        assertFalse(RepoPolicy.mayUpgradeUnknownLocalCheck(false,true,"UNKNOWN","CHECK","flylife",false))
+        assertTrue(RepoPolicy.useCurrentForLocalQuery("QUERY","UNKNOWN",sha,sha,true))
+        assertFalse(RepoPolicy.useCurrentForLocalQuery("START","UNKNOWN",sha,sha,true))
+        assertFalse(RepoPolicy.useCurrentForLocalQuery("QUERY","UNKNOWN",sha,sha,false))
+        assertFalse(RepoPolicy.useCurrentForLocalQuery("QUERY","UNKNOWN","b".repeat(64),sha,true))
+        assertFalse(RepoPolicy.useCurrentForLocalQuery("QUERY","RUNNING",sha,sha,true))
+    }
     @Test fun staleJobCanBeQueriedAfterHelperUpdate() {
         val id="a".repeat(32)
         val original="b".repeat(64)

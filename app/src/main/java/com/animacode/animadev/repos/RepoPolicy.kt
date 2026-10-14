@@ -49,6 +49,16 @@ object RepoPolicy {
     }
     // Query never retries START. The SHA is from a previously installed
     // local runner, not a user-entered value.
+    /** Versioned helper installation does not start Git or mutate project state. */
+    fun mayUpgradeUnknownLocalCheck(pending:Boolean, blocked:Boolean, state:String,
+                                    action:String, projectId:String, localProfile:Boolean):Boolean =
+        !pending && blocked && state=="UNKNOWN" && action=="CHECK" &&
+            projectId!="animaquiz" && localProfile
+    /** Reconcile by the same durable ID with a newly installed reader, never by START. */
+    fun useCurrentForLocalQuery(mode:String, state:String, installedSha:String,
+                                currentSha:String, authorizedLocal:Boolean):Boolean =
+        mode=="QUERY" && state=="UNKNOWN" && authorizedLocal &&
+            installedSha.matches(Regex("[a-f0-9]{64}")) && installedSha==currentSha
     fun canRecoverJob(pending:Boolean,jobId:String,jobRunnerSha:String,installedSha:String):Boolean =
         !pending && jobId.matches(Regex("[a-f0-9]{32}")) &&
             (jobRunnerSha.ifBlank {installedSha}).matches(Regex("[a-f0-9]{64}"))
