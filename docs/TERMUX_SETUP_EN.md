@@ -41,4 +41,4 @@ Keep JKS, passwords and SSH private keys out of shared Downloads. Do not blindly
 
 
 ## Release metrics and APK install cache (candidate, 19 October 2026)
-Release CPU and memory metrics are sampled from Termux procfs, without invoking top/free every 4.5 seconds. Android can restrict access to some counters; affected values may be absent without affecting the build. The Android installer uses a rolling private cache of up to three verified APK copies; original artifacts in the chosen destination are never removed.
+Release CPU and memory metrics are sampled from Termux procfs, without invoking free. If procfs CPU counters are restricted, one top -n 1 snapshot without the forced delay is used; some values may be absent without affecting the build. The Android installer uses a rolling private cache of up to three verified APK copies; original artifacts in the chosen destination are never removed.

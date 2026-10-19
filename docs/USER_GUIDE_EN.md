@@ -79,5 +79,5 @@ Do not delete Termux or Git directories to clear app cache. AnimaDev cache clean
 - Release AAB and Debug APK notifications open their respective build tabs.
 - At most three checksum-verified installer APK copies are kept in AnimaDev's private cache. Original build artifacts are never deleted.
 - The Release history retains the 100 newest completed jobs; evicted jobs' event data is also removed.
-- Termux CPU/RAM metrics are read from procfs without spawning top/free. Values are omitted if Android restricts access to the counters.
+- Termux CPU/RAM metrics are read from procfs without spawning free. A single top -n 1 CPU snapshot is used if Android restricts procfs; unavailable values are not fabricated.
 - Saved signing passwords remain Android Keystore-encrypted and are reported saved only after the durable write succeeds.

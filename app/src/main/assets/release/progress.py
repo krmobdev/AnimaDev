@@ -1,5 +1,5 @@
 """Read sanitized Release progress for an exact request ID. No secrets or raw logs."""
-import json,pathlib,re,sys,time,os
+import json,pathlib,re,sys,time,os,subprocess
 
 def _memory(text):
     """Linux memory counters are KiB; publish bounded MiB only."""
@@ -49,8 +49,28 @@ def _cpu_metrics(before,after,cores):
             "cpu_process_percent":min(100000,round(100*cores*active/total)),
             "cpu_cores":cores}
 
+def _top_cpu():
+    r=subprocess.run(["top","-b","-n","1"],capture_output=True,text=True,timeout=2,check=False)
+    if r.returncode:return {}
+    lines=r.stdout.splitlines()
+    frames=[i for i,x in enumerate(lines) if x.strip().startswith("PID USER")]
+    if not frames:return {}
+    values=[]
+    for line in lines[frames[-1]+1:]:
+        col=line.split()
+        if len(col)>8 and col[0].isdigit():
+            try:
+                v=float(col[8])
+                if 0<=v<=10000:values.append(v)
+            except ValueError:pass
+    if not values:return {}
+    total=round(sum(values))
+    cores=max(1,os.cpu_count() or 1)
+    return {"cpu_percent":min(100,round(total/cores)),
+            "cpu_process_percent":min(100000,total),"cpu_cores":cores}
+
 def resource_metrics():
-    """Termux-owned CPU usage sampled via procfs, without spawning top/free."""
+    """Prefer procfs; use one top snapshot if Android restricts it."""
     result={"sampled_at":int(time.time()*1000)}
     try:result.update(_memory(pathlib.Path("/proc/meminfo").read_text()))
     except (OSError,ValueError):pass
@@ -60,6 +80,9 @@ def resource_metrics():
         second=_proc_ticks()
         result.update(_cpu_metrics(first,second,max(1,os.cpu_count() or 1)))
     except (OSError,ValueError,IndexError):pass
+    if "cpu_percent" not in result:
+        try:result.update(_top_cpu())
+        except (OSError,ValueError,subprocess.TimeoutExpired):pass
     return result
 
 STATE=pathlib.Path("/data/data/com.termux/files/home/.local/share/animadev")
