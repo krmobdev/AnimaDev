@@ -30,7 +30,7 @@ class ReleaseMetricsTest(unittest.TestCase):
         self.assertEqual(progress._cpu_metrics((10,1,2),(10,2,2),8),{})
 
     def test_restricted_proc_uses_only_one_top_snapshot(self):
-        listing="PID USER PR NI VIRT RES SHR S %CPU %MEM TIME+ COMMAND\\n1234 u0 20 0 100 80 40 S 160.0 0.1 00:00 python\\n"
+        listing="PID USER PR NI VIRT RES SHR S %CPU %MEM TIME+ COMMAND\n1234 u0 20 0 100 80 40 S 160.0 0.1 00:00 python\n"
         with patch.object(progress.subprocess,"run",return_value=SimpleNamespace(returncode=0,stdout=listing)) as proc:
             cpu=progress._top_cpu()
         self.assertEqual(proc.call_args.args[0],["top","-b","-n","1"])
