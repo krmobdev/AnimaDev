@@ -1,51 +1,65 @@
 """Read sanitized Release progress for an exact request ID. No secrets or raw logs."""
-import json,pathlib,re,sys
-import subprocess,time,os
+import json,pathlib,re,sys,time,os
+
+def _memory(text):
+    """Linux memory counters are KiB; publish bounded MiB only."""
+    rows={}
+    for line in text.splitlines():
+        key,sep,rest=line.partition(":")
+        if sep:
+            parts=rest.split()
+            if parts and parts[0].isdigit():rows[key]=int(parts[0])
+    total=rows.get("MemTotal",0)//1024
+    available=rows.get("MemAvailable",-1)//1024
+    if not 0<=available<=total<=1048576 or total==0:return {}
+    result={"mem_total_mb":total,"mem_available_mb":available,
+            "mem_used_mb":total-available}
+    if "SwapTotal" in rows and "SwapFree" in rows:
+        used=(rows["SwapTotal"]-rows["SwapFree"])//1024
+        if 0<=used<=1048576:result["swap_used_mb"]=used
+    return result
+
+def _process_ticks(line):
+    # /proc/PID/stat has a parenthesized comm field that may contain spaces.
+    fields=line.rsplit(") ",1)[1].split()
+    return int(fields[11])+int(fields[12])
+
+def _proc_ticks():
+    values=pathlib.Path("/proc/stat").read_text().splitlines()[0].split()
+    if not values or values[0]!="cpu":raise ValueError("cpu")
+    total=sum(int(v) for v in values[1:])
+    processes=0
+    ticks=0
+    uid=os.getuid()
+    for entry in os.scandir("/proc"):
+        if not entry.name.isdecimal():continue
+        try:
+            if entry.stat(follow_symlinks=False).st_uid!=uid:continue
+            ticks+=_process_ticks(pathlib.Path(entry.path,"stat").read_text())
+            processes+=1
+        except (OSError,ValueError,IndexError):
+            continue  # short-lived process, or invisible to this Termux UID
+    return total,ticks,processes
+
+def _cpu_metrics(before,after,cores):
+    total=after[0]-before[0]
+    active=max(0,after[1]-before[1])
+    if total<=0 or before[2]==0 or after[2]==0:return {}
+    return {"cpu_percent":min(100,round(100*active/total)),
+            "cpu_process_percent":min(100000,round(100*cores*active/total)),
+            "cpu_cores":cores}
 
 def resource_metrics():
-    """Numbers only: never return process listings, arguments, secrets or raw logs."""
+    """Termux-owned CPU usage sampled via procfs, without spawning top/free."""
     result={"sampled_at":int(time.time()*1000)}
+    try:result.update(_memory(pathlib.Path("/proc/meminfo").read_text()))
+    except (OSError,ValueError):pass
     try:
-        free=subprocess.run(["free","-m"],capture_output=True,text=True,
-                            timeout=2,check=False)
-        if free.returncode==0:
-            memory=next((line.split() for line in free.stdout.splitlines()
-                         if line.startswith("Mem:")),None)
-            if memory and len(memory)>=7:
-                total,available=int(memory[1]),int(memory[6])
-                if 0<=available<=total<=1048576:
-                    result.update(mem_total_mb=total,mem_available_mb=available,
-                                  mem_used_mb=total-available)
-            swap=next((line.split() for line in free.stdout.splitlines()
-                       if line.startswith("Swap:")),None)
-            if swap and len(swap)>=4:
-                result["swap_used_mb"]=max(0,min(int(swap[2]),1048576))
-    except (OSError,ValueError,subprocess.TimeoutExpired):
-        pass
-    try:
-        top=subprocess.run(["top","-b","-n","2","-d","1"],capture_output=True,
-                           text=True,timeout=4,check=False)
-        if top.returncode==0:
-            lines=top.stdout.splitlines()
-            frames=[i for i,line in enumerate(lines) if line.strip().startswith("PID USER")]
-            if frames:
-                samples=[]
-                for line in lines[frames[-1]+1:]:
-                    cols=line.split()
-                    if len(cols)>=9 and cols[0].isdigit():
-                        try:
-                            value=float(cols[8])
-                            if 0<=value<=10000:samples.append(value)
-                        except ValueError:
-                            continue
-                if samples:
-                    cores=max(1,os.cpu_count() or 1)
-                    process_total=sum(samples)
-                    result["cpu_percent"]=min(100,round(process_total/cores))
-                    result["cpu_process_percent"]=min(100000,round(process_total))
-                    result["cpu_cores"]=cores
-    except (OSError,ValueError,subprocess.TimeoutExpired):
-        pass
+        first=_proc_ticks()
+        time.sleep(0.15)
+        second=_proc_ticks()
+        result.update(_cpu_metrics(first,second,max(1,os.cpu_count() or 1)))
+    except (OSError,ValueError,IndexError):pass
     return result
 
 STATE=pathlib.Path("/data/data/com.termux/files/home/.local/share/animadev")
