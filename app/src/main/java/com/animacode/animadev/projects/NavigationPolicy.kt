@@ -19,6 +19,13 @@ data class NavigationState(val section:String="projects",val route:String="list"
     companion object {
         /** Fresh launcher navigation keeps selection, never auto-opens it. Saved Compose state restores separately. */
         fun freshLaunch(selectedProject:String)=NavigationState(project=selectedProject)
-        fun notificationTarget(job:String,restored:Boolean)=if(restored)"" else job }
+        fun notificationTarget(job:String,restored:Boolean)=if(restored)"" else job
+        /** Notification source selects the correct build subtab, prioritizing Release. */
+        fun notificationBuildTab(release:Boolean,debug:Boolean):Int?=when {
+            release->1
+            debug->0
+            else->null
+        }
+    }
     val root get()=route=="list"
 }

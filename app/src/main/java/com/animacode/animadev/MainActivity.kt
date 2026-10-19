@@ -80,6 +80,8 @@ class MainActivity:ComponentActivity() {
             // Navigating to Journal removes those screens from composition.
             var selectedTestTab by rememberSaveable(selected) { mutableIntStateOf(0) }
             var selectedBuildTab by rememberSaveable(selected) { mutableIntStateOf(0) }
+            // Applied only after the new project key restores its own tab state.
+            var notificationTab by remember { mutableIntStateOf(-1) }
             var settingsSection by rememberSaveable { mutableStateOf("") }
             var settingsParent by rememberSaveable { mutableStateOf("list") }
             var supportParent by rememberSaveable { mutableStateOf("list") }
@@ -131,8 +133,15 @@ class MainActivity:ComponentActivity() {
                     val target=projects.all().firstOrNull {it.id==id && it.supported}
                     if(target!=null) {
                         selected=target.id;projects.select(target.id);top="projects";route="build"
+                        notificationTab=NavigationState.notificationBuildTab(requestedRelease,requestedBuild) ?: -1
                     }
                     requestedRelease=false;requestedBuild=false
+                }
+            }
+            LaunchedEffect(selected,notificationTab) {
+                if(notificationTab in 0..1) {
+                    selectedBuildTab=notificationTab
+                    notificationTab=-1
                 }
             }
             LaunchedEffect(requestedJournal) {

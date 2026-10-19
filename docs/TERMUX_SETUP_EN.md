@@ -38,3 +38,7 @@ Allow RUN_COMMAND in Termux and grant the requested Android permission. In the a
 
 ## 5. Security
 Keep JKS, passwords and SSH private keys out of shared Downloads. Do not blindly execute untrusted repository scripts. This guide does not change repositories or install anything automatically.
+
+
+## Release metrics and APK install cache (candidate, 19 October 2026)
+Release CPU and memory metrics are sampled from Termux procfs, without invoking free. If procfs CPU counters are restricted, one top -n 1 snapshot without the forced delay is used; some values may be absent without affecting the build. The Android installer uses a rolling private cache of up to three verified APK copies; original artifacts in the chosen destination are never removed.

@@ -19,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import com.animacode.animadev.repos.*
 import com.animacode.animadev.termux.TermuxGateway
@@ -265,13 +267,20 @@ import com.animacode.animadev.termux.TermuxGateway
                             if(storedCredentials==null) {
                                 com.animacode.animadev.projects.ActionButton(onClick={
                                     tap()
-                                    val ok=vault.save(project.id,signing.documentUri(project.id),signing.alias(project.id),
-                                        releasePassword,releaseKeyPassword)
-                                    vaultMessage=if(ok)"Сохранено в Android Keystore. Пароль ещё не проверен; подтверждение будет при подписи Release."
-                                        else "Не удалось сохранить пароль в Android Keystore. Проверьте доступ к телефону."
-                                    if(ok) {
-                                        releasePassword="";releaseKeyPassword=""
-                                        showPasswordFields=false;vaultGeneration++
+                                    val password=releasePassword
+                                    val keyPassword=releaseKeyPassword
+                                    val uri=signing.documentUri(project.id)
+                                    val alias=signing.alias(project.id)
+                                    releaseScope.launch {
+                                        val ok=withContext(Dispatchers.IO) {
+                                            vault.save(project.id,uri,alias,password,keyPassword)
+                                        }
+                                        vaultMessage=if(ok)"Сохранено в Android Keystore. Пароль ещё не проверен; подтверждение будет при подписи Release."
+                                            else "Не удалось сохранить пароль в Android Keystore. Проверьте доступ к телефону."
+                                        if(ok) {
+                                            releasePassword="";releaseKeyPassword=""
+                                            showPasswordFields=false;vaultGeneration++
+                                        }
                                     }
                                 },enabled=!releaseOrDebugBusy && hasSigningKey &&
                                     signing.alias(project.id).isNotBlank() && releasePassword.isNotEmpty()) {
@@ -322,8 +331,11 @@ import com.animacode.animadev.termux.TermuxGateway
                                 color=MaterialTheme.colorScheme.onSurfaceVariant)
                             if(vaultSaved) OutlinedButton(onClick={
                                 tap()
-                                vaultMessage=if(vault.forget(project.id))"Сохранённые пароли удалены." else "Удаление не подтверждено."
-                                showPasswordFields=true;vaultGeneration++
+                                releaseScope.launch {
+                                    val forgotten=withContext(Dispatchers.IO) { vault.forget(project.id) }
+                                    vaultMessage=if(forgotten)"Сохранённые пароли удалены." else "Удаление не подтверждено."
+                                    if(forgotten) {showPasswordFields=true;vaultGeneration++}
+                                }
                             },enabled=!releaseOrDebugBusy) {Text("Удалить сохранённый пароль")}
                         }
                     }

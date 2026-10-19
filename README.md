@@ -93,3 +93,7 @@ The guides and change log are bundled offline into the APK from these **same Git
 Real Android UI/device acceptance requires on-device tests, not just successful compilation.
 
 For older stage reports and design notes, see the [docs/](docs/) directory. Old beta constraints are historical and superseded by the current `AGENTS.md` owner authorization.
+
+
+### Аудит Antigravity / Antigravity audit fixes (2026-10-19)
+Notifications return to the proper Debug APK / Release AAB tab. Verified install APK copies are held in a private 3-file rolling cache (not the source artifacts). Release history retains 100 finished tasks and their event data; old event keys are pruned. CPU/RAM sampling prefers procfs and falls back to one fast top -n 1 CPU snapshot. Work is proposed on a separate branch only; no release or merge to main.

@@ -1,5 +1,17 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-19 19:39 GMT+03:00 · 0.4.0-beta.10-dev.47 (61) — исправления аудита, кандидат / audit fixes, candidate
+- RU: Уведомления Release AAB открывают вкладку Release, Debug APK — вкладку Debug. Переход в другой проект не сбрасывает выбор из уведомления.
+- RU: Проверенные временные APK ограничены тремя файлами в приватном кэше; исходные APK не удаляются. Старые события Release удаляются вместе с вытесненными заданиями (история — 100 заданий).
+- RU: Отслеживание загрузки CPU/RAM во время Release использует /proc или один top -n 1, если Android блокирует CPU-статистику (free не запускается); если система ограничивает доступ к данным, недоступные показатели не подменяются вымышленными.
+- RU: Некритичные состояния проектов и ADB сохраняются без синхронного I/O интерфейса; шифрованные пароли сохраняются с подтверждённым commit в Dispatchers.IO. Защитные синхронные записи заданий и строгая проверка подписанного результата остаются без ослабления.
+- EN: Release/Debug notifications open the correct build subtab, including after project selection changes.
+- EN: Verified private APK install cache is capped at three files; original artifacts stay intact. Event keys are rotated with the 100 most recent completed Release jobs.
+- EN: Release CPU and RAM metrics prefer procfs or one top -n 1 snapshot if CPU counters are restricted (no free); inaccessible metrics are omitted rather than guessed.
+- EN: Noncritical project/ADB preferences no longer require blocking disk writes on the UI thread; encrypted-password commits move to IO. Durable job-state writes and strict signed-result validation remain in place.
+- RU/EN: Только кандидат из ветки исправлений, без слияния в main, релиза или заявления Android-приёмки / Candidate only; not merged or released, Android acceptance pending.
+
+
 ## 2026-10-13 07:03 GMT+03:00 · 0.4.0-beta.10-dev.47 (61) — кандидат / candidate
 - RU: «Обновить origin с GitHub» явно получает все refs/heads/* независимо от узкого remote.origin.fetch. Показ веток начинается с origin, поэтому новые GitHub-ветки доступны на первых страницах даже при множестве локальных веток.
 - RU: Сохраняются незакоммиченные файлы, локальные коммиты, журнал и все worktree. Без reset, clean, push, переключения текущей ветки при fetch и удаления remote-tracking refs. Перед checkout SHA повторно сверяется с GitHub.

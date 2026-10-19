@@ -87,6 +87,9 @@ object ArtifactGateway {
                 "APK_CHECKSUM_MISMATCH"
             }
             check(temp.renameTo(target)) {"CACHE_UNAVAILABLE"}
+            // Retain the APK currently passed to FileProvider and at most two previous builds.
+            // Never follow symlinks or remove unrelated files from the private cache.
+            InstallCachePolicy.prune(directory,target)
             return target
         } finally {
             temp.delete()

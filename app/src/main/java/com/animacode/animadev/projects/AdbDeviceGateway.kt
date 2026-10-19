@@ -117,8 +117,8 @@ except Exception:
     print(json.dumps({'request_id':req,'ok':False,'count':0,'device':'',
         'offline':0,'unauthorized':0,'connect_status':'TRANSPORT_ERROR'}))
 """.trimIndent()
-        if(!prefs.edit().putString("request",request).putLong("sent_at",System.currentTimeMillis())
-            .putBoolean("pending",true).putString("message",if(endpoint.isBlank())"Проверяем adb devices -l в Termux…" else "Подключаем Pixel и проверяем ADB…").commit())return
+        prefs.edit().putString("request",request).putLong("sent_at",System.currentTimeMillis())
+            .putBoolean("pending",true).putString("message",if(endpoint.isBlank())"Проверяем adb devices -l в Termux…" else "Подключаем Pixel и проверяем ADB…").apply()
         val callback=PendingIntent.getBroadcast(context,request.hashCode(),
             Intent(context,AdbDeviceReceiver::class.java).apply {
                 action="com.animacode.animadev.ADB_DEVICES"
@@ -138,13 +138,13 @@ except Exception:
         } catch(_:Exception) {
             callback.cancel()
             prefs.edit().putBoolean("pending",false).putInt("count",0)
-                .putString("message","Нет ответа Termux. Проверьте разрешение RUN_COMMAND.").commit()
+                .putString("message","Нет ответа Termux. Проверьте разрешение RUN_COMMAND.").apply()
         }
     }
     fun expire() {
         if(prefs.getBoolean("pending",false) && System.currentTimeMillis()-prefs.getLong("sent_at",0)>45_000)
             prefs.edit().putBoolean("pending",false).putInt("count",0)
-                .putString("message","ADB не ответил вовремя. Повторите проверку.").commit()
+                .putString("message","ADB не ответил вовремя. Повторите проверку.").apply()
     }
 }
 
@@ -195,6 +195,6 @@ class AdbDeviceReceiver:BroadcastReceiver() {
                     }
                 }
                 else->"Обнаружено $count устройств. Отключите лишние: разрешено одно физическое устройство."
-            }).commit()
+            }).apply()
     }
 }

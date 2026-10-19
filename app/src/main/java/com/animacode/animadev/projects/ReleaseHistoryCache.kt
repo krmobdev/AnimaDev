@@ -50,7 +50,14 @@ class ReleaseHistoryCache(context:Context) {
             val item=old.optJSONObject(i) ?:continue
             if(item.optString("job_id")!=jobId && list.length()<100)list.put(item)
         }
-        prefs.edit().putString("history",list.toString()).apply()
+        // Events must rotate together with the 100-entry history. Clean up orphans
+        // left by older versions, but preserve the current job while it is observed.
+        val retained=(0 until list.length()).mapNotNull {list.optJSONObject(it)?.optString("job_id")}
+            .toSet()+jobId
+        val edit=prefs.edit().putString("history",list.toString())
+        prefs.all.keys.filter {it.startsWith("events_") && it.removePrefix("events_") !in retained}
+            .forEach {edit.remove(it)}
+        edit.apply()
     }
 
     fun events(jobId:String):List<JSONObject> {
