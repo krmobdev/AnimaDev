@@ -28,3 +28,17 @@
 
 - Безопасные durable commit в ключевых переходах Release и переключения веток намеренно сохранены. Для полного устранения синхронного I/O требуется проектирование и инструментальный тест goAsync/потоков/восстановления после kill.
 - Не запускать производство APK с новыми versionCode до отдельного решения о релизе.
+
+## Фактическая проверка исправлений, 19.10.2026
+
+Исходный код проверялся в отдельном, первоначально чистом detached Git worktree Android Termux по точному SHA GitHub `16a97245111599c30b03730a08b5e87ea95bad60`. Исходный каталог AnimaDev остался на `main`.
+
+- `./gradlew --offline --no-daemon --console=plain :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin` — **BUILD SUCCESSFUL**, 214 JVM-тестов из 29 XML-отчётов, 0 failures; весь Android instrumentation source скомпилирован. **Инструментальные тесты на устройстве не запускались**, поэтому Android UI/инсталляция ещё не приняты.
+- `python -m unittest runner.test_release_progress_metrics -v` — **6/6 успешно**, в том числе запасной `top -b -n 1` при закрытом Android `/proc/stat`.
+- Проба `resource_metrics()` на том же Android Termux вернула реальные значения CPU, RAM и swap. При полностью закрытом procfs оригинальная версия патча показывала только RAM; поэтому добавлен проверенный ограниченный fallback CPU.
+- Полный `python -m unittest discover -s runner -p 'test_*.py' -v` **не завершился**: истёк заданный тайм-аут в 180 секунд. В промежуточном выводе два падения: `test_differing_remote_sha_prevents_switch` и `test_bundled_runner_is_exactly_the_verified_catalog`. Оба воспроизведены на исходном `main` до патча: первое из-за несовпадения ожиданий mock Git-команд; второе из-за различия исходного `runner/catalog.py` и уже встроенного `app/src/main/assets/catalog/catalog.py`. Исправлять эти отдельные исходные проблемы без постановки задачи на расширение scope не стали.
+- Ни Android APK для установки, ни реальный Release AAB не собирались в рамках этого исправления. `main` не обновлялся.
+
+### Остаточные риски
+- Миграция всех защищённых `commit()` на фоновые операции запрещена без отдельного теста атомарности, состояния заданий после process death и реакции BroadcastReceiver. HIGH-01 закрыт **частично**.
+- Ветка содержит регрессионные тесты и документированные исправления, но merge/релиз требуют отдельного разрешения владельца.
