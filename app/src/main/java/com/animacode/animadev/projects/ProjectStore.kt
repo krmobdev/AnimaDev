@@ -16,16 +16,19 @@ data class LocalProject(val id:String,val name:String,val path:String,val branch
 }
 class ProjectStore(context:Context) {
     val prefs=context.getSharedPreferences("projects_v1",Context.MODE_PRIVATE)
-    init { if(!prefs.contains("projects"))prefs.edit().putString("projects",JSONArray().put(LocalProject("animaquiz","AnimaQuiz",ProjectPolicy.QUIZ).json()).toString()).commit() }
+    init { if(!prefs.contains("projects"))prefs.edit().putString("projects",JSONArray().put(LocalProject("animaquiz","AnimaQuiz",ProjectPolicy.QUIZ).json()).toString()).apply() }
     fun all():List<LocalProject> = try {
         val a=JSONArray(prefs.getString("projects","[]"));buildList { for(i in 0 until a.length())runCatching { LocalProject.parse(a.getJSONObject(i)) }.getOrNull()?.let { add(it) } }.distinctBy { it.path }
     } catch(_:Exception) { emptyList() }
-    private fun save(items:List<LocalProject>)=prefs.edit().putString("projects",JSONArray(items.map { it.json() }).toString()).commit()
+    private fun save(items:List<LocalProject>):Boolean {
+        prefs.edit().putString("projects",JSONArray(items.map { it.json() }).toString()).apply()
+        return true // Accepted in memory; disk write is scheduled without blocking UI.
+    }
     fun add(project:LocalProject):Boolean { if(all().any { it.path==project.path } || !ProjectPolicy.validId(project.id,project.path))return false;return save(all()+project) }
-    fun remove(id:String):Boolean { val remaining=all().filterNot { it.id==id };val selected=ProjectPolicy.nextSelection(remaining.map { it.id },selected());return save(remaining) && prefs.edit().putString("selected",selected).commit() }
+    fun remove(id:String):Boolean { val remaining=all().filterNot { it.id==id };val selected=ProjectPolicy.nextSelection(remaining.map { it.id },selected());prefs.edit().putString("projects",JSONArray(remaining.map {it.json()}).toString()).putString("selected",selected).apply();return true }
     private val selection=ProjectSelection(object:SelectionStorage {
         override fun load()=prefs.getString("selected","") ?: ""
-        override fun save(id:String)=prefs.edit().putString("selected",id).commit()
+        override fun save(id:String):Boolean {prefs.edit().putString("selected",id).apply();return true}
     })
     fun select(id:String)=selection.choose(all().map { it.id },id)
     fun selected()=selection.read(all().map { it.id })
@@ -35,7 +38,7 @@ class ProjectStore(context:Context) {
         if(all().none { it.id==id })return false
         val next=(prefs.getStringSet("pinned_ids",emptySet()) ?: emptySet()).toMutableSet()
         if(!next.add(id))next.remove(id)
-        return prefs.edit().putStringSet("pinned_ids",next).commit()
+        prefs.edit().putStringSet("pinned_ids",next).apply();return true
     }
     fun sorted(items:List<LocalProject>):List<LocalProject> =
         items.withIndex().sortedWith(compareBy<IndexedValue<LocalProject>>(

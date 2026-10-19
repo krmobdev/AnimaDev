@@ -41,5 +41,11 @@ class NavigationPolicyTest {
     @Test fun openingAnotherProjectClearsJournal() { val n=NavigationState().openProject("one").journal("old").openProject("two");assertEquals("two",n.project);assertEquals("",n.job);assertEquals("workspace",n.route) }
     @Test fun copiedSavedFieldsRestoreContext() { val before=NavigationState().openProject("one").tool("tests").journal("owned");val after=NavigationState(before.section,before.route,before.project,before.job,before.settingsParent,before.journalParent);assertEquals(before,after);assertEquals("tests",after.back()!!.route) }
     @Test fun reopeningSettingsPreservesBackTarget() { assertEquals("git",NavigationState().openProject("one").tool("git").settings().settings().back()!!.route) }
+    @Test fun releaseNotificationSelectsAabSubtab() {
+        assertEquals(1,NavigationState.notificationBuildTab(true,false))
+        assertEquals(0,NavigationState.notificationBuildTab(false,true))
+        assertEquals(1,NavigationState.notificationBuildTab(true,true))
+        assertNull(NavigationState.notificationBuildTab(false,false))
+    }
     @Test fun recreationDoesNotReplayNotificationNavigation() { assertEquals("",NavigationState.notificationTarget("owned",true));assertEquals("owned",NavigationState.notificationTarget("owned",false)) }
 }
