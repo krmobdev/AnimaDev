@@ -70,3 +70,7 @@ Open Settings → Appearance → Language to choose System default, Russian or E
 
 ## Data safety
 Do not delete Termux or Git directories to clear app cache. AnimaDev cache cleaning does not remove sources, job journals, SQLite, keystores or saved credentials.
+
+## AnimaBridge service controls (dev.48)
+
+The **Termux → AnimaBridge** card offers Check, Start, Stop and Restart for the already-registered `animabridge` runit service. Register it once using the Termux setup guide and stop any manually launched agent before using Start. AnimaDev calls the fixed `sv` program via Termux RUN_COMMAND, not the Python agent path; no pairing secrets are copied into the app.
