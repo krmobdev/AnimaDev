@@ -1,5 +1,13 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-26 11:00 GMT+03:00 · 0.4.0-beta.10-dev.48 (63; QA 64)
+- RU: На экране Termux появилась карточка AnimaBridge: проверка состояния зарегистрированной службы runit и явные кнопки «Запустить», «Остановить», «Перезапустить». Команды отправляются через официальный Termux RUN_COMMAND с фиксированным путём к sv и неизменяемым именем службы.
+- RU: Перед запуском требуется подтверждённое состояние DOWN. Результат возвращается через одноразовый callback с ID запроса; после команд выполняется независимая проверка sv status. При неизвестном результате нельзя повторять запуск без проверки. Shizuku остаётся отдельной системной диагностикой.
+- RU: Подготовлен одноразовый установщик службы scripts/install_animabridge_service.sh — регистрирует службу изначально остановленной, не завершает текущий агент и не раскрывает секреты. Обновлённые справки встроены в APK.
+- EN: Termux screen now controls the fixed registered AnimaBridge runit service using explicit Status / Start / Stop / Restart buttons through Termux RUN_COMMAND; no agent directory paths enter the Android app.
+- EN: A request-bound one-shot callback and post-action status check prevent blind retries. Registration script starts the service DOWN and does not disturb an existing manual agent; Shizuku remains independent.
+
+
 ## 2026-10-13 · 0.4.0-beta.10-dev.46 (60)
 - RU: Исправлен GitHub-first выбор ветки: после обновления origin доступны ветки, существующие только на GitHub. Termux проверяет текущую чистоту дерева, SHA локальной/удалённой ссылки и серверный SHA, создаёт отслеживающую ветку или обновляет отстающую строго через fast-forward.
 - RU: Разошедшиеся истории, локальные ветки без origin, изменившийся GitHub SHA и незакоммиченные файлы блокируются с понятной причиной. Никаких force, reset, clean, удалений или push.
