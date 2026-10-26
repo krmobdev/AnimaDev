@@ -18,6 +18,7 @@
 | Jobs / Задания | Время, этап, журнал, восстановление по ID, запрос статуса и поддерживаемая отмена Ctrl+C |
 | History / История | Старые задания и журнал отдельно от рабочего экрана |
 | Termux | Диагностика Git, Python, Java, SDK; встроенное руководство по установке компонентов |
+| AnimaBridge service | Управление зарегистрированной службой runit: Status / Start / Stop / Restart через Termux RUN_COMMAND; независимый от расположения агента интерфейс |
 | Shizuku | Прямое подключение к уже работающей службе через Binder, запрос разрешения, состояние и UID; без зависимости от ADB/Render |
 | Files / Файлы | Выбранная папка в основной памяти или стандартные Downloads; очистка только временного кэша AnimaDev |
 | Help / Справка | Локальная документация, история изменений и сведения о версии |
@@ -91,3 +92,7 @@ The guides and change log are bundled offline into the APK from these **same Git
 Real Android UI/device acceptance requires on-device tests, not just successful compilation.
 
 For older stage reports and design notes, see the [docs/](docs/) directory. Old beta constraints are historical and superseded by the current `AGENTS.md` owner authorization.
+
+## AnimaBridge service (experimental dev.48)
+
+The Termux page has an **AnimaBridge** service card. First install `termux-services` and register the runit service using [scripts/install_animabridge_service.sh](scripts/install_animabridge_service.sh), following [docs/TERMUX_SETUP.md](docs/TERMUX_SETUP.md). The service is initially **down**: the running manual 3.5 agent is not stopped or duplicated. Once a manual agent is stopped, the app can start it via the registered service. The app never stores the agent's filesystem path or pairing secret; it invokes only fixed `sv status/up/down/restart` operations through Termux RUN_COMMAND. Shizuku is a separate Binder connection and cannot open Termux-private files.
