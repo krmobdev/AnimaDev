@@ -35,3 +35,14 @@ Allow RUN_COMMAND in Termux and grant the requested Android permission. In the a
 
 ## 5. Security
 Keep JKS, passwords and SSH private keys out of shared Downloads. Do not blindly execute untrusted repository scripts. This guide does not change repositories or install anything automatically.
+
+## AnimaBridge runit service (dev.48)
+
+AnimaDev controls only a named, pre-registered `animabridge` runit service through the authorized Termux RUN_COMMAND integration, not through Shizuku's shell UID.
+
+1. In Termux, install `pkg install termux-services`, then open a fresh Termux session so `runsvdir` starts.
+2. From the AnimaDev source checkout run `bash scripts/install_animabridge_service.sh ~/anima-workspace/AnimaBridge-3.5` once. The script creates a stable `~/.local/share/animabridge/active` link and a service initially **DOWN**. It does not stop an existing manually running agent.
+3. Stop the manually started agent yourself with Ctrl+C before adopting the service. In AnimaDev → Termux → AnimaBridge, tap Check, then Start.
+4. Stop and Restart require a verified running state. An unconfirmed callback or timeout requires a new Check before any further action. Changing the actual agent location only changes the Termux-side `active` link.
+
+No device pairing secrets, Termux-private files or arbitrary executable paths are exposed to AnimaDev or Shizuku. A runit process state is not equivalent to proof of a healthy Render connection.
