@@ -2,6 +2,8 @@
 
 ## 2026-10-27 13:45 UTC+03:00 · 0.4.0-beta.10-dev.51 (69; QA 70)
 - RU: Исправлена причина выключенного автозапуска AnimaBridge: регистрационный флаг runit/down оставался после sv up и sv restart, и диспетчер повторно не поднимал агента. «Запустить» разрешает постоянный автозапуск только после подтверждения реального Python-процесса, «Остановить» сохраняет отключение автозапуска.
+- RU: Регрессионная проверка точного регулярного выражения PID предотвращает ложную ошибку распознавания запущенного агента.
+- EN: Regression coverage confirms the Python PID-matching regular expression used by the service controller.
 - RU: В интерфейсе отдельно видно состояние «Работает, автозапуск отключён». «Перезапустить» допускается из остановленного состояния, при перезапуске проверяется смена PID, а успешная команда sv больше не равняется доказательству связи с сервером.
 - EN: Fix runit persistent service startup: the registration down flag formerly survived up/restart. Explicit Start enables autostart only after verifying a live Python process; Stop disables autostart persistently; Restart verifies a new PID.
 - EN: Show running-with-autostart-disabled separately. A running local Python process does not prove a connected remote AnimaBridge session. The live agent was not restarted for this source change.

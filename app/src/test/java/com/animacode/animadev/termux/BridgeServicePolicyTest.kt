@@ -7,6 +7,7 @@ class BridgeServicePolicyTest {
     @Test fun controlScriptPersistsExplicitServicePreference() {
         val script = BridgeServicePolicy.CONTROL_SCRIPT
         assertTrue(script.contains("DOWN_FLAG = SERVICE + \"/down\""))
+        assertTrue(script.contains("""re.search(r"\(pid (\d+)\)", output)"""))
         assertTrue(script.contains("with open(DOWN_FLAG, \"a\")"))
         assertTrue(script.contains("os.unlink(DOWN_FLAG)"))
         assertTrue(script.contains("agent_pid(state.stdout)"))

@@ -34,7 +34,7 @@ object BridgeServicePolicy {
         def status():
             return call([SV, "status", SERVICE])
         def agent_pid(output):
-            match = re.search(r"\\(pid (\\d+)\\)", output) if output.startswith("run: ") else None
+            match = re.search(r"\(pid (\d+)\)", output) if output.startswith("run: ") else None
             if not match:
                 return None
             pid = match.group(1)
