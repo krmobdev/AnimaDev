@@ -36,4 +36,11 @@
     <string name="bridge_add_another_widget">Добавить ещё один виджет</string>
     <string name="bridge_widget_count">Установлено виджетов: %1$d</string>
     <string name="bridge_widget_manual_hint">Рабочий стол → Виджеты → AnimaDev → AnimaBridge. Лаунчер не поддерживает добавление одним нажатием.</string>
+
+    <string name="bridge_widget_compact_name">AnimaBridge · Компактный</string>
+    <string name="bridge_widget_full_name">AnimaBridge · Панель</string>
+    <string name="bridge_widget_compact_description">Статус агента и быстрые кнопки. 4×2.</string>
+    <string name="bridge_widget_full_description">Агент, автозапуск, локальная проверка, управление. 4×3.</string>
+    <string name="bridge_widget_server_short">Связь не проверена</string>
+    <string name="bridge_widget_checked_short">Проверка</string>
 </resources>

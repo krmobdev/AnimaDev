@@ -1,5 +1,11 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-27 · 0.4.0-beta.10-dev.56 (79; QA 80)
+- RU: Цветное содержимое виджетов больше не обрезается при 4×3: компактный и полный варианты стали раздельными системными виджетами с явными фиксированными компоновками, без угадывания размера по OPTION_APPWIDGET_MIN_HEIGHT и прозрачных пустот.
+- RU: Добавлены собственные PNG-превью для списка виджетов ColorOS, названия/описания и две кнопки добавления из AnimaDev. Наличие агента/статус берутся из общего BridgeServiceStore; открытие приложения не запускает копию.
+- EN: Separate compact 4×2 and full 4×3 providers, tight fill-height layouts, bitmap picker previews, two add-widget actions, synchronized statuses. No change to runit service control.
+
+
 ## 2026-10-27 · Документация для открытого репозитория / Open-source documentation (без изменений APK)
 - RU: README, отдельные инструкции самостоятельной сборки и лицензия 0BSD добавлены для публичных пользователей. Руководства пользователя и Termux перестроены по сценариям, устаревшие пометки dev.41–55 убраны из начала инструкций, исторические изменения остаются в этом журнале.
 - EN: Added newcomer README/build guides and 0BSD licensing; reorganized RU/EN user and Termux setup guides by workflow rather than historical dev milestones. Application code and Android version remain at dev.55; no official APK release.

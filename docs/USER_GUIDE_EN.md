@@ -38,6 +38,8 @@ Each project's main tools are **Git**, **Tests**, **Build** and **History**. Exp
 
 **Files.** Choose an authorized device-storage folder or Downloads. Clearing AnimaDev's temporary cache is not intended to delete your Git repositories, Termux history, signing keys or SDK.
 
+Widget picker now offers separate **AnimaBridge Compact (4×2)** and **AnimaBridge Dashboard (4×3)** with visible previews and independent sizing. The older AnimaBridge widget becomes compact after app update; add Dashboard separately for autostart/server details and four commands.
+
 ## 4. AnimaBridge — optional agent control
 
 AnimaDev **does not bundle or install AnimaBridge Agent**. The agent must be installed separately and registered with Termux `termux-services` before the app can manage its `animabridge` service (see [Termux setup](TERMUX_SETUP_EN.md)).

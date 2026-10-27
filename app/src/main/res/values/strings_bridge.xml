@@ -36,4 +36,11 @@
     <string name="bridge_add_another_widget">Add another home widget</string>
     <string name="bridge_widget_count">Widgets installed: %1$d</string>
     <string name="bridge_widget_manual_hint">Home screen → Widgets → AnimaDev → AnimaBridge (launcher does not support one-tap pinning).</string>
+
+    <string name="bridge_widget_compact_name">AnimaBridge · Compact</string>
+    <string name="bridge_widget_full_name">AnimaBridge · Dashboard</string>
+    <string name="bridge_widget_compact_description">Agent status and quick controls. 4×2.</string>
+    <string name="bridge_widget_full_description">Agent, autostart, local status and controls. 4×3.</string>
+    <string name="bridge_widget_server_short">Link not verified</string>
+    <string name="bridge_widget_checked_short">Checked</string>
 </resources>

@@ -43,28 +43,35 @@ class SingleActivityWidgetTest(unittest.TestCase):
         self.assertIn("Intent(context, MainActivity::class.java).apply {", widget)
         self.assertIn("PendingIntent.FLAG_IMMUTABLE", widget)
 
-    def test_widget_card_wraps_content_inside_transparent_host(self):
-        for size in ("large", "medium", "compact"):
-            file = RES / f"layout/bridge_widget_{size}.xml"
-            root = ET.parse(file).getroot()
+    def test_widget_layouts_fill_hosts_without_clipping_or_transparent_gap(self):
+        for size, rows, buttons in (("compact", 2, 3), ("large", 3, 4)):
+            root = ET.parse(RES / f"layout/bridge_widget_{size}.xml").getroot()
             with self.subTest(size=size):
-                self.assertEqual(root.tag, "FrameLayout")
+                self.assertEqual(root.tag, "LinearLayout")
                 self.assertEqual(root.attrib.get(NS + "layout_height"), "match_parent")
-                self.assertNotIn(NS + "background", root.attrib)
-                card = list(root)[0]
-                self.assertEqual(card.tag, "LinearLayout")
-                self.assertEqual(card.attrib.get(NS + "layout_height"), "wrap_content")
-                self.assertEqual(card.attrib.get(NS + "gravity"), "top")
-                self.assertEqual(card.attrib.get(NS + "layout_gravity"), "top")
-                self.assertEqual(
-                    card.attrib.get(NS + "background"), "@drawable/bridge_widget_background"
-                )
+                self.assertEqual(root.attrib.get(NS + "background"), "@drawable/bridge_widget_background")
+                self.assertEqual(root.attrib.get(NS + "gravity"), "center_vertical")
+                text = (RES / f"layout/bridge_widget_{size}.xml").read_text()
+                self.assertEqual(text.count("android:layout_height=\"36dp\""), buttons)
+                self.assertIn("@+id/bridge_widget_checked", text)
 
-    def test_home_widget_targets_three_rows_and_stays_resizable(self):
-        root = ET.parse(RES / "xml/bridge_widget_info.xml").getroot()
-        self.assertEqual(root.attrib.get(NS + "targetCellWidth"), "4")
-        self.assertEqual(root.attrib.get(NS + "targetCellHeight"), "3")
-        self.assertEqual(root.attrib.get(NS + "resizeMode"), "horizontal|vertical")
+    def test_two_widget_sizes_have_static_picker_previews(self):
+        app = ET.parse(MANIFEST).getroot().find("application")
+        receivers = [r.attrib.get(NS + "name") for r in app.findall("receiver")]
+        for name in (".termux.BridgeWidgetProvider", ".termux.BridgeFullWidgetProvider"):
+            self.assertIn(name, receivers)
+        for name, height in (("bridge_widget_info", "2"), ("bridge_widget_full_info", "3")):
+            root = ET.parse(RES / f"xml/{name}.xml").getroot()
+            self.assertEqual(root.attrib.get(NS + "targetCellWidth"), "4")
+            self.assertEqual(root.attrib.get(NS + "targetCellHeight"), height)
+            self.assertEqual(root.attrib.get(NS + "resizeMode"), "horizontal|vertical")
+            resource = root.attrib.get(NS + "previewImage")
+            self.assertTrue(resource)
+            self.assertTrue((RES / ("drawable/" + resource.split("/")[-1] + ".png")).is_file())
+        source = (JAVA / "termux/BridgeWidgetProvider.kt").read_text(encoding="utf-8")
+        self.assertIn("BridgeFullWidgetProvider", source)
+        self.assertIn("layoutForProvider(full: Boolean)", source)
+        self.assertNotIn("OPTION_APPWIDGET_MIN_HEIGHT", source)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.animacode.animadev.termux.BridgeTilePresence
 import com.animacode.animadev.termux.BridgeWidgetProvider
+import com.animacode.animadev.termux.BridgeFullWidgetProvider
 import com.animacode.animadev.termux.BridgeServiceGateway
 import com.animacode.animadev.termux.BridgeServicePolicy
 import com.animacode.animadev.termux.BridgeServiceStore
@@ -39,6 +40,8 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
         tileAdded = BridgeTilePresence.isAdded(context)
         widgetCount = widgetManager.getAppWidgetIds(
             ComponentName(context, BridgeWidgetProvider::class.java),
+        ).size + widgetManager.getAppWidgetIds(
+            ComponentName(context, BridgeFullWidgetProvider::class.java),
         ).size
         pinSupported = widgetManager.isRequestPinAppWidgetSupported
     }
@@ -167,34 +170,38 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Button(
-                enabled = pinSupported,
-                onClick = {
-                    try {
-                        val accepted = widgetManager.requestPinAppWidget(
-                            ComponentName(context, BridgeWidgetProvider::class.java),
-                            null, null,
-                        )
-                        if (!accepted)
-                            installNote = context.getString(R.string.bridge_widget_manual_hint)
-                        else installNote = ""
-                    } catch (_: RuntimeException) {
-                        installNote = context.getString(R.string.bridge_widget_manual_hint)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2B5942),
-                    contentColor = Color(0xFFC5FFDC),
-                ),
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    "＋ " + context.getString(
-                        if (widgetCount > 0) R.string.bridge_add_another_widget
-                        else R.string.bridge_pin_widget,
-                    ),
-                    style = MaterialTheme.typography.titleSmall,
-                )
+                listOf(
+                    BridgeWidgetProvider::class.java to R.string.bridge_widget_compact_name,
+                    BridgeFullWidgetProvider::class.java to R.string.bridge_widget_full_name,
+                ).forEach { (providerClass, titleId) ->
+                    Button(
+                        enabled = pinSupported,
+                        onClick = {
+                            try {
+                                val accepted = widgetManager.requestPinAppWidget(
+                                    ComponentName(context, providerClass), null, null,
+                                )
+                                installNote = if (accepted) ""
+                                    else context.getString(R.string.bridge_widget_manual_hint)
+                            } catch (_: RuntimeException) {
+                                installNote = context.getString(R.string.bridge_widget_manual_hint)
+                            }
+                        },
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2B5942),
+                            contentColor = Color(0xFFC5FFDC),
+                        ),
+                    ) {
+                        Text("+ " + context.getString(titleId), maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                }
             }
             if (widgetCount > 0) {
                 Text(

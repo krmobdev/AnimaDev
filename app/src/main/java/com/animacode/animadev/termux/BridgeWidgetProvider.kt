@@ -16,7 +16,7 @@ import java.text.DateFormat
 import java.util.Date
 
 /** Modern resize-aware launcher widget. One gateway for app, tile, and widget. */
-class BridgeWidgetProvider : AppWidgetProvider() {
+open class BridgeWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         ids.forEach { render(context, manager, it) }
         BridgeSurfaceSync.checkIfStale(context)
@@ -45,16 +45,16 @@ class BridgeWidgetProvider : AppWidgetProvider() {
         private const val AMBER = 0xFFFFCE87.toInt()
         private const val GRAY = 0xFF8DA99A.toInt()
 
-        internal fun layoutForSize(width: Int, height: Int): Int = when {
-            width in 1..229 -> R.layout.bridge_widget_compact
-            height >= 215 -> R.layout.bridge_widget_large
-            else -> R.layout.bridge_widget_medium
-        }
+        // Two independent widget entries: each has its own fixed, tested cell geometry.
+        // Never guess "full" from ColorOS' reported minHeight; that caused clipping.
+        internal fun layoutForProvider(full: Boolean): Int =
+            if (full) R.layout.bridge_widget_large else R.layout.bridge_widget_compact
 
         fun renderAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, BridgeWidgetProvider::class.java))
-            ids.forEach { render(context, manager, it) }
+            val fullIds = manager.getAppWidgetIds(ComponentName(context, BridgeFullWidgetProvider::class.java))
+            (ids + fullIds).distinct().forEach { render(context, manager, it) }
         }
 
         private fun render(context: Context, manager: AppWidgetManager, id: Int) {
@@ -62,13 +62,11 @@ class BridgeWidgetProvider : AppWidgetProvider() {
             val pending = record.phase == "REQUESTED"
             val active = record.serviceState in setOf("running", "ephemeral")
             val stopped = record.serviceState in setOf("stopped", "supervisor_off")
-            val opts = manager.getAppWidgetOptions(id)
-            val layout = layoutForSize(
-                opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0),
-                opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0),
-            )
-            val compact = layout == R.layout.bridge_widget_compact
-            val expanded = layout == R.layout.bridge_widget_large
+            val isFull = manager.getAppWidgetInfo(id)?.provider?.className ==
+                BridgeFullWidgetProvider::class.java.name
+            val layout = layoutForProvider(isFull)
+            val compact = !isFull
+            val expanded = isFull
             val views = RemoteViews(context.packageName, layout)
             val state = when {
                 pending -> R.string.bridge_checking
@@ -92,7 +90,7 @@ class BridgeWidgetProvider : AppWidgetProvider() {
             views.setTextColor(R.id.bridge_widget_pill, accent)
             views.setTextColor(R.id.bridge_widget_dot, accent)
 
-            if (!compact) {
+            if (true) {
                 val checked = if (record.action == "status" && record.phase == "DONE" &&
                     record.requestedAt > 0
                 ) DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(record.requestedAt))
@@ -111,7 +109,7 @@ class BridgeWidgetProvider : AppWidgetProvider() {
                     R.id.bridge_widget_feedback,
                     if (record.phase == "ERROR" || record.phase == "UNKNOWN")
                         record.message.take(60)
-                    else context.getString(R.string.bridge_server_unverified),
+                    else context.getString(R.string.bridge_widget_server_short),
                 )
             }
             bind(context, views, id, R.id.bridge_widget_start, R.id.bridge_widget_start_bg,
@@ -120,7 +118,7 @@ class BridgeWidgetProvider : AppWidgetProvider() {
             bind(context, views, id, R.id.bridge_widget_stop, R.id.bridge_widget_stop_bg,
                 R.id.bridge_widget_stop_text, "down",
                 BridgeServicePolicy.permits("down", record.serviceState, pending) && active, false)
-            if (!compact) bind(context, views, id, R.id.bridge_widget_check,
+            bind(context, views, id, R.id.bridge_widget_check,
                 R.id.bridge_widget_check_bg, R.id.bridge_widget_check_text, "status", !pending, false)
             if (expanded) bind(context, views, id, R.id.bridge_widget_restart,
                 R.id.bridge_widget_restart_bg, R.id.bridge_widget_restart_text, "restart",
@@ -162,7 +160,11 @@ class BridgeWidgetProvider : AppWidgetProvider() {
                 command == "down" -> 0xFFFFDBD4.toInt()
                 else -> Color.WHITE
             })
-            val intent = Intent(context, BridgeWidgetProvider::class.java).apply {
+            val info = AppWidgetManager.getInstance(context).getAppWidgetInfo(id)
+            val isFull = info?.provider?.className == BridgeFullWidgetProvider::class.java.name
+            val target = if (isFull) BridgeFullWidgetProvider::class.java
+                else BridgeWidgetProvider::class.java
+            val intent = Intent(context, target).apply {
                 action = ACTION
                 data = Uri.parse("animadev://widget/$id/$command")
                 putExtra(EXTRA, command)
@@ -176,3 +178,6 @@ class BridgeWidgetProvider : AppWidgetProvider() {
         }
     }
 }
+
+/** Large widget is independently selectable in Android's widget picker. */
+class BridgeFullWidgetProvider : BridgeWidgetProvider()
