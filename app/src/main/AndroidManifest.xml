@@ -34,5 +34,23 @@
         <receiver android:name=".projects.BranchSwitchReceiver" android:exported="false" />
         <receiver android:name=".termux.ProbeResultReceiver" android:exported="false" />
         <receiver android:name=".termux.BridgeServiceResultReceiver" android:exported="false" />
+        <service android:name=".termux.BridgeQuickTileService"
+            android:exported="true" android:label="@string/bridge_tile_label"
+            android:icon="@drawable/ic_bridge_tile"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE"/>
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true" />
+        </service>
+        <receiver android:name=".termux.BridgeWidgetProvider" android:exported="false"
+            android:label="@string/bridge_widget_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/bridge_widget_info" />
+        </receiver>
     </application>
 </manifest>

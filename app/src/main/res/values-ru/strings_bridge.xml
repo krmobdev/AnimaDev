@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bridge_tile_label">AnimaBridge</string>
+    <string name="bridge_widget_title">AnimaBridge</string>
+    <string name="bridge_local_running">Процесс Python запущен</string>
+    <string name="bridge_autostart_off">Работает · автозапуск выкл.</string>
+    <string name="bridge_stopped">Служба остановлена</string>
+    <string name="bridge_supervisor_off">Runit не запущен</string>
+    <string name="bridge_conflict">Конфликт агентов</string>
+    <string name="bridge_unknown">Неизвестно</string>
+    <string name="bridge_checking">Проверка…</string>
+    <string name="bridge_server_unverified">Сервер: связь не проверена</string>
+    <string name="bridge_autostart_label">Автозапуск</string>
+    <string name="bridge_checked_label">Проверено</string>
+    <string name="bridge_enabled">Вкл.</string>
+    <string name="bridge_disabled">Выкл.</string>
+    <string name="bridge_start">Запустить</string>
+    <string name="bridge_stop">Остановить</string>
+    <string name="bridge_restart">Рестарт</string>
+    <string name="bridge_check">Проверить</string>
+    <string name="bridge_add_tile">Добавить в шторку</string>
+    <string name="bridge_add_widget_hint">Рабочий стол: Виджеты → AnimaBridge</string>
+</resources>

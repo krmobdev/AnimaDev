@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bridge_tile_label">AnimaBridge</string>
+    <string name="bridge_widget_title">AnimaBridge</string>
+    <string name="bridge_local_running">Python running</string>
+    <string name="bridge_autostart_off">Running · autostart off</string>
+    <string name="bridge_stopped">Stopped</string>
+    <string name="bridge_supervisor_off">Runit not running</string>
+    <string name="bridge_conflict">Agent conflict</string>
+    <string name="bridge_unknown">Unknown</string>
+    <string name="bridge_checking">Checking…</string>
+    <string name="bridge_server_unverified">Server: not verified</string>
+    <string name="bridge_autostart_label">Autostart</string>
+    <string name="bridge_checked_label">Checked</string>
+    <string name="bridge_enabled">On</string>
+    <string name="bridge_disabled">Off</string>
+    <string name="bridge_start">Start</string>
+    <string name="bridge_stop">Stop</string>
+    <string name="bridge_restart">Restart</string>
+    <string name="bridge_check">Check</string>
+    <string name="bridge_add_tile">Add to Quick Settings</string>
+    <string name="bridge_add_widget_hint">Home screen: Widgets → AnimaBridge</string>
+</resources>

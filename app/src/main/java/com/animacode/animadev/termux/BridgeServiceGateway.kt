@@ -222,7 +222,7 @@ class BridgeServiceGateway(private val context: Context) {
             putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "AnimaDev · AnimaBridge $action")
             putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", callback)
         }
-        return try {
+        val dispatched = try {
             if (context.startService(command) == null) {
                 callback.cancel()
                 store.write(next.copy(phase = "ERROR", message = "Termux command service is not available."))
@@ -238,5 +238,7 @@ class BridgeServiceGateway(private val context: Context) {
                 }))
             false
         }
+        BridgeSurfaceSync.publish(context)
+        return dispatched
     }
 }

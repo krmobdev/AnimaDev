@@ -17,6 +17,7 @@ class BridgeServiceResultReceiver : BroadcastReceiver() {
         if (b == null) {
             store.write(current.copy(phase = "ERROR", serviceState = "unknown",
                 message = "Termux returned no result."))
+            BridgeSurfaceSync.publish(context)
             return
         }
         val stdout = b.getString("stdout", "") ?: ""
@@ -44,5 +45,6 @@ class BridgeServiceResultReceiver : BroadcastReceiver() {
                 else -> "Runit action verified; checking current service status. Server connection must be checked separately."
             }
         ))
+        BridgeSurfaceSync.publish(context)
     }
 }

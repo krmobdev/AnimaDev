@@ -1,6 +1,11 @@
 package com.animacode.animadev.projects
 
 import android.content.Context
+import android.app.StatusBarManager
+import android.content.ComponentName
+import android.graphics.drawable.Icon
+import com.animacode.animadev.R
+import com.animacode.animadev.termux.BridgeQuickTileService
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -87,6 +92,27 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
                     enabled = termuxReady && BridgeServicePolicy.permits("restart", record.serviceState, pending),
                 ) { Text(if (english) "Restart" else "Перезапустить", maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
+            OutlinedButton(
+                onClick = {
+                    try {
+                        context.getSystemService(StatusBarManager::class.java)
+                            ?.requestAddTileService(
+                                ComponentName(context, BridgeQuickTileService::class.java),
+                                context.getString(R.string.bridge_tile_label),
+                                Icon.createWithResource(context, R.drawable.ic_bridge_tile),
+                                context.mainExecutor,
+                            ) { }
+                    } catch (_: RuntimeException) {
+                        // System tile picker may be unavailable on customized Android ROMs.
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(context.getString(R.string.bridge_add_tile)) }
+            Text(
+                context.getString(R.string.bridge_add_widget_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             if (record.message.isNotEmpty()) {
                 Text(record.message, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
