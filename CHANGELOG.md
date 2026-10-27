@@ -1,5 +1,10 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-27 · 0.4.0-beta.10-dev.58 (83; QA 84)
+- RU: Кнопки добавления виджетов в AnimaBridge больше не обрезаются в две одинаковые «+ AnimaBrid…». Два действия отображаются во всю ширину с конкретными названиями: «+ Быстрый виджет · 4×2» и «+ Полный виджет · 4×3». Выбор провайдеров и поведение подтверждения сохранены.
+- EN: Full-width, unambiguous Quick widget 4×2 and Full widget 4×3 add actions instead of two truncated identical labels.
+
+
 ## 2026-10-27 · 0.4.0-beta.10-dev.57 (81; QA 82)
 - RU: На ColorOS переразмерены оба виджета: полный пульт умещается в доступную высоту 4×3, кнопки не обрезаются, фон заполняет весь слот без прозрачной пустоты. Для компактного 4×2 добавлены автозапуск и честная пометка, что серверная связь не проверена. В выборе виджетов приоритет отдан настоящим PNG-превью вместо пустого RemoteViews-preview.
 - EN: Tighten both widget layouts for ColorOS 4×2 / 4×3 cells, show autostart and explicitly unverified server state in Compact, prefer bundled PNG picker thumbnails over placeholder previewLayout; add regressions. No agent service changes.

@@ -45,4 +45,6 @@
     <string name="bridge_widget_checked_short">Проверка</string>
     <string name="bridge_widget_compact_summary_placeholder">Авто: ? · Сервер: не проверен</string>
     <string name="bridge_widget_compact_summary">Авто: %1$s · Сервер: не проверен</string>
+    <string name="bridge_widget_add_compact">+ Быстрый виджет · 4×2</string>
+    <string name="bridge_widget_add_full">+ Полный виджет · 4×3</string>
 </resources>

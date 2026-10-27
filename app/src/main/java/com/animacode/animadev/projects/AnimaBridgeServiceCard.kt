@@ -171,13 +171,15 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
                 )
             }
 
-            Row(
+            // Each action identifies widget purpose and grid size.
+            // Two full-width buttons avoid duplicate truncated titles.
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 listOf(
-                    BridgeWidgetProvider::class.java to R.string.bridge_widget_compact_name,
-                    BridgeFullWidgetProvider::class.java to R.string.bridge_widget_full_name,
+                    BridgeWidgetProvider::class.java to R.string.bridge_widget_add_compact,
+                    BridgeFullWidgetProvider::class.java to R.string.bridge_widget_add_full,
                 ).forEach { (providerClass, titleId) ->
                     Button(
                         enabled = pinSupported,
@@ -192,13 +194,13 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
                                 installNote = context.getString(R.string.bridge_widget_manual_hint)
                             }
                         },
-                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF2B5942),
                             contentColor = Color(0xFFC5FFDC),
                         ),
                     ) {
-                        Text("+ " + context.getString(titleId), maxLines = 1,
+                        Text(context.getString(titleId), maxLines = 1,
                             overflow = TextOverflow.Ellipsis)
                     }
                 }

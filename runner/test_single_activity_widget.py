@@ -62,6 +62,25 @@ class SingleActivityWidgetTest(unittest.TestCase):
                     self.assertIn("android:padding=\"5dp\"", text)
 
 
+    def test_widget_add_buttons_have_clear_size_labels_without_half_width_ellipsis(self):
+        card = (JAVA / "projects/AnimaBridgeServiceCard.kt").read_text(encoding="utf-8")
+        self.assertIn("R.string.bridge_widget_add_compact", card)
+        self.assertIn("R.string.bridge_widget_add_full", card)
+        block = card.split("R.string.bridge_widget_add_compact")[1].split(
+            "if (widgetCount > 0)")[0]
+        self.assertIn("Modifier.fillMaxWidth().heightIn(min = 52.dp)", block)
+        self.assertNotIn("Modifier.weight(1f)", block)
+        for loc in ("values", "values-ru"):
+            content = (RES / loc / "strings_bridge.xml").read_text(encoding="utf-8")
+            for suffix, size in (("compact", "4×2"), ("full", "4×3")):
+                label = re.search(
+                    r'<string name="bridge_widget_add_' + suffix + r'">(.*?)</string>',
+                    content,
+                )
+                self.assertIsNotNone(label, (loc, suffix))
+                self.assertIn(size, label.group(1))
+                self.assertNotIn("AnimaBridge", label.group(1))
+
     def test_two_widget_sizes_have_static_picker_previews(self):
         app = ET.parse(MANIFEST).getroot().find("application")
         receivers = [r.attrib.get(NS + "name") for r in app.findall("receiver")]

@@ -45,4 +45,6 @@
     <string name="bridge_widget_checked_short">Checked</string>
     <string name="bridge_widget_compact_summary_placeholder">Auto: ? · Server: unchecked</string>
     <string name="bridge_widget_compact_summary">Auto: %1$s · Server: unchecked</string>
+    <string name="bridge_widget_add_compact">+ Quick widget · 4×2</string>
+    <string name="bridge_widget_add_full">+ Full widget · 4×3</string>
 </resources>
