@@ -1,112 +1,70 @@
-# AnimaDev · 0.4.0-beta.10-dev.47
+# AnimaDev
 
-AnimaBridge dev.55: compact launcher widgets with wrap-content panels and a single reusable MainActivity task (widget + notifications). Back no longer reveals duplicated AnimaDev activities.
+[English](README_EN.md) · [Сборка из исходников](docs/BUILD_FROM_SOURCE.md) · [Лицензия 0BSD](LICENSE) · [Изменения](CHANGELOG.md)
 
-AnimaBridge dev.54: clear Quick Settings installation state and one-tap Home widget pinning when the launcher supports it.
+**AnimaDev** — Android-приложение для управления Git-проектами, Gradle-сборками и тестами прямо на телефоне через **Termux**. Можно проверять ветки GitHub, запускать разрешённые сборки, читать журналы, собирать APK и AAB. Существующие исходники, ключи подписи и рабочие каталоги остаются в Termux.
 
-AnimaBridge dev.54: modern resize-adaptive emerald widget, styled action buttons, shared status refresh without app UI.
+**Состояние:** открытая бета `0.4.0-beta.10-dev.55` (Android 13+). Репозиторий публичный; готовые APK в GitHub Releases **пока не публикуются**. Приложение можно собрать самостоятельно. Работа функций на разных оболочках Android и устройствах требует проверки; успешная компиляция не означает полного тестирования на любом телефоне.
 
-AnimaBridge dev.53: quick-settings tile and resizable home-screen widget with Start/Stop/Restart/Check, common service state, and no claim that a local Python process proves server connectivity.
+## Что умеет
 
-AnimaBridge dev.52: Restart is disabled while stopped; Start is the only command that can start a stopped service. The controller also rejects stale restart requests.
+- **Проекты и Git:** обнаружение существующих локальных репозиториев, просмотр worktree, веток, статуса изменений, безопасные проверки и синхронизация без скрытого reset/force.
+- **Тесты и сборки:** Gradle/JUnit, Debug APK, подписанные Release APK и AAB при наличии вашего JKS; отчёты, идентификаторы заданий и журналы.
+- **Termux:** проверка окружения, управление заранее зарегистрированной службой AnimaBridge через `runit`.
+- **Быстрый доступ:** плитка в шторке Android и адаптивный виджет рабочего стола для службы AnimaBridge.
+- **Настройки:** русский/английский интерфейс, системная тема и дополнительные темы оформления.
 
-AnimaBridge dev.51: explicit Start enables **persistent runit autostart** after verifying Python health; Stop persistently disables it. The UI distinguishes normally-down supervision and running processes from confirmed remote connectivity.
+AnimaDev **не содержит сам AnimaBridge Agent**. Управление агентом, плитка и виджет относятся только к *отдельно установленной и зарегистрированной* службе. Без неё остальные инструменты AnimaDev продолжают работать. **Shizuku необязателен:** текущее подключение служит для проверки Binder/разрешений, а не для исполнения Termux-команд.
 
-AnimaBridge dev.50: **Start** now initializes the Termux runit supervisor through background RUN_COMMAND when needed; no manual Termux window is required. Shizuku is for system Binder access, not private Termux commands. Service health is checked against the actual Python process.
+## Что требуется
 
-**AnimaDev** — Android-приложение для тех, кто разрабатывает и собирает проекты **прямо на телефоне через Termux**. Оно объединяет Git и worktree, Gradle-тесты, сборку Debug APK и подписанных Release AAB, мониторинг задач, журналы и историю операций. Требуется Android 13+; интерфейс написан на Kotlin и Jetpack Compose.
+| Компонент | Для чего |
+| --- | --- |
+| Android **13 или новее** | Запуск приложения |
+| [Termux](https://github.com/termux/termux-app) + разрешение `RUN_COMMAND` | Выполнение Git/Gradle и интеграция с AnimaDev |
+| Git, Java **21**, Android SDK, Gradle-зависимости | Сборка Android-проектов |
+| Существующий локальный Git-проект | Для проектных функций |
+| [Shizuku](https://github.com/RikkaApps/Shizuku) | Только необязательная диагностика |
+| Отдельный AnimaBridge Agent + `termux-services` | Только для управления агентом/виджета/плитки |
 
-**English:** An Android 13+ companion for local Git, Gradle tests, APK/AAB builds and job history in Termux. No mandatory PC, VPS, AnimaBridge or GitHub API token is required by the installed app.
+**Сборка самой AnimaDev** требует JDK 21, Android SDK Platform **37**, Android Gradle Plugin **9.3.1**, Gradle wrapper **9.5.0** (скачивается wrapper), совместимых Maven-зависимостей и сети для первой загрузки.
 
-**Статус / Status:** `0.4.0-beta.10-dev.47`. Владелец подтвердил ручное тестирование приложения на устройстве 11.10.2026; автоматизированная UI-проверка Emerald ещё не завершена. Публичный GitHub Release с готовым APK пока не опубликован — см. [инструкцию по подготовке Termux](docs/TERMUX_SETUP.md) и раздел разработки ниже.
+## Быстрая сборка APK
 
-**dev.47 candidate (not installed or device-accepted):** GitHub-first branch enumeration now fetches every remote head even when the local fetch refspec is restricted, and pages origin branches before local-only branches. Existing worktree, local commits and job history remain untouched. / Кандидат dev.47: полный охват веток GitHub и приоритет origin при постраничной загрузке; установка и испытания на Android ожидаются.
-
-## Функционал / Features
-
-| Раздел / Area | Возможности / Capabilities |
-|---|---|
-| Projects / Проекты | Обнаружение существующих локальных Git-репозиториев и worktree, сохранение вкладок; просмотр ветки, SHA и состояния |
-| Git | Проверка origin / GitHub SHA, разрешённые операции и явная безопасная синхронизация fast-forward |
-| Tests / Тесты | Unit-тесты Gradle, Android instrumentation через разрешённый ADB, JUnit-отчёты |
-| Debug APK | Повторное выполнение Gradle задач с `--rerun-tasks`, проверка SHA-256 APK и установка через системный Android Package Installer / FileProvider |
-| Release AAB | Подпись через JKS с защищённой передачей, проверка артефакта, сохранение в выбранную папку |
-| Jobs / Задания | Время, этап, журнал, восстановление по ID, запрос статуса и поддерживаемая отмена Ctrl+C |
-| History / История | Старые задания и журнал отдельно от рабочего экрана |
-| Termux | Диагностика Git, Python, Java, SDK; встроенное руководство по установке компонентов |
-| Shizuku | Прямое подключение к уже работающей службе через Binder, запрос разрешения, состояние и UID; без зависимости от ADB/Render |
-| Files / Файлы | Выбранная папка в основной памяти или стандартные Downloads; очистка только временного кэша AnimaDev |
-| Help / Справка | Локальная документация, история изменений и сведения о версии |
-| Language / Язык | Русский, English и системный язык. Метки и диагностические сообщения локализованы, сырой вывод терминала сохраняется неизменным |
-
-## Быстрый старт / Quick start
-
-1. Install Termux from a trusted source, open it once and explicitly grant RUN_COMMAND integration. / Установите Termux, откройте и разрешите RUN_COMMAND.
-2. Open **Termux → Check environment**, read **Build setup guide** and verify Java, SDK and Git.
-3. Add an existing local Git repository under **Projects** (nothing is cloned automatically). / Добавьте локальный Git-репозиторий.
-4. In Git tools verify branch, origin and GitHub SHA before TEST/BUILD. / Сверьте GitHub SHA и чистоту дерева.
-5. Inspect Job ID and Journal during execution. **QUERY** does not start another job. / Проверяйте статус прежнего задания по ID.
-6. For Debug tap Build and open APK through the **native Android installer**. AAB is for publishing, not direct device installation.
-
-## Worktree overview / Рабочие каталоги
-
-**Main project tools come first.** The Worktrees section below the tools is collapsed by default; it shows the current branch/status and number of other worktrees. Tap **Show** to expand lazy-loaded entries, or **Hide** to collapse them again. The read-only Termux catalog discovers linked working directories. Each entry includes its branch, path, local HEAD, and uncommitted-file count when available. Tap another worktree for copyable path details; AnimaDev never switches to or mutates it implicitly. Refresh reads from Termux, **not live GitHub**. Compare the actual remote branch separately before claiming changes were pushed.
-
-## Git commit vs working tree / Коммиты и рабочие файлы
-
-Matching local and GitHub commit IDs confirms commit alignment **only**. A dirty working tree means tracked or untracked local file differences still exist. AnimaDev reports filenames and blocks unsafe fast-forward/checkout rather than silently resetting or committing user files. The Branches view lists cached local/origin references; refresh reads them from Termux without a network fetch. Git → Check updates verifies the current GitHub commit separately.
-
-## Emerald navigation / Навигация Emerald
-
-The new skin has no legacy three-dot overflow on the Projects or project tool screens. A dedicated gear action opens Settings, where Change log, Documentation and About are first-class cards. Back returns to the previous tool through Settings. The older Pulse skin remains unchanged.
-
-## Android UI testing / Проверка на устройстве
-
-Emerald Compose tests use a separate `-PanimadevDeviceFixture=true` package so the installed AnimaDev application and its data remain untouched. Pixel 7 was reachable via ADB; the 2026-10-11 run was inconclusive because its screen was dozing/locked, so all four tests reported no Compose hierarchy. Rerun with the device awake and unlocked; do not treat this as a successful UI test.
-
-## Два скина / Two skins
-
-- **Pulse / Material:** existing UI preserved. Stored settings, project data and results stay intact.
-- **Emerald Glass (opt-in):** graphite/emerald theme inspired by owner-approved mockups.
-  Implemented across Projects, project dashboard, root navigation, Build, Tests, History, Branches, Termux, Settings index and About. Live job monitoring, journal filtering/export and nested settings now use Emerald components. Adaptive narrow-screen layouts, large-font navigation/tabs and lightweight color transitions have been added. The owner has confirmed a manual on-device check; automated Emerald UI acceptance still requires a conclusive run in the isolated device-fixture package.
-- Switch using **Settings → Appearance → Emerald Glass**. Turning it off restores
-  your previous Pulse/Material style without resetting projects or jobs.
-- [Emerald Glass implementation checklist](docs/EMERALD_GLASS_ROADMAP.md).
-
-## Documentation / Документация
-
-- [Список изменений / Changelog](CHANGELOG.md) — newest entries at top, including date/time and version.
-- [Руководство пользователя / User guide (RU)](docs/USER_GUIDE.md)
-- [User Guide (EN)](docs/USER_GUIDE_EN.md)
-- [Подготовка Termux (RU)](docs/TERMUX_SETUP.md)
-- [Termux build setup (EN)](docs/TERMUX_SETUP_EN.md)
-- [Архитектура / Architecture](docs/architecture.md)
-- [План поставки / Delivery roadmap](docs/BUILD_DELIVERY_ROADMAP.md)
-
-The guides and change log are bundled offline into the APK from these **same GitHub files**, so editing a document in GitHub and rebuilding updates in-app help automatically.
-
-## Safety / Безопасность
-
-- No automatic push, force updates, destructive clean/reset, or implicit Git branch switch.
-- Never expose signing secrets or SSH keys in logs, Git or command arguments.
-- Run one Gradle job per protected build slot. UNKNOWN requires confirmation, not a duplicate START.
-- Cache clearing deletes only app-owned temporary copies and exports, never Termux, SDK, Gradle dependency cache, job SQLite or projects.
-- Installation uses a checksum-verified copy and Android's system Package Installer.
-- Project execution requires an explicitly supported and verified profile. Additional worktrees may be read-only.
-
-## Development / Разработка
-
-- `main` is the owner-approved baseline; ongoing integration work happens in `feature/termux-probe`. Do not merge further development changes without owner review.
-- Kotlin, Compose, AGP 9.3.1, Gradle 9.5.0, compileSdk 37, minSdk 33, Java 21 toolchain (bytecode 17).
-- Gradle (on an already prepared Termux instance):
+На компьютере с настроенным Android SDK и JDK 21:
 
 ```sh
-./gradlew :app:testDebugUnitTest :app:assembleDebug --offline --no-daemon --rerun-tasks --console=plain
+git clone https://github.com/krmobdev/AnimaDev.git
+cd AnimaDev
+./gradlew :app:assembleDebug --no-daemon --console=plain
 ```
 
-Real Android UI/device acceptance requires on-device tests, not just successful compilation.
+Готовый файл: `app/build/outputs/apk/debug/app-debug.apk`. В Windows используйте `gradlew.bat`. Это **отладочная APK**, подписанная ключом вашей сборочной среды, а не официальным ключом владельца; не рассчитывайте, что она установится поверх чужой сборки с другой подписью. Удаление приложения может стереть его локальные данные.
 
-For older stage reports and design notes, see the [docs/](docs/) directory. Old beta constraints are historical and superseded by the current `AGENTS.md` owner authorization.
+На самом телефоне сборка возможна в подготовленном Termux, но требует совместимого Android SDK и **Termux-версии AAPT2**. Подробности: **[сборка из исходников](docs/BUILD_FROM_SOURCE.md)** и **[подготовка Termux](docs/TERMUX_SETUP.md)**. Параметр `--offline` используйте лишь после загрузки зависимостей.
 
-### dev.49: signed Release APK and AnimaBridge control
-The dev branch carries original main history, the dev.48 Termux/runit AnimaBridge card and a third Build choice: signed Release APK alongside Debug APK and signed Release AAB. The APK pipeline uses offline assembleRelease, zipalign, apksigner signing and verification, package/version and SHA-256 verification, then export. Existing SAF/JKS credentials use the same encrypted transport as AAB. The app does not automatically publish releases or push Git commits.
+## Первое использование
+
+1. Установите совместимую собранную APK и Termux; откройте Termux хотя бы один раз.
+2. В настройках Termux разрешите `allow-external-apps=true`, а в системных настройках Android выдайте AnimaDev разрешение **RUN_COMMAND**. Подробные инструкции — [здесь](docs/TERMUX_SETUP.md).
+3. В AnimaDev откройте **Termux → Проверить** и убедитесь, что локальная команда действительно выполняется.
+4. Добавьте существующий Git-проект через **Проекты**, проверьте ветку и SHA.
+5. Только после проверки окружения используйте сборку и тесты. Статус задания `UNKNOWN` сначала уточняйте по тому же ID — не запускайте дубликат вслепую.
+
+Для быстрого управления *уже установленным* AnimaBridge: откройте **Termux → AnimaBridge → Добавить в шторку** или добавьте виджет Android. Локально запущенный Python **не гарантирует** связи агента с сервером. Не управляйте одновременно ручной и `runit`-копиями агента.
+
+## Документация
+
+- [Руководство пользователя (RU)](docs/USER_GUIDE.md) · [User Guide (EN)](docs/USER_GUIDE_EN.md)
+- [Сборка из исходников (RU)](docs/BUILD_FROM_SOURCE.md) · [Build from source (EN)](docs/BUILD_FROM_SOURCE_EN.md)
+- [Подготовка Termux (RU)](docs/TERMUX_SETUP.md) · [Termux setup (EN)](docs/TERMUX_SETUP_EN.md)
+- [Changelog](CHANGELOG.md) · [Архитектура](docs/architecture.md) · [Вклад в проект](CONTRIBUTING.md)
+- [Сторонние зависимости и лицензии](docs/THIRD_PARTY.md)
+
+## Публикация, лицензия и безопасность
+
+**Releases пока отсутствуют намеренно.** GitHub Actions для автоматической публикации APK также не настроены. Исходники и Gradle wrapper доступны; для собственной установки собирайте Debug APK, для распространения своей сборки используйте собственную подпись.
+
+**Лицензия проекта: [0BSD](LICENSE).** Собственный код можно использовать, изменять, копировать и распространять, в том числе коммерчески, **без обязательного указания автора**. На сторонние библиотеки, инструменты, иконки и шрифты распространяются **их собственные** лицензии — см. [THIRD_PARTY](docs/THIRD_PARTY.md). Не публикуйте свои SSH-ключи, JKS, пароли или приватные журналы.
+
+Разработка идёт в `dev`; одобренные изменения переводятся в `main`. Пожелания и ошибки можно оформлять через [GitHub Issues](https://github.com/krmobdev/AnimaDev/issues).
