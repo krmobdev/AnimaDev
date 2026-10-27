@@ -65,7 +65,6 @@ open class BridgeWidgetProvider : AppWidgetProvider() {
             val isFull = manager.getAppWidgetInfo(id)?.provider?.className ==
                 BridgeFullWidgetProvider::class.java.name
             val layout = layoutForProvider(isFull)
-            val compact = !isFull
             val expanded = isFull
             val views = RemoteViews(context.packageName, layout)
             val state = when {
@@ -90,14 +89,12 @@ open class BridgeWidgetProvider : AppWidgetProvider() {
             views.setTextColor(R.id.bridge_widget_pill, accent)
             views.setTextColor(R.id.bridge_widget_dot, accent)
 
-            if (true) {
-                val checked = if (record.action == "status" && record.phase == "DONE" &&
-                    record.requestedAt > 0
-                ) DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(record.requestedAt))
-                  else context.getString(R.string.bridge_unknown)
-                views.setTextViewText(R.id.bridge_widget_checked,
-                    context.getString(R.string.bridge_checked_label) + " · " + checked)
-            }
+            val checked = if (record.action == "status" && record.phase == "DONE" &&
+                record.requestedAt > 0
+            ) DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(record.requestedAt))
+              else context.getString(R.string.bridge_unknown)
+            views.setTextViewText(R.id.bridge_widget_checked,
+                context.getString(R.string.bridge_checked_label) + " · " + checked)
             if (expanded) {
                 val autostart = when (record.serviceState) {
                     "running" -> R.string.bridge_enabled

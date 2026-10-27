@@ -52,7 +52,7 @@ class SingleActivityWidgetTest(unittest.TestCase):
                 self.assertEqual(root.attrib.get(NS + "background"), "@drawable/bridge_widget_background")
                 self.assertEqual(root.attrib.get(NS + "gravity"), "center_vertical")
                 text = (RES / f"layout/bridge_widget_{size}.xml").read_text()
-                self.assertEqual(text.count("android:layout_height=\"36dp\""), buttons)
+                self.assertEqual(text.count("android:layout_height=\"" + ("33dp" if size == "large" else "36dp") + "\""), buttons)
                 self.assertIn("@+id/bridge_widget_checked", text)
 
     def test_two_widget_sizes_have_static_picker_previews(self):
