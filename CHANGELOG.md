@@ -1,5 +1,10 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-27 · Документация для открытого репозитория / Open-source documentation (без изменений APK)
+- RU: README, отдельные инструкции самостоятельной сборки и лицензия 0BSD добавлены для публичных пользователей. Руководства пользователя и Termux перестроены по сценариям, устаревшие пометки dev.41–55 убраны из начала инструкций, исторические изменения остаются в этом журнале.
+- EN: Added newcomer README/build guides and 0BSD licensing; reorganized RU/EN user and Termux setup guides by workflow rather than historical dev milestones. Application code and Android version remain at dev.55; no official APK release.
+
+
 ## 2026-10-27 · 0.4.0-beta.10-dev.55 (77; QA 78)
 - RU: Исправлены дубликаты MainActivity после перехода из домашнего виджета: единственный singleTask для AnimaDev, явный NEW_TASK + CLEAR_TOP + SINGLE_TOP для виджета и уведомлений. Существующий экран и навигация сохраняются, не появляется второй экран при Back/выходе.
 - RU: Виджет стал компактнее: фон теперь охватывает только контент, а не всю выделенную ColorOS область; внутренние отступы уменьшены, большие пустые верхние и нижние поля убраны. Начальный размер 4×3 клетки, размер по-прежнему изменяемый.

@@ -1,56 +1,84 @@
-# Termux — local Android build setup
+# Termux setup for AnimaDev
 
-## AnimaBridge Start and Restart buttons (dev.52)
-Use Start when the service is stopped or the runit supervisor is offline. Restart is enabled only for a verified running Python agent, including running-with-autostart-disabled. The controller also refuses restart when the service is stopped or not ready, preventing an unexpected start.
+[Русский](TERMUX_SETUP.md) · [Home](../README_EN.md) · [Build AnimaDev](BUILD_FROM_SOURCE_EN.md)
 
+**Start here:** Termux runs local Git and Gradle commands invoked by AnimaDev. Normal Git/Gradle features **do not require** AnimaBridge Agent, Shizuku, a VPS or a separate backend server. The app does not silently install your toolchain.
 
-## AnimaBridge persistent supervision (dev.51)
-Start now clears the registration-time runit normally-down marker **only after** a real Python agent process is confirmed. This permits runsvdir to restart the agent after its own restart. Stop restores the marker, preserving an intentional stop. When the UI says Running, autostart disabled, press Start to enable persistent supervision without interrupting the current Python process. Restart checks that the PID changed. A local running process is not proof of a live server session.
+## 1. Install Termux and authorize commands
 
+1. Install a compatible Termux release from a trusted source and open it at least once.
+2. Inside Termux, run `mkdir -p ~/.termux` and add `allow-external-apps=true` to `~/.termux/termux.properties` while preserving other settings.
+3. Apply Termux settings and grant AnimaDev the `com.termux.permission.RUN_COMMAND` Android permission when requested. Some Termux builds require reopening the application.
+4. In AnimaDev, open **Termux → Check environment**. This should probe your tools without silently installing system packages.
 
-## Launch AnimaBridge without opening Termux (dev.50)
-Once Termux and RUN_COMMAND have been set up, tap Start in AnimaDev. If the runit supervisor is absent, AnimaDev initializes it inside the Termux UID via a background RUN_COMMAND and then starts the registered service. No manual terminal launch is required. Check is read-only and never initializes the supervisor. Shizuku's Android shell UID cannot directly access private Termux HOME. Supervisor-off, wrapper-starting and manual-agent-conflict are not treated as a healthy Python agent; startup is verified separately. Android may restrict service launches after Termux is force-stopped.
+`RUN_COMMAND` authorizes applications to execute permitted commands under the Termux user. Grant it **only to trusted apps**.
 
+## 2. Install base tools
 
-## Complete GitHub branch fetch in dev.47 (candidate)
-The **Refresh origin from GitHub** action fetches all `refs/heads/*` regardless of the local `remote.origin.fetch` setting. This does not reset or clean the worktree, prune remote-tracking refs, or check out another branch. Switching still verifies the live GitHub SHA before acting.
+In Termux, manually run:
 
-## Optional Shizuku
-AnimaDev dev.43 connects directly to a running Shizuku service using the official Android Binder API. On the **Termux → Shizuku** card, request access and approve it in the Shizuku manager. This connection requires no `rish`, root, remote server or persistent ADB connection. The owner must start Shizuku separately; non-root installations usually need a restart after phone reboot. Existing Termux tools continue working independently.
-
-
-## Background Release AAB in AnimaDev dev.41
-The background worker uses the existing `~/android-sdk` if RUN_COMMAND does not provide ANDROID_HOME, without writing project files.
-Release progress contains allowlisted Gradle task names and fixed diagnostic summaries only. Signing secrets are never logged. Prime missing dependencies using one unsigned online AAB build before an offline build.
-
-
-Run these commands **manually in Termux** after checking what they do. AnimaDev never silently installs toolchains.
-
-## 1. Base packages
 ```sh
 pkg update
 pkg install git python openjdk-21 curl unzip
-termux-setup-storage
 ```
-Verify with `java -version`, `python --version`, `git --version`. Accept Android storage access only if needed.
 
-## 2. Android SDK
-Obtain Android SDK command-line tools, platform-tools, the platform and build-tools versions required by your project's Gradle configuration. Set ANDROID_HOME/ANDROID_SDK_ROOT to your real SDK location. The command `sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"` is an **example only**: use the compileSdk/buildTools versions your project actually needs. Standard desktop AAPT2 may not run on Termux's Android architecture, so use a compatible Termux AAPT2 if your toolchain requires it.
+Verify `java -version`, `git --version`, `python --version`. Shared storage access may require `termux-setup-storage` and an Android permission prompt; do this only when needed.
 
-## 3. Gradle
-Use the repository's own `./gradlew`. Once dependencies have been downloaded, validate:
+Configure Git and any GitHub SSH keys locally. Never commit tokens or private credentials.
+
+## 3. Android SDK and Gradle
+
+Android builds require an actual **Android SDK** (platform-tools, a platform compatible with the project's `compileSdk` and build-tools), plus Java. Installing the JDK alone **does not** install the Android SDK.
+
+To build **AnimaDev itself**, use **Android SDK Platform 37**, JDK 21, the Gradle wrapper 9.5.0 and AGP 9.3.1. For another project, follow **that project's** Gradle configuration.
+
+Set your SDK's actual location; example only:
+
+```sh
+export ANDROID_HOME="$HOME/android-sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+```
+
+**Termux note:** a standard desktop AAPT2 may not run on Android. If necessary, install an Android-compatible AAPT2 and use the Gradle override `-Pandroid.aapt2FromMavenOverride=/absolute/path/to/aapt2`. Adapt paths to your environment.
+
+Use your project's checked-in wrapper:
+
 ```sh
 ./gradlew --version
-./gradlew :app:assembleDebug --offline --no-daemon --rerun-tasks --console=plain
+./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon --console=plain
 ```
-An initial offline build may fail before dependencies are downloaded. Avoid deleting ~/.gradle or your Android SDK during troubleshooting.
 
-## 4. AnimaDev integration
-Allow RUN_COMMAND in Termux and grant the requested Android permission. In the app, choose Check environment, then inspect Java, Android SDK and Gradle. Verify GitHub branch and SHA before running jobs. Device tests also require authorized ADB.
+Do **not** use `--offline` for the first build if dependencies are not cached. Once downloaded, offline builds are possible. See [Build from source](BUILD_FROM_SOURCE_EN.md) for the app itself.
 
-## 5. Security
-Keep JKS, passwords and SSH private keys out of shared Downloads. Do not blindly execute untrusted repository scripts. This guide does not change repositories or install anything automatically.
+## 4. Connect an existing project
 
-### AnimaBridge service control and signed APK (dev.49)
-Register animabridge using the reviewed scripts/install_animabridge_service.sh first. Registration leaves runit DOWN. Do not start a duplicate over a live manual agent. The AnimaDev Termux card uses allowlisted sv actions through Termux RUN_COMMAND, not direct agent paths or credentials.
-Signed Release APK additionally uses local zipalign, apksigner, aapt, JDK and Android SDK. JKS is transferred only through the existing encrypted local channel.
+1. Open **Termux → Check environment**.
+2. Add a Git checkout via **Projects**.
+3. Verify the selected `origin`, branch and uncommitted changes before write operations.
+4. Use the supported Git/Gradle actions. A task in `UNKNOWN` state must be queried again under the **same ID**, not blindly started a second time.
+
+On-device instrumentation tests require separately configured and authorized ADB.
+
+## 5. AnimaBridge Agent — optional separate service
+
+**AnimaDev does not install the agent automatically.** If you have already installed AnimaBridge Agent and want to manage it through AnimaDev:
+
+1. Install `termux-services` with `pkg install termux-services`; reopen Termux to initialize the `runit` supervisor.
+2. Confirm that the **actual installed** agent directory contains `termux_agent/__main__.py`.
+3. Read the checked-in [`scripts/install_animabridge_service.sh`](../scripts/install_animabridge_service.sh) before running it. It registers the service **initially down** and refuses to overwrite an existing registration.
+4. **Never start a supervised agent on top of a manual instance.** Stop the manual agent safely first. Then use AnimaDev → Termux → AnimaBridge → **Start**.
+5. Inspect local state using `sv status animabridge` in Termux. You may use the in-app controls or standard `sv` commands.
+
+After a verified Start, AnimaDev removes runit's `normally down` marker to enable persistent supervisor startup. Stop restores that marker. Restart is only available when an actual agent process is running. Android's Quick Settings tile and home widget manage the same registered service — not an additional agent. **Local Python running does not prove remote server connectivity.**
+
+## 6. Shizuku — optional
+
+Under **Termux → Shizuku**, authorize access to an independently started Shizuku service and inspect the Binder connection. At present this is **diagnostic**, not a way of executing Python inside Termux's private home. Shizuku is not required for Git/Gradle or runit service control.
+
+## 7. Safety and troubleshooting
+
+- Keep JKS files, signing passwords, tokens, private keys and sensitive logs out of public GitHub and shared Downloads.
+- Do not delete your Gradle cache or SDK as a first response to a setup error.
+- Android may block Termux background launching after force-stop until Termux is opened again.
+- If RUN_COMMAND fails, inspect permissions and the Termux integration before starting another agent.
+- No official APKs are currently published on GitHub Releases. You can [build the app from source](BUILD_FROM_SOURCE_EN.md).
