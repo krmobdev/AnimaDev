@@ -1,5 +1,7 @@
 # AnimaDev · 0.4.0-beta.10-dev.47
 
+AnimaBridge dev.50: **Start** now initializes the Termux runit supervisor through background RUN_COMMAND when needed; no manual Termux window is required. Shizuku is for system Binder access, not private Termux commands. Service health is checked against the actual Python process.
+
 **AnimaDev** — Android-приложение для тех, кто разрабатывает и собирает проекты **прямо на телефоне через Termux**. Оно объединяет Git и worktree, Gradle-тесты, сборку Debug APK и подписанных Release AAB, мониторинг задач, журналы и историю операций. Требуется Android 13+; интерфейс написан на Kotlin и Jetpack Compose.
 
 **English:** An Android 13+ companion for local Git, Gradle tests, APK/AAB builds and job history in Termux. No mandatory PC, VPS, AnimaBridge or GitHub API token is required by the installed app.

@@ -1,5 +1,9 @@
 # AnimaDev — User Guide
 
+## Launch AnimaBridge without opening Termux (dev.50)
+Once Termux and RUN_COMMAND have been set up, tap Start in AnimaDev. If the runit supervisor is absent, AnimaDev initializes it inside the Termux UID via a background RUN_COMMAND and then starts the registered service. No manual terminal launch is required. Check is read-only and never initializes the supervisor. Shizuku's Android shell UID cannot directly access private Termux HOME. Supervisor-off, wrapper-starting and manual-agent-conflict are not treated as a healthy Python agent; startup is verified separately. Android may restrict service launches after Termux is force-stopped.
+
+
 ## GitHub-first in dev.47 (candidate)
 After an explicit **Refresh origin from GitHub**, Termux fetches **all GitHub heads** even when the repository has a single-branch `remote.origin.fetch` refspec. Origin branches are paged before local-only branches; use **Load more** to see subsequent pages. Search covers loaded pages only. A stale origin ref cannot authorize switching: the live GitHub SHA is verified again. Fetch does not switch branches, reset worktrees or prune refs. Device acceptance is still pending.
 

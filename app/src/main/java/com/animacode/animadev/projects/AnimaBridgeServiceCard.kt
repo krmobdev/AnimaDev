@@ -43,6 +43,9 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
     val status = when (record.serviceState) {
         "running" -> if (english) "Service running" else "Служба работает"
         "stopped" -> if (english) "Service stopped" else "Служба остановлена"
+        "supervisor_off" -> if (english) "Supervisor not running" else "Диспетчер runit не запущен"
+        "conflict" -> if (english) "Agent conflict" else "Конфликт с ручным агентом"
+        "starting" -> if (english) "Agent starting" else "Агент запускается"
         else -> if (english) "Status not confirmed" else "Состояние не подтверждено"
     }
     Card(
@@ -86,6 +89,22 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
             if (record.message.isNotEmpty()) {
                 Text(record.message, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (record.serviceState == "supervisor_off") {
+                Text(
+                    if (english) "Tap Start: AnimaDev will initialize runit silently via Termux RUN_COMMAND. You do not need to open Termux."
+                    else "Нажмите «Запустить»: AnimaDev поднимет runit через RUN_COMMAND в фоне. Открывать окно Termux не нужно.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (record.serviceState == "conflict") {
+                Text(
+                    if (english) "A manual agent is already active. Stop the supervised wrapper safely; do not start a duplicate."
+                    else "Обнаружен ручной агент. Не запускайте второй экземпляр; можно остановить оболочку службы.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (record.serviceState == "unknown") {
                 Text(

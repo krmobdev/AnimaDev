@@ -10,11 +10,21 @@ class BridgeServicePolicyTest {
         assertEquals("stopped", BridgeServicePolicy.parseStatus(
             "down: /data/data/com.termux/files/usr/var/service/animabridge: 3s, normally up"))
         assertEquals("unknown", BridgeServicePolicy.parseStatus("run: /tmp/ssh: (pid 4) 5s"))
+        assertEquals("supervisor_off", BridgeServicePolicy.parseStatus(
+            "supervisor-off: /data/data/com.termux/files/usr/var/service/animabridge"))
+        assertEquals("starting", BridgeServicePolicy.parseStatus(
+            "starting: /data/data/com.termux/files/usr/var/service/animabridge"))
+        assertEquals("conflict", BridgeServicePolicy.parseStatus(
+            "conflict: /data/data/com.termux/files/usr/var/service/animabridge"))
         assertEquals("unknown", BridgeServicePolicy.parseStatus("supervise not running"))
     }
     @Test fun controlsRequireVerifiedStateAndNoPendingRequest() {
         assertTrue(BridgeServicePolicy.permits("up", "stopped", false))
         assertFalse(BridgeServicePolicy.permits("up", "running", false))
+        assertTrue(BridgeServicePolicy.permits("up", "supervisor_off", false))
+        assertFalse(BridgeServicePolicy.permits("up", "starting", false))
+        assertTrue(BridgeServicePolicy.permits("down", "conflict", false))
+        assertFalse(BridgeServicePolicy.permits("restart", "conflict", false))
         assertTrue(BridgeServicePolicy.permits("restart", "running", false))
         assertTrue(BridgeServicePolicy.permits("down", "running", false))
         assertFalse(BridgeServicePolicy.permits("down", "unknown", false))

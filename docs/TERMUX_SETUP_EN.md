@@ -1,5 +1,9 @@
 # Termux — local Android build setup
 
+## Launch AnimaBridge without opening Termux (dev.50)
+Once Termux and RUN_COMMAND have been set up, tap Start in AnimaDev. If the runit supervisor is absent, AnimaDev initializes it inside the Termux UID via a background RUN_COMMAND and then starts the registered service. No manual terminal launch is required. Check is read-only and never initializes the supervisor. Shizuku's Android shell UID cannot directly access private Termux HOME. Supervisor-off, wrapper-starting and manual-agent-conflict are not treated as a healthy Python agent; startup is verified separately. Android may restrict service launches after Termux is force-stopped.
+
+
 ## Complete GitHub branch fetch in dev.47 (candidate)
 The **Refresh origin from GitHub** action fetches all `refs/heads/*` regardless of the local `remote.origin.fetch` setting. This does not reset or clean the worktree, prune remote-tracking refs, or check out another branch. Switching still verifies the live GitHub SHA before acting.
 

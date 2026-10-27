@@ -1,5 +1,11 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-27 · 0.4.0-beta.10-dev.50 (67; QA 68)
+- RU: Исправлен запуск AnimaBridge без ручного открытия Termux. По нажатию «Запустить» AnimaDev инициализирует runit (service-daemon) внутри Termux UID через фоновый RUN_COMMAND, только если диспетчер ещё отсутствует.
+- RU: Проверка статуса отличает отсутствие диспетчера, временный запуск оболочки, конфликт с ручным агентом и действительно работающий процесс Python. Устранено ложное «Служба работает» при перезапуске оболочки; команды не выполняются повторно автоматически.
+- EN: Start initializes the Termux runit supervisor on demand via background RUN_COMMAND, without opening the Termux terminal. Status separates supervisor-off, wrapper-starting, manual-agent conflict and verified Python agent states.
+- EN: Shizuku remains Android shell/Binder connectivity, not Termux HOME access. No live agents, personal projects, keys or main branch were modified by this source change.
+
 ## 2026-10-27 · 0.4.0-beta.10-dev.49 (65; QA 66)
 - RU: При проверке APK поддержан реальный формат вывода apksigner V3.0 Signer: certificate SHA-256 digest; полная синтетическая подпись APK подтверждена на устройстве.
 - EN: Accept apksigner's V3.0 Signer certificate digest output; real-APK signing and verification passed with an ephemeral synthetic JKS.
