@@ -41,6 +41,8 @@
     <string name="bridge_widget_full_name">AnimaBridge · Dashboard</string>
     <string name="bridge_widget_compact_description">Agent status and quick controls. 4×2.</string>
     <string name="bridge_widget_full_description">Agent, autostart, local status and controls. 4×3.</string>
-    <string name="bridge_widget_server_short">Link not verified</string>
+    <string name="bridge_widget_server_short">Not checked</string>
     <string name="bridge_widget_checked_short">Checked</string>
+    <string name="bridge_widget_compact_summary_placeholder">Auto: ? · Server: unchecked</string>
+    <string name="bridge_widget_compact_summary">Auto: %1$s · Server: unchecked</string>
 </resources>

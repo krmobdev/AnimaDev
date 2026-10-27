@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"
  android:gravity="center_vertical" android:orientation="vertical"
- android:padding="7dp" android:background="@drawable/bridge_widget_background">
-<LinearLayout android:layout_width="match_parent" android:layout_height="22dp"
+ android:padding="5dp" android:background="@drawable/bridge_widget_background">
+<LinearLayout android:layout_width="match_parent" android:layout_height="20dp"
  android:gravity="center_vertical" android:orientation="horizontal">
  <ImageView android:layout_width="23dp" android:layout_height="23dp"
   android:src="@drawable/ic_bridge_tile" android:tint="#7EF5AA" android:contentDescription="@null"/>
@@ -18,12 +18,12 @@
   android:text="@string/bridge_unknown" android:fontFamily="sans-serif-medium"/>
 </LinearLayout>
 <TextView android:id="@+id/bridge_widget_state" android:layout_width="match_parent" android:layout_height="wrap_content"
- android:layout_marginTop="3dp" android:textSize="16sp" android:textColor="#7EF5AA"
+ android:layout_marginTop="2dp" android:textSize="15sp" android:textColor="#7EF5AA"
  android:singleLine="true" android:ellipsize="end" android:fontFamily="sans-serif-medium"
  android:text="@string/bridge_unknown"/>
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
- android:layout_marginTop="3dp" android:orientation="horizontal">
-<LinearLayout android:layout_width="0dp" android:layout_height="34dp"
+ android:layout_marginTop="2dp" android:orientation="horizontal">
+<LinearLayout android:layout_width="0dp" android:layout_height="30dp"
  android:layout_weight="1" android:layout_marginEnd="5dp" android:background="@drawable/bridge_widget_info_cell"
  android:orientation="vertical" android:gravity="center_vertical" android:paddingStart="9dp" android:paddingEnd="5dp">
  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/bridge_autostart_label"
@@ -32,7 +32,7 @@
   android:textSize="12sp" android:textColor="#F1FFF6" android:fontFamily="sans-serif-medium"
   android:singleLine="true" android:ellipsize="end" android:text="@string/bridge_unknown"/>
 </LinearLayout>
-<LinearLayout android:layout_width="0dp" android:layout_height="34dp"
+<LinearLayout android:layout_width="0dp" android:layout_height="30dp"
  android:layout_weight="1" android:layout_marginEnd="5dp" android:background="@drawable/bridge_widget_info_cell"
  android:orientation="vertical" android:gravity="center_vertical" android:paddingStart="9dp" android:paddingEnd="5dp">
  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/bridge_widget_connection_title"
@@ -47,8 +47,8 @@
  android:textColor="#A8BEB0" android:textSize="10sp" android:singleLine="true"
  android:text="@string/bridge_widget_checked_short"/>
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
- android:layout_marginTop="4dp" android:orientation="horizontal"><FrameLayout android:id="@+id/bridge_widget_start" android:layout_width="0dp"
- android:layout_height="33dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:clickable="true">
+ android:layout_marginTop="3dp" android:orientation="horizontal"><FrameLayout android:id="@+id/bridge_widget_start" android:layout_width="0dp"
+ android:layout_height="30dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:clickable="true">
  <ImageView android:id="@+id/bridge_widget_start_bg" android:layout_width="match_parent"
   android:layout_height="match_parent" android:src="@drawable/bridge_widget_action_secondary"
   android:scaleType="fitXY" android:contentDescription="@null"/>
@@ -57,7 +57,7 @@
   android:textSize="11sp" android:textColor="#F3FFF8" android:text="@string/bridge_start"/>
 </FrameLayout>
 <FrameLayout android:id="@+id/bridge_widget_stop" android:layout_width="0dp"
- android:layout_height="33dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:clickable="true">
+ android:layout_height="30dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:clickable="true">
  <ImageView android:id="@+id/bridge_widget_stop_bg" android:layout_width="match_parent"
   android:layout_height="match_parent" android:src="@drawable/bridge_widget_action_secondary"
   android:scaleType="fitXY" android:contentDescription="@null"/>
@@ -66,8 +66,8 @@
   android:textSize="11sp" android:textColor="#F3FFF8" android:text="@string/bridge_stop"/>
 </FrameLayout></LinearLayout>
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
- android:layout_marginTop="4dp" android:orientation="horizontal"><FrameLayout android:id="@+id/bridge_widget_restart" android:layout_width="0dp"
- android:layout_height="33dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:clickable="true">
+ android:layout_marginTop="3dp" android:orientation="horizontal"><FrameLayout android:id="@+id/bridge_widget_restart" android:layout_width="0dp"
+ android:layout_height="30dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:clickable="true">
  <ImageView android:id="@+id/bridge_widget_restart_bg" android:layout_width="match_parent"
   android:layout_height="match_parent" android:src="@drawable/bridge_widget_action_secondary"
   android:scaleType="fitXY" android:contentDescription="@null"/>
@@ -76,7 +76,7 @@
   android:textSize="11sp" android:textColor="#F3FFF8" android:text="@string/bridge_restart"/>
 </FrameLayout>
 <FrameLayout android:id="@+id/bridge_widget_check" android:layout_width="0dp"
- android:layout_height="33dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:clickable="true">
+ android:layout_height="30dp" android:layout_weight="1" android:layout_marginEnd="5dp" android:clickable="true">
  <ImageView android:id="@+id/bridge_widget_check_bg" android:layout_width="match_parent"
   android:layout_height="match_parent" android:src="@drawable/bridge_widget_action_secondary"
   android:scaleType="fitXY" android:contentDescription="@null"/>

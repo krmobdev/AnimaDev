@@ -95,6 +95,20 @@ open class BridgeWidgetProvider : AppWidgetProvider() {
               else context.getString(R.string.bridge_unknown)
             views.setTextViewText(R.id.bridge_widget_checked,
                 context.getString(R.string.bridge_checked_label) + " · " + checked)
+            if (!expanded) {
+                val autostart = when (record.serviceState) {
+                    "running" -> R.string.bridge_enabled
+                    "ephemeral", "stopped" -> R.string.bridge_disabled
+                    else -> R.string.bridge_unknown
+                }
+                views.setTextViewText(
+                    R.id.bridge_widget_summary,
+                    context.getString(
+                        R.string.bridge_widget_compact_summary,
+                        context.getString(autostart),
+                    ),
+                )
+            }
             if (expanded) {
                 val autostart = when (record.serviceState) {
                     "running" -> R.string.bridge_enabled

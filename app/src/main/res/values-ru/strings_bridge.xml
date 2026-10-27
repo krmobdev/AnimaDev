@@ -41,6 +41,8 @@
     <string name="bridge_widget_full_name">AnimaBridge · Панель</string>
     <string name="bridge_widget_compact_description">Статус агента и быстрые кнопки. 4×2.</string>
     <string name="bridge_widget_full_description">Агент, автозапуск, локальная проверка, управление. 4×3.</string>
-    <string name="bridge_widget_server_short">Связь не проверена</string>
+    <string name="bridge_widget_server_short">Не проверена</string>
     <string name="bridge_widget_checked_short">Проверка</string>
+    <string name="bridge_widget_compact_summary_placeholder">Авто: ? · Сервер: не проверен</string>
+    <string name="bridge_widget_compact_summary">Авто: %1$s · Сервер: не проверен</string>
 </resources>

@@ -1,5 +1,10 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-27 · 0.4.0-beta.10-dev.57 (81; QA 82)
+- RU: На ColorOS переразмерены оба виджета: полный пульт умещается в доступную высоту 4×3, кнопки не обрезаются, фон заполняет весь слот без прозрачной пустоты. Для компактного 4×2 добавлены автозапуск и честная пометка, что серверная связь не проверена. В выборе виджетов приоритет отдан настоящим PNG-превью вместо пустого RemoteViews-preview.
+- EN: Tighten both widget layouts for ColorOS 4×2 / 4×3 cells, show autostart and explicitly unverified server state in Compact, prefer bundled PNG picker thumbnails over placeholder previewLayout; add regressions. No agent service changes.
+
+
 ## 2026-10-27 · 0.4.0-beta.10-dev.56 (79; QA 80)
 - RU: Цветное содержимое виджетов больше не обрезается при 4×3: компактный и полный варианты стали раздельными системными виджетами с явными фиксированными компоновками, без угадывания размера по OPTION_APPWIDGET_MIN_HEIGHT и прозрачных пустот.
 - RU: Добавлены собственные PNG-превью для списка виджетов ColorOS, названия/описания и две кнопки добавления из AnimaDev. Наличие агента/статус берутся из общего BridgeServiceStore; открытие приложения не запускает копию.

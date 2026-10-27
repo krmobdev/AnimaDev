@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
- android:minWidth="250dp" android:minHeight="105dp"
+ android:minWidth="250dp" android:minHeight="100dp"
  android:targetCellWidth="4" android:targetCellHeight="2"
- android:minResizeWidth="220dp" android:minResizeHeight="105dp"
+ android:minResizeWidth="220dp" android:minResizeHeight="100dp"
  android:initialLayout="@layout/bridge_widget_compact"
- android:previewLayout="@layout/bridge_widget_compact"
  android:previewImage="@drawable/bridge_widget_preview_compact"
  android:updatePeriodMillis="0" android:resizeMode="horizontal|vertical"
  android:widgetCategory="home_screen" android:description="@string/bridge_widget_compact_description"/>

@@ -52,8 +52,15 @@ class SingleActivityWidgetTest(unittest.TestCase):
                 self.assertEqual(root.attrib.get(NS + "background"), "@drawable/bridge_widget_background")
                 self.assertEqual(root.attrib.get(NS + "gravity"), "center_vertical")
                 text = (RES / f"layout/bridge_widget_{size}.xml").read_text()
-                self.assertEqual(text.count("android:layout_height=\"" + ("33dp" if size == "large" else "36dp") + "\""), buttons)
+                self.assertEqual(text.count("android:layout_height=\"" + "30dp" + "\""), buttons + (2 if size == "large" else 0))
                 self.assertIn("@+id/bridge_widget_checked", text)
+                self.assertEqual(root.attrib.get(NS + "gravity"), "center_vertical")
+                if size == "compact":
+                    self.assertIn("@+id/bridge_widget_summary", text)
+                    self.assertIn("android:padding=\"6dp\"", text)
+                else:
+                    self.assertIn("android:padding=\"5dp\"", text)
+
 
     def test_two_widget_sizes_have_static_picker_previews(self):
         app = ET.parse(MANIFEST).getroot().find("application")
@@ -65,6 +72,8 @@ class SingleActivityWidgetTest(unittest.TestCase):
             self.assertEqual(root.attrib.get(NS + "targetCellWidth"), "4")
             self.assertEqual(root.attrib.get(NS + "targetCellHeight"), height)
             self.assertEqual(root.attrib.get(NS + "resizeMode"), "horizontal|vertical")
+            self.assertIsNone(root.attrib.get(NS + "previewLayout"))
+            self.assertLessEqual(int(root.attrib.get(NS + "minHeight")[:-2]), 165)
             resource = root.attrib.get(NS + "previewImage")
             self.assertTrue(resource)
             self.assertTrue((RES / ("drawable/" + resource.split("/")[-1] + ".png")).is_file())
@@ -72,6 +81,7 @@ class SingleActivityWidgetTest(unittest.TestCase):
         self.assertIn("BridgeFullWidgetProvider", source)
         self.assertIn("layoutForProvider(full: Boolean)", source)
         self.assertNotIn("OPTION_APPWIDGET_MIN_HEIGHT", source)
+        self.assertIn("R.id.bridge_widget_summary", source)
 
 
 if __name__ == "__main__":

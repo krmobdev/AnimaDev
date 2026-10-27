@@ -57,7 +57,7 @@ Do not run a manually started agent alongside another copy supervised by `runit`
 
 Use **Add to Quick Settings** on the AnimaBridge card. After system confirmation the in-app button shows the tile as added; remove it through Android's Quick Settings editor.
 
-Use **Add home widget** or your launcher's **Home → Widgets → AnimaDev** menu. Widgets offer status and Start/Stop/Restart/Check actions depending on their size. Resize using the launcher.
+Use **Add home widget** or your launcher's **Home → Widgets → AnimaDev** menu. Choose **4×2** (process, autostart, latest check, unverified server link and quick controls) or **4×3** (full four-action dashboard). The widget picker shows static examples rather than live agent measurements. Resize using your launcher.
 
 Tapping a widget's title returns to AnimaDev's **existing task** instead of stacking a second Activity. Widgets and the tile share the same service gateway — they do not create a second agent.
 
