@@ -65,7 +65,12 @@ object BridgeServicePolicy {
                 else:
                     print(output)
                 sys.exit(0)
-            if action in ("up", "restart") and before.returncode != 0:
+            if action == "restart" and (
+                before.returncode != 0 or not agent_pid(before.stdout)
+            ):
+                print("Service is stopped or not ready; use Start instead.", file=sys.stderr)
+                sys.exit(10)
+            if action == "up" and before.returncode != 0:
                 # Only explicit user action may start Termux runit in the background.
                 env = os.environ.copy()
                 env.update(PREFIX=PREFIX, SVDIR=PREFIX + "/var/service",
@@ -137,7 +142,7 @@ object BridgeServicePolicy {
             "status" -> true
             "up" -> serviceState in setOf("stopped", "supervisor_off", "ephemeral")
             "down" -> serviceState in setOf("running", "ephemeral", "starting", "conflict")
-            "restart" -> serviceState in setOf("running", "ephemeral", "stopped", "starting")
+            "restart" -> serviceState in setOf("running", "ephemeral")
             else -> false
         }
 }

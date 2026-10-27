@@ -1,5 +1,7 @@
 # AnimaDev · 0.4.0-beta.10-dev.47
 
+AnimaBridge dev.52: Restart is disabled while stopped; Start is the only command that can start a stopped service. The controller also rejects stale restart requests.
+
 AnimaBridge dev.51: explicit Start enables **persistent runit autostart** after verifying Python health; Stop persistently disables it. The UI distinguishes normally-down supervision and running processes from confirmed remote connectivity.
 
 AnimaBridge dev.50: **Start** now initializes the Termux runit supervisor through background RUN_COMMAND when needed; no manual Termux window is required. Shizuku is for system Binder access, not private Termux commands. Service health is checked against the actual Python process.

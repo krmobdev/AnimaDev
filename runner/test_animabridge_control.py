@@ -117,16 +117,31 @@ class EmbeddedControllerTest(unittest.TestCase):
         self.assertEqual(self.fake.active_pid, pid)
         self.assertFalse(self.down.exists())
 
-    def test_stop_then_restart_restores_persistent_agent(self):
+    def test_stop_rejects_restart_then_start_restores_persistent_agent(self):
         code, _, _ = self.invoke("down")
         self.assertEqual(code, 0)
         self.assertTrue(self.down.exists())
         self.assertIsNone(self.fake.active_pid)
-        code, out, err = self.invoke("restart")
+        code, _, err = self.invoke("restart")
+        self.assertEqual(code, 10)
+        self.assertIn("use Start instead", err)
+        self.assertIsNone(self.fake.active_pid)
+        self.assertTrue(self.down.exists())
+        code, out, err = self.invoke("up")
         self.assertEqual(code, 0, err)
         self.assertIn("verified", out)
         self.assertIsNotNone(self.fake.active_pid)
         self.assertFalse(self.down.exists())
+
+    def test_restart_does_not_start_stopped_supervisor(self):
+        self.down.touch()
+        self.fake.active_pid = None
+        self.fake.supervisor = False
+        code, _, err = self.invoke("restart")
+        self.assertEqual(code, 10)
+        self.assertIn("use Start instead", err)
+        self.assertFalse(self.fake.supervisor)
+        self.assertTrue(self.down.exists())
 
     def test_supervisor_absent_start_starts_supervisor_safely(self):
         self.down.touch()

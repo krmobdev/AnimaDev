@@ -1,5 +1,9 @@
 # Termux — local Android build setup
 
+## AnimaBridge Start and Restart buttons (dev.52)
+Use Start when the service is stopped or the runit supervisor is offline. Restart is enabled only for a verified running Python agent, including running-with-autostart-disabled. The controller also refuses restart when the service is stopped or not ready, preventing an unexpected start.
+
+
 ## AnimaBridge persistent supervision (dev.51)
 Start now clears the registration-time runit normally-down marker **only after** a real Python agent process is confirmed. This permits runsvdir to restart the agent after its own restart. Stop restores the marker, preserving an intentional stop. When the UI says Running, autostart disabled, press Start to enable persistent supervision without interrupting the current Python process. Restart checks that the PID changed. A local running process is not proof of a live server session.
 

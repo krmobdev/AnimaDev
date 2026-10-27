@@ -13,6 +13,7 @@ class BridgeServicePolicyTest {
         assertTrue(script.contains("agent_pid(state.stdout)"))
         assertTrue(script.contains("action != \"restart\" or prior_pid != pid"))
         assertTrue(script.contains("Manual agent detected."))
+        assertTrue(script.contains("Service is stopped or not ready; use Start instead."))
     }
 
     @Test fun statusParserRejectsUnrelatedServices() {
@@ -40,7 +41,9 @@ class BridgeServicePolicyTest {
         assertFalse(BridgeServicePolicy.permits("restart", "conflict", false))
         assertTrue(BridgeServicePolicy.permits("up", "ephemeral", false))
         assertTrue(BridgeServicePolicy.permits("restart", "ephemeral", false))
-        assertTrue(BridgeServicePolicy.permits("restart", "stopped", false))
+        assertFalse(BridgeServicePolicy.permits("restart", "stopped", false))
+        assertFalse(BridgeServicePolicy.permits("restart", "starting", false))
+        assertFalse(BridgeServicePolicy.permits("restart", "supervisor_off", false))
         assertTrue(BridgeServicePolicy.permits("restart", "running", false))
         assertTrue(BridgeServicePolicy.permits("down", "running", false))
         assertFalse(BridgeServicePolicy.permits("down", "unknown", false))
