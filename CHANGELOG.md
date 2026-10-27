@@ -1,5 +1,11 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-27 13:45 UTC+03:00 · 0.4.0-beta.10-dev.51 (69; QA 70)
+- RU: Исправлена причина выключенного автозапуска AnimaBridge: регистрационный флаг runit/down оставался после sv up и sv restart, и диспетчер повторно не поднимал агента. «Запустить» разрешает постоянный автозапуск только после подтверждения реального Python-процесса, «Остановить» сохраняет отключение автозапуска.
+- RU: В интерфейсе отдельно видно состояние «Работает, автозапуск отключён». «Перезапустить» допускается из остановленного состояния, при перезапуске проверяется смена PID, а успешная команда sv больше не равняется доказательству связи с сервером.
+- EN: Fix runit persistent service startup: the registration down flag formerly survived up/restart. Explicit Start enables autostart only after verifying a live Python process; Stop disables autostart persistently; Restart verifies a new PID.
+- EN: Show running-with-autostart-disabled separately. A running local Python process does not prove a connected remote AnimaBridge session. The live agent was not restarted for this source change.
+
 ## 2026-10-27 · 0.4.0-beta.10-dev.50 (67; QA 68)
 - RU: Исправлен запуск AnimaBridge без ручного открытия Termux. По нажатию «Запустить» AnimaDev инициализирует runit (service-daemon) внутри Termux UID через фоновый RUN_COMMAND, только если диспетчер ещё отсутствует.
 - RU: Проверка статуса отличает отсутствие диспетчера, временный запуск оболочки, конфликт с ручным агентом и действительно работающий процесс Python. Устранено ложное «Служба работает» при перезапуске оболочки; команды не выполняются повторно автоматически.

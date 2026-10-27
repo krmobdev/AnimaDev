@@ -34,13 +34,14 @@ class BridgeServiceResultReceiver : BroadcastReceiver() {
             exitCode = exit,
             message = when {
                 !ok -> "Service command not confirmed (exit: ${exit ?: "?"}); verify termux-services registration."
-                current.action == "status" && status == "running" -> "AnimaBridge service is running."
+                current.action == "status" && status == "running" -> "Agent process is running; server connection not verified."
+                current.action == "status" && status == "ephemeral" -> "Agent is running, but supervisor autostart is disabled. Tap Start to enable persistent service."
                 current.action == "status" && status == "stopped" -> "AnimaBridge service is stopped."
                 current.action == "status" && status == "supervisor_off" -> "Runit is not active. Start will initialize it in the background."
                 current.action == "status" && status == "conflict" -> "A manual AnimaBridge agent conflicts with the supervised service."
                 current.action == "status" && status == "starting" -> "Service wrapper is starting, but agent is not yet verified. Check again."
                 current.action == "status" -> "Could not verify the registered service."
-                else -> "Command accepted; verifying the actual service state."
+                else -> "Runit action verified; checking current service status. Server connection must be checked separately."
             }
         ))
     }

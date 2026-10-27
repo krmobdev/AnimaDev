@@ -1,5 +1,9 @@
 # Termux — local Android build setup
 
+## AnimaBridge persistent supervision (dev.51)
+Start now clears the registration-time runit normally-down marker **only after** a real Python agent process is confirmed. This permits runsvdir to restart the agent after its own restart. Stop restores the marker, preserving an intentional stop. When the UI says Running, autostart disabled, press Start to enable persistent supervision without interrupting the current Python process. Restart checks that the PID changed. A local running process is not proof of a live server session.
+
+
 ## Launch AnimaBridge without opening Termux (dev.50)
 Once Termux and RUN_COMMAND have been set up, tap Start in AnimaDev. If the runit supervisor is absent, AnimaDev initializes it inside the Termux UID via a background RUN_COMMAND and then starts the registered service. No manual terminal launch is required. Check is read-only and never initializes the supervisor. Shizuku's Android shell UID cannot directly access private Termux HOME. Supervisor-off, wrapper-starting and manual-agent-conflict are not treated as a healthy Python agent; startup is verified separately. Android may restrict service launches after Termux is force-stopped.
 

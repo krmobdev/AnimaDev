@@ -41,7 +41,8 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
         }
     }
     val status = when (record.serviceState) {
-        "running" -> if (english) "Service running" else "Служба работает"
+        "running" -> if (english) "Agent process running" else "Процесс агента запущен"
+        "ephemeral" -> if (english) "Running, autostart disabled" else "Работает, автозапуск отключён"
         "stopped" -> if (english) "Service stopped" else "Служба остановлена"
         "supervisor_off" -> if (english) "Supervisor not running" else "Диспетчер runit не запущен"
         "conflict" -> if (english) "Agent conflict" else "Конфликт с ручным агентом"
@@ -89,6 +90,22 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
             if (record.message.isNotEmpty()) {
                 Text(record.message, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (record.serviceState == "ephemeral") {
+                Text(
+                    if (english) "The service is normally down: after the runit supervisor restarts, the agent will not start automatically. Tap Start to enable persistent startup without restarting the running agent."
+                    else "Служба настроена как normally down: после перезапуска runit агент не поднимется сам. Нажмите «Запустить», чтобы включить автозапуск без перезапуска текущего агента.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (record.serviceState == "running") {
+                Text(
+                    if (english) "Only the local Python process was checked. Connection to the AnimaBridge server was not verified."
+                    else "Проверен только локальный процесс Python. Связь с сервером AnimaBridge не проверялась.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (record.serviceState == "supervisor_off") {
                 Text(

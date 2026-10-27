@@ -21,6 +21,7 @@ object BridgeServicePolicy {
         import os, re, subprocess, sys, time
         PREFIX = "/data/data/com.termux/files/usr"
         SERVICE = PREFIX + "/var/service/animabridge"
+        DOWN_FLAG = SERVICE + "/down"
         SV = PREFIX + "/bin/sv"
         action = sys.argv[1]
         if action not in ("status", "up", "down", "restart"):
@@ -29,34 +30,43 @@ object BridgeServicePolicy {
             print("AnimaBridge runit service is not registered.", file=sys.stderr)
             sys.exit(2)
         def call(argv, env=None):
-            return subprocess.run(argv, capture_output=True, text=True, timeout=10, env=env)
+            return subprocess.run(argv, capture_output=True, text=True, timeout=18, env=env)
         def status():
             return call([SV, "status", SERVICE])
+        def agent_pid(output):
+            match = re.search(r"\\(pid (\\d+)\\)", output) if output.startswith("run: ") else None
+            if not match:
+                return None
+            pid = match.group(1)
+            try:
+                executable = os.path.basename(os.readlink("/proc/" + pid + "/exe"))
+            except OSError:
+                return None
+            return pid if executable.startswith("python") else None
+        def manual_agent():
+            result = call([PREFIX + "/bin/pgrep", "-f",
+                           "^python(3)? -m termux_agent run --remote$"])
+            return result.returncode == 0
         try:
+            before = status()
             if action == "status":
-                result = status()
-                if result.returncode != 0:
+                if before.returncode != 0:
                     print("supervisor-off: " + SERVICE)
                     sys.exit(0)
-                line = result.stdout.strip()
-                if line.startswith("run: "):
-                    pid = re.search(r"\(pid (\d+)\)", line)
-                    name = ""
-                    if pid:
-                        try:
-                            name = os.path.basename(os.readlink("/proc/" + pid.group(1) + "/exe"))
-                        except OSError:
-                            pass
-                    if not name.startswith("python"):
-                        manual = call([PREFIX + "/bin/pgrep", "-f",
-                                       "^python(3)? -m termux_agent run --remote$"])
-                        print(("conflict: " if manual.returncode == 0 else "starting: ") + SERVICE)
-                        sys.exit(0)
-                print(line)
+                output = before.stdout.strip()
+                if output.startswith("run: "):
+                    pid = agent_pid(output)
+                    if not pid:
+                        print(("conflict: " if manual_agent() else "starting: ") + SERVICE)
+                    elif os.path.exists(DOWN_FLAG):
+                        print("ephemeral: " + SERVICE)
+                    else:
+                        print(output)
+                else:
+                    print(output)
                 sys.exit(0)
-            if action == "up" and status().returncode != 0:
-                # runit is normally initialized by an interactive Termux login.
-                # Initialize it here instead, entirely in the background, only on explicit Start.
+            if action in ("up", "restart") and before.returncode != 0:
+                # Only explicit user action may start Termux runit in the background.
                 env = os.environ.copy()
                 env.update(PREFIX=PREFIX, SVDIR=PREFIX + "/var/service",
                            LOGDIR=PREFIX + "/var/log")
@@ -71,11 +81,43 @@ object BridgeServicePolicy {
                 else:
                     print("Termux runit supervisor did not become ready.", file=sys.stderr)
                     sys.exit(4)
+            # Never try to adopt a manually started agent or start a duplicate.
+            if action in ("up", "restart") and manual_agent():
+                print("Manual agent detected. Stop it before starting the runit service.", file=sys.stderr)
+                sys.exit(7)
+            prior_pid = agent_pid(before.stdout) if before.returncode == 0 else None
+            if action == "down":
+                # Preserve an explicit Stop across future runit supervisor restarts.
+                with open(DOWN_FLAG, "a"):
+                    pass
             result = call([SV, action, SERVICE])
             if result.returncode != 0:
-                print("AnimaBridge service command was rejected.", file=sys.stderr)
+                print("AnimaBridge runit command failed (action=" + action + ").", file=sys.stderr)
                 sys.exit(5)
-            print("Command accepted; verify service state.")
+            if action == "down":
+                for attempt in range(20):
+                    state = status()
+                    if state.returncode == 0 and state.stdout.startswith("down: "):
+                        print("AnimaBridge stopped; autostart disabled.")
+                        sys.exit(0)
+                    time.sleep(0.25)
+                print("Stop was not confirmed by runit.", file=sys.stderr)
+                sys.exit(8)
+            # Success requires a real Python agent; sv accepting a command is insufficient.
+            for attempt in range(28):
+                state = status()
+                pid = agent_pid(state.stdout) if state.returncode == 0 else None
+                if pid and (action != "restart" or prior_pid != pid):
+                    # Only after success: next supervisor startup must restore this agent.
+                    try:
+                        os.unlink(DOWN_FLAG)
+                    except FileNotFoundError:
+                        pass
+                    print("Agent process verified; persistent runit start enabled.")
+                    sys.exit(0)
+                time.sleep(0.25)
+            print("Agent did not reach a verified running state.", file=sys.stderr)
+            sys.exit(9)
         except (OSError, subprocess.TimeoutExpired):
             print("Termux runit command unavailable.", file=sys.stderr)
             sys.exit(6)
@@ -83,6 +125,7 @@ object BridgeServicePolicy {
 
     fun parseStatus(stdout: String): String = when {
         stdout.startsWith("run: ${SERVICE}:") -> "running"
+        stdout == "ephemeral: ${SERVICE}" -> "ephemeral"
         stdout.startsWith("down: ${SERVICE}:") -> "stopped"
         stdout == "supervisor-off: ${SERVICE}" -> "supervisor_off"
         stdout == "conflict: ${SERVICE}" -> "conflict"
@@ -92,9 +135,9 @@ object BridgeServicePolicy {
     fun permits(action: String, serviceState: String, pending: Boolean): Boolean =
         !pending && when (action) {
             "status" -> true
-            "up" -> serviceState == "stopped" || serviceState == "supervisor_off"
-            "down" -> serviceState in setOf("running", "starting", "conflict")
-            "restart" -> serviceState == "running"
+            "up" -> serviceState in setOf("stopped", "supervisor_off", "ephemeral")
+            "down" -> serviceState in setOf("running", "ephemeral", "starting", "conflict")
+            "restart" -> serviceState in setOf("running", "ephemeral", "stopped", "starting")
             else -> false
         }
 }
