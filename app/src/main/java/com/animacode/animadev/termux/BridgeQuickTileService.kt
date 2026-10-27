@@ -2,6 +2,7 @@ package com.animacode.animadev.termux
 
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import com.animacode.animadev.R
 
 /** A one-tap local runit controller. "Active" means Python process, not server connectivity. */
 class BridgeQuickTileService : TileService() {

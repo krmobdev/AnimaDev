@@ -5,6 +5,7 @@
 - RU: Все поверхности используют единую очередь BridgeServiceGateway и общий BridgeServiceStore. Проверка по событию, без фонового постоянного опроса и без запуска второго агента. При неизвестном состоянии плитка сначала запрашивает статус, а не выполняет слепой toggle.
 - RU: Добавлена кнопка системного запроса «Добавить в шторку». Виджет добавляется из стандартного меню Android. Наличие Python-процесса не выдаётся за подтверждённую связь с сервером.
 - EN: Adds Quick Settings TileService and resizable RemoteViews widget, sharing the existing serialized Termux RUN_COMMAND gateway. Event-driven status, explicit verification, no blind toggles. Tile add prompt and home-widget discovery included.
+- RU: Исправлен импорт ресурсов Android в TileService, обнаруженный при компиляции на устройстве.
 
 ## 2026-10-27 14:20 UTC+03:00 · 0.4.0-beta.10-dev.52 (71; QA 72)
 - RU: Исправлена доступность кнопки «Перезапустить»: она активна только при реально запущенном процессе агента. При остановленной службе доступна «Запустить», а «Перезапустить» заблокирована.
