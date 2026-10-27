@@ -1,6 +1,8 @@
 # AnimaDev — Change Log / Список изменений
 
 ## 2026-10-27 · 0.4.0-beta.10-dev.54 (75; QA 76)
+- RU: Кнопка плитки в приложении теперь яркая, после подтверждённого добавления становится неактивной и показывает пояснение об удалении через Android. Добавлена системная кнопка размещения виджета на рабочем столе и счётчик виджетов, с учётом поддержки лаунчером.
+- EN: Prominent QS tile add button tracks SystemUI lifecycle confirmation, disables when added, and explains system-managed removal. Launcher widget pin prompt with manual fallback and count added.
 - RU: Виджет полностью переработан: современная изумрудная карточка, три компоновки по размеру, крупный статус, кастомные скруглённые кнопки и аккуратные индикаторы. Старые системные Button удалены из новых макетов.
 - RU: Плитка и виджет после успешной управляющей команды самостоятельно запрашивают фактический статус службы; обновление не зависит от открытого AnimaDev.
 - EN: Modern emerald-themed compact, medium and expanded widget layouts with fully custom RemoteViews action buttons. Post-command status refresh also works when the app screen is closed.

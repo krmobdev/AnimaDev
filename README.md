@@ -1,5 +1,7 @@
 # AnimaDev · 0.4.0-beta.10-dev.47
 
+AnimaBridge dev.54: clear Quick Settings installation state and one-tap Home widget pinning when the launcher supports it.
+
 AnimaBridge dev.54: modern resize-adaptive emerald widget, styled action buttons, shared status refresh without app UI.
 
 AnimaBridge dev.53: quick-settings tile and resizable home-screen widget with Start/Stop/Restart/Check, common service state, and no claim that a local Python process proves server connectivity.

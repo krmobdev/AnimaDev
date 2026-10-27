@@ -27,4 +27,13 @@
     <string name="bridge_widget_kicker">ПУЛЬТ УПРАВЛЕНИЯ</string>
     <string name="bridge_widget_connection_title">Сервер</string>
     <string name="bridge_widget_local_process">LOCAL · RUNIT</string>
+
+    <string name="bridge_tile_added">Плитка добавлена в шторку</string>
+    <string name="bridge_tile_remove_hint">Чтобы удалить: шторка → Изменить плитки → убрать AnimaBridge.</string>
+    <string name="bridge_tile_unavailable">Системный запрос недоступен. Открой шторку → Изменить плитки и добавь AnimaBridge вручную.</string>
+    <string name="bridge_tile_declined">Плитка не добавлена. Можно попробовать ещё раз.</string>
+    <string name="bridge_pin_widget">Добавить виджет на рабочий стол</string>
+    <string name="bridge_add_another_widget">Добавить ещё один виджет</string>
+    <string name="bridge_widget_count">Установлено виджетов: %1$d</string>
+    <string name="bridge_widget_manual_hint">Рабочий стол → Виджеты → AnimaDev → AnimaBridge. Лаунчер не поддерживает добавление одним нажатием.</string>
 </resources>

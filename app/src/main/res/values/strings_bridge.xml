@@ -27,4 +27,13 @@
     <string name="bridge_widget_kicker">QUICK CONTROL</string>
     <string name="bridge_widget_connection_title">Server</string>
     <string name="bridge_widget_local_process">LOCAL · RUNIT</string>
+
+    <string name="bridge_tile_added">Tile added to Quick Settings</string>
+    <string name="bridge_tile_remove_hint">To remove: Quick Settings → Edit tiles → remove AnimaBridge.</string>
+    <string name="bridge_tile_unavailable">System tile picker unavailable. Open Quick Settings → Edit and add AnimaBridge manually.</string>
+    <string name="bridge_tile_declined">Tile not added. You can try again from here.</string>
+    <string name="bridge_pin_widget">Add widget to Home screen</string>
+    <string name="bridge_add_another_widget">Add another home widget</string>
+    <string name="bridge_widget_count">Widgets installed: %1$d</string>
+    <string name="bridge_widget_manual_hint">Home screen → Widgets → AnimaDev → AnimaBridge (launcher does not support one-tap pinning).</string>
 </resources>

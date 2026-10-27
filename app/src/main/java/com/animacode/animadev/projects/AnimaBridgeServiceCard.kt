@@ -2,6 +2,7 @@ package com.animacode.animadev.projects
 
 import android.content.Context
 import android.app.StatusBarManager
+import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.graphics.drawable.Icon
 import com.animacode.animadev.R
@@ -14,6 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import com.animacode.animadev.termux.BridgeTilePresence
+import com.animacode.animadev.termux.BridgeWidgetProvider
 import com.animacode.animadev.termux.BridgeServiceGateway
 import com.animacode.animadev.termux.BridgeServicePolicy
 import com.animacode.animadev.termux.BridgeServiceStore
@@ -26,11 +30,25 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
     val gateway = remember(context) { BridgeServiceGateway(context) }
     val store = remember(context) { BridgeServiceStore(context) }
     var record by remember { mutableStateOf(store.read()) }
+    var tileAdded by remember { mutableStateOf(BridgeTilePresence.isAdded(context)) }
+    val widgetManager = remember(context) { AppWidgetManager.getInstance(context) }
+    var widgetCount by remember { mutableIntStateOf(0) }
+    var pinSupported by remember { mutableStateOf(false) }
+    var installNote by remember { mutableStateOf("") }
+    fun refreshInstallState() {
+        tileAdded = BridgeTilePresence.isAdded(context)
+        widgetCount = widgetManager.getAppWidgetIds(
+            ComponentName(context, BridgeWidgetProvider::class.java),
+        ).size
+        pinSupported = widgetManager.isRequestPinAppWidgetSupported
+    }
     LaunchedEffect(termuxReady) {
+        refreshInstallState()
         if (termuxReady && record.phase != "REQUESTED") gateway.request("status")
         while (true) {
             delay(700L)
             record = store.read()
+            refreshInstallState()
             // 'sv up/down/restart' returning zero confirms acceptance, not health.
             // Exactly one follow-up 'sv status' confirms the observed state.
             if (termuxReady && record.phase == "DONE" && record.action != "status") {
@@ -92,27 +110,112 @@ fun AnimaBridgeServiceCard(context: Context, termuxReady: Boolean) {
                     enabled = termuxReady && BridgeServicePolicy.permits("restart", record.serviceState, pending),
                 ) { Text(if (english) "Restart" else "Перезапустить", maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
-            OutlinedButton(
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text(
+                if (english) "Quick access" else "Быстрый доступ",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Button(
+                enabled = !tileAdded,
                 onClick = {
                     try {
-                        context.getSystemService(StatusBarManager::class.java)
-                            ?.requestAddTileService(
+                        val statusBar = context.getSystemService(StatusBarManager::class.java)
+                        if (statusBar == null) {
+                            installNote = context.getString(R.string.bridge_tile_unavailable)
+                        } else {
+                            statusBar.requestAddTileService(
                                 ComponentName(context, BridgeQuickTileService::class.java),
                                 context.getString(R.string.bridge_tile_label),
                                 Icon.createWithResource(context, R.drawable.ic_bridge_tile),
                                 context.mainExecutor,
-                            ) { }
+                            ) { result ->
+                                when (result) {
+                                    StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED,
+                                    StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> {
+                                        BridgeTilePresence.setAdded(context, true)
+                                        tileAdded = true
+                                        installNote = ""
+                                    }
+                                    StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_NOT_ADDED ->
+                                        installNote = context.getString(R.string.bridge_tile_declined)
+                                    else -> installNote = context.getString(R.string.bridge_tile_unavailable)
+                                }
+                            }
+                        }
                     } catch (_: RuntimeException) {
-                        // System tile picker may be unavailable on customized Android ROMs.
+                        installNote = context.getString(R.string.bridge_tile_unavailable)
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(context.getString(R.string.bridge_add_tile)) }
-            Text(
-                context.getString(R.string.bridge_add_widget_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF7CF5AA),
+                    contentColor = Color(0xFF10291D),
+                    disabledContainerColor = Color(0xFF26543D),
+                    disabledContentColor = Color(0xFFB1FFD0),
+                ),
+            ) {
+                Text(
+                    if (tileAdded) "✓ " + context.getString(R.string.bridge_tile_added)
+                    else "＋ " + context.getString(R.string.bridge_add_tile),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+            if (tileAdded) {
+                Text(
+                    context.getString(R.string.bridge_tile_remove_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Button(
+                enabled = pinSupported,
+                onClick = {
+                    try {
+                        val accepted = widgetManager.requestPinAppWidget(
+                            ComponentName(context, BridgeWidgetProvider::class.java),
+                            null, null,
+                        )
+                        if (!accepted)
+                            installNote = context.getString(R.string.bridge_widget_manual_hint)
+                        else installNote = ""
+                    } catch (_: RuntimeException) {
+                        installNote = context.getString(R.string.bridge_widget_manual_hint)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2B5942),
+                    contentColor = Color(0xFFC5FFDC),
+                ),
+            ) {
+                Text(
+                    "＋ " + context.getString(
+                        if (widgetCount > 0) R.string.bridge_add_another_widget
+                        else R.string.bridge_pin_widget,
+                    ),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+            if (widgetCount > 0) {
+                Text(
+                    context.getString(R.string.bridge_widget_count, widgetCount),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF9DFDC0),
+                )
+            }
+            if (!pinSupported) {
+                Text(
+                    context.getString(R.string.bridge_widget_manual_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (installNote.isNotBlank()) {
+                Text(
+                    installNote, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (record.message.isNotEmpty()) {
                 Text(record.message, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)

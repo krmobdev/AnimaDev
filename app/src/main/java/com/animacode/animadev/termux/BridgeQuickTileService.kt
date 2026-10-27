@@ -8,12 +8,20 @@ import com.animacode.animadev.R
 class BridgeQuickTileService : TileService() {
     override fun onTileAdded() {
         super.onTileAdded()
+        BridgeTilePresence.setAdded(this, true)
         BridgeSurfaceSync.checkIfStale(this, 0L)
         showState()
     }
 
+    override fun onTileRemoved() {
+        BridgeTilePresence.setAdded(this, false)
+        super.onTileRemoved()
+    }
+
     override fun onStartListening() {
         super.onStartListening()
+        // Reconcile tiles already installed before this feature existed.
+        BridgeTilePresence.setAdded(this, true)
         showState()
         BridgeSurfaceSync.checkIfStale(this)
     }
