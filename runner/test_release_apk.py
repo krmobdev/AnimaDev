@@ -69,7 +69,7 @@ class ReleaseApkTests(unittest.TestCase):
                 return subprocess.CompletedProcess(cmd,0,stdout=b"",stderr=b"")
             if cmd[0]=="apksigner" and cmd[1]=="verify":
                 return subprocess.CompletedProcess(cmd,0,
-                    stdout=b"Signer #1 certificate SHA-256 digest: "+b"a"*64+b"\n",
+                    stdout=b"V3.0 Signer: certificate SHA-256 digest: "+b"a"*64+b"\n",
                     stderr=b"")
             if cmd[0]=="aapt":
                 return subprocess.CompletedProcess(cmd,0,

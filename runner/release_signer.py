@@ -186,8 +186,9 @@ def sign_apk(unsigned, aligned, signed, key_data, store_password, key_password,
             timeout=90,check=False)
         if verification.returncode!=0 or len(verification.stdout)>16384:
             raise SigningError("APK_SIGNATURE_INVALID")
-        fingerprint=re.search(rb"Signer #1 certificate SHA-256 digest:\s*([a-fA-F0-9]{64})",
-                              verification.stdout)
+        fingerprint=re.search(
+            rb"(?:^|\n)(?:V[234](?:\.[0-9]+)? Signer:|Signer #1) certificate SHA-256 digest:\s*([a-fA-F0-9]{64})(?=\s|$)",
+            verification.stdout)
         if not fingerprint:
             raise SigningError("APK_SIGNATURE_INVALID")
         cert=fingerprint.group(1).decode("ascii").lower()

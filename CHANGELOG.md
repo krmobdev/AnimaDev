@@ -1,6 +1,8 @@
 # AnimaDev — Change Log / Список изменений
 
 ## 2026-10-27 · 0.4.0-beta.10-dev.49 (65; QA 66)
+- RU: При проверке APK поддержан реальный формат вывода apksigner V3.0 Signer: certificate SHA-256 digest; полная синтетическая подпись APK подтверждена на устройстве.
+- EN: Accept apksigner's V3.0 Signer certificate digest output; real-APK signing and verification passed with an ephemeral synthetic JKS.
 - RU: Исправлена конфигурация Gradle 9: Release Lint зависит от prepareSupportDocs, как и от prepareReleaseScripts; устранён отказ assembleRelease до создания APK.
 - EN: Fix Gradle 9 release lint input dependencies on the generated in-app support documentation; assembleRelease no longer fails at the lint model task.
 - RU: Ветка dev создана от актуального main; в неё перенесены управление зарегистрированной службой AnimaBridge из dev.48 и новый тип подписанной сборки Release APK. Основная ветка main и прежняя feature-ветка не изменены.
