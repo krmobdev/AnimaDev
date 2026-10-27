@@ -32,7 +32,7 @@ class ReleaseHistoryCache(context:Context) {
             prefs.edit().putString(key,added.toString()).apply()
         }
         if(status !in terminal || record.optLong("ended_at")<=0L)return
-        val entry=JSONObject().put("action","RELEASE_AAB")
+        val entry=JSONObject().put("action",record.optString("kind","RELEASE_AAB"))
             .put("project_id",record.optString("project"))
             .put("job_id",jobId).put("id",jobId)
             .put("state",status).put("phase",phase).put("message",message)

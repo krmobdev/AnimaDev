@@ -1,4 +1,4 @@
-"""One-shot Release AAB worker. Secrets arrive ONLY via authenticated hybrid envelope.
+"""One-shot signed Release APK/AAB worker. Secrets arrive ONLY via authenticated hybrid envelope.
 
 This source is concatenated after release_signer.py from the signed Android APK.
 No dynamic shell commands, keystore paths, secret environment variables, Git writes,
@@ -104,11 +104,37 @@ def _bundle_file(root):
         raise ReleaseFailure("ARTIFACT_PATH_DENIED")
     return target
 
-def _export(signed,request,project,sha,meta):
+
+def _apk_file(root):
+    directory=root/"app/build/outputs/apk/release"
+    metadata=directory/"output-metadata.json"
+    if metadata.is_symlink() or not metadata.is_file() or directory.resolve()!=directory.absolute():
+        raise ReleaseFailure("APK_METADATA_INVALID")
+    try:
+        raw=json.loads(metadata.read_text(encoding="utf-8"))
+        element=raw["elements"][0]
+        if raw["variantName"]!="release" or len(raw["elements"])!=1:
+            raise ValueError()
+        filename=element["outputFile"]
+        if filename not in ("app-release-unsigned.apk","app-release.apk"):
+            raise ValueError()
+        identity={"applicationId":raw["applicationId"],
+                  "versionCode":int(element["versionCode"]),
+                  "versionName":str(element["versionName"])}
+        if not re.fullmatch(r"[A-Za-z0-9_.]{1,180}",identity["applicationId"]):
+            raise ValueError()
+        if identity["versionCode"]<1 or len(identity["versionName"])>120:
+            raise ValueError()
+        return directory/filename,identity
+    except (OSError,ValueError,KeyError,TypeError,IndexError,OverflowError):
+        raise ReleaseFailure("APK_METADATA_INVALID")
+
+def _export(signed,request,project,sha,meta,variant="RELEASE_AAB"):
     if not DOWNLOADS.is_dir() or DOWNLOADS.is_symlink():
         raise ReleaseFailure("DOWNLOADS_UNAVAILABLE")
     name=re.sub(r"[^A-Za-z0-9_-]+","_",project["name"])[:35].strip("_") or "AndroidProject"
-    target=DOWNLOADS/(name+"_"+sha[:12]+"_"+request[:8]+"_release.aab")
+    suffix=".apk" if variant=="RELEASE_APK" else ".aab"
+    target=DOWNLOADS/(name+"_"+sha[:12]+"_"+request[:8]+"_release"+suffix)
     tmp=DOWNLOADS/(".animadev-release-"+request+".part")
     if target.exists() or target.is_symlink() or tmp.exists() or tmp.is_symlink():
         raise ReleaseFailure("ARTIFACT_PATH_DENIED")
@@ -130,8 +156,10 @@ def _export(signed,request,project,sha,meta):
         try:tmp.unlink()
         except OSError:pass
         raise ReleaseFailure("EXPORT_FAILED")
-    return {"kind":"RELEASE_AAB","path":str(target),"sha256":digest.hexdigest(),
-            "size":target.stat().st_size,"commit":sha}
+    return {"kind":variant,"path":str(target),"sha256":digest.hexdigest(),
+            "size":target.stat().st_size,"commit":sha,
+            **({k:meta[k] for k in ("signer_sha256","applicationId","versionCode","versionName")}
+                if variant=="RELEASE_APK" else {})}
 
 # Only fixed Gradle task labels and allowlisted diagnostic summaries are exposed.
 # No stdout text from custom build scripts, passwords, paths, or signing tools is saved.
@@ -193,12 +221,13 @@ class ReleaseProgress:
         safe=safe_gradle_line(raw)
         if safe:self.write("GRADLE",safe)
 
-def run_gradle_release(root,env,cancel_path,progress):
+def run_gradle_release(root,env,cancel_path,progress,variant="RELEASE_AAB"):
     """Drain Gradle stdout so tasks can be tracked; never persist raw output."""
     import selectors
     try:
         proc=subprocess.Popen(["/data/data/com.termux/files/usr/bin/bash",
-            "./gradlew",":app:bundleRelease","--offline","--no-daemon","--rerun-tasks","--console=plain"],
+            "./gradlew",(":app:assembleRelease" if variant=="RELEASE_APK" else ":app:bundleRelease"),
+            "--offline","--no-daemon","--rerun-tasks","--console=plain"],
             cwd=root,env=env,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,start_new_session=True)
     except OSError:
@@ -255,11 +284,14 @@ def run_gradle_release(root,env,cancel_path,progress):
     if proc.returncode!=0:
         progress.write("FAILED","Gradle завершился с ошибкой; проверьте предыдущие этапы")
         raise ReleaseFailure("GRADLE_FAILED")
-    progress.write("GRADLE","Gradle завершил Release AAB")
+    progress.write("GRADLE","Gradle завершил Release APK" if variant=="RELEASE_APK" else "Gradle завершил Release AAB")
 
 def run(payload):
     required={"request_id","project","alias","keystore","store_password","key_password"}
-    if type(payload) is not dict or set(payload)!=required or not isinstance(payload["request_id"],str) or not RX_ID.fullmatch(payload["request_id"]):
+    if type(payload) is not dict or set(payload) not in (required,required|{"variant"}) or not isinstance(payload["request_id"],str) or not RX_ID.fullmatch(payload["request_id"]):
+        raise ReleaseFailure("RESULT_MALFORMED")
+    variant=payload.get("variant","RELEASE_AAB")
+    if variant not in ("RELEASE_APK","RELEASE_AAB") or type(variant) is not str:
         raise ReleaseFailure("RESULT_MALFORMED")
     project=payload["project"]
     request=payload["request_id"]
@@ -311,9 +343,17 @@ def run(payload):
             gradlew=root/"gradlew"
             if not gradlew.is_file() or gradlew.is_symlink():
                 raise ReleaseFailure("GRADLE_MISSING")
-            unsigned=_bundle_file(root)
+            unsigned=_bundle_file(root) if variant=="RELEASE_AAB" else None
+            apk_dir=root/"app/build/outputs/apk/release"
+            pre_apks={}
+            if variant=="RELEASE_APK":
+                for filename in ("app-release-unsigned.apk","app-release.apk"):
+                    path=apk_dir/filename
+                    if path.is_file() and not path.is_symlink():
+                        st=path.stat()
+                        pre_apks[filename]=(st.st_ino,st.st_size,st.st_mtime_ns,st.st_ctime_ns)
             old=None
-            if unsigned.exists():
+            if unsigned is not None and unsigned.exists():
                 stat=unsigned.stat()
                 old=(stat.st_ino,stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns)
             # The entire Gradle process has no knowledge of credentials.
@@ -330,8 +370,12 @@ def run(payload):
             if not pathlib.Path(env.get("ANDROID_SDK_ROOT","")).is_dir():
                 env["ANDROID_SDK_ROOT"]=str(sdk)
             if cancel_path.is_file():raise ReleaseFailure("CANCELLED")
-            progress.write("GRADLE","Запуск офлайн-сборки Release AAB")
-            run_gradle_release(root,env,cancel_path,progress)
+            progress.write("GRADLE","Запуск офлайн-сборки Release APK" if variant=="RELEASE_APK" else "Запуск офлайн-сборки Release AAB")
+            run_gradle_release(root,env,cancel_path,progress,variant)
+            expected=None
+            if variant=="RELEASE_APK":
+                unsigned,expected=_apk_file(root)
+                old=pre_apks.get(unsigned.name)
             if _git_clean(root,project)!=sha:
                 raise ReleaseFailure("BUILD_OUTDATED")
             if not unsigned.is_file() or unsigned.is_symlink():
@@ -339,21 +383,30 @@ def run(payload):
             stat=unsigned.stat()
             if old==(stat.st_ino,stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns):
                 raise ReleaseFailure("ARTIFACT_INVALID")
-            progress.write("SIGNING","Gradle собрал AAB · проверяем ключ и подпись")
-            signed=unsigned.parent/(".animadev-"+project["id"]+"-"+sha[:12]+"-"+os.urandom(4).hex()+".aab")
+            progress.write("SIGNING","Gradle собрал "+("APK" if variant=="RELEASE_APK" else "AAB")+" · проверяем подпись")
+            suffix=".apk" if variant=="RELEASE_APK" else ".aab"
+            signed=unsigned.parent/(".animadev-"+project["id"]+"-"+sha[:12]+"-"+os.urandom(4).hex()+suffix)
+            aligned=signed.with_name(signed.stem+"-aligned.apk") if variant=="RELEASE_APK" else None
             try:
                 if cancel_path.is_file():raise ReleaseFailure("CANCELLED")
-                meta=sign_bundle(unsigned,signed,key_bytes,store_password,key_password,alias,
-                                 jarsigner="/data/data/com.termux/files/usr/bin/jarsigner")
+                if variant=="RELEASE_APK":
+                    meta=sign_apk(unsigned,aligned,signed,key_bytes,store_password,key_password,alias,expected)
+                else:
+                    meta=sign_bundle(unsigned,signed,key_bytes,store_password,key_password,alias,
+                                     jarsigner="/data/data/com.termux/files/usr/bin/jarsigner")
                 if _git_clean(root,project)!=sha:
                     raise ReleaseFailure("BUILD_OUTDATED")
                 if cancel_path.is_file():raise ReleaseFailure("CANCELLED")
-                progress.write("EXPORTING","Подпись проверена · сохраняем AAB в Загрузки")
-                artifact=_export(signed,request,project,sha,meta)
-                progress.write("DONE","Подписанный AAB успешно сохранён")
+                progress.write("EXPORTING","Подпись проверена · сохраняем "+("APK" if variant=="RELEASE_APK" else "AAB")+" в Загрузки")
+                artifact=(_export(signed,request,project,sha,meta,variant)
+                          if variant=="RELEASE_APK" else _export(signed,request,project,sha,meta))
+                progress.write("DONE","Подписанный "+("APK" if variant=="RELEASE_APK" else "AAB")+" успешно сохранён")
             finally:
                 try:signed.unlink()
                 except OSError:pass
+                if aligned is not None:
+                    try:aligned.unlink()
+                    except OSError:pass
             return artifact
         finally:
             # Cancellation markers never contain a signing secret.

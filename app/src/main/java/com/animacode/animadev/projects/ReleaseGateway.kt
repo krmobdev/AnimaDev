@@ -46,10 +46,10 @@ class ReleaseStore(private val context:Context) {
         }
         return ok
     }
-    fun begin(project:String,id:String,sha:String,outputDir:String):Boolean {
+    fun begin(project:String,id:String,sha:String,outputDir:String,kind:String="RELEASE_AAB"):Boolean {
         if(busy())return false
         return write(JSONObject().put("project",project).put("id",id).put("sha",sha)
-            .put("output_dir",outputDir)
+            .put("output_dir",outputDir).put("kind",kind)
             .put("state","REQUESTED").put("phase","ENROLLING").put("started_at",System.currentTimeMillis())
             .put("message","Termux собирает Release AAB. Задание может занять несколько минут; не запускайте его повторно."))
     }
@@ -70,7 +70,8 @@ class ReleaseGateway(private val context:Context) {
     private val store=ReleaseStore(context)
     private val signing=SigningStore(context)
 
-    suspend fun launch(project:LocalProject,storePassword:String,keyPassword:String):String {
+    suspend fun launch(project:LocalProject,storePassword:String,keyPassword:String,kind:String="RELEASE_AAB"):String {
+        if(kind !in setOf("RELEASE_APK","RELEASE_AAB"))return "Неизвестный вариант Release."
         val repo=RepoStore(context).read()
         if(store.busy())return "Release AAB уже выполняется или его результат неизвестен."
         if(!project.supported || !RepoGateway(context).mayBuild(repo,project.id)
@@ -120,10 +121,11 @@ class ReleaseGateway(private val context:Context) {
             val payload=JSONObject().put("request_id",request).put("project",profile)
                 .put("alias",alias).put("keystore",Base64.encodeToString(key,Base64.NO_WRAP))
                 .put("store_password",storePassword).put("key_password",keyPassword)
+                .put("variant",kind)
             val reserved=synchronized(BuildConcurrencyPolicy.launchMonitor) {
                 val current=RepoStore(context)
                 if(current.blocked() || current.read().optBoolean("pending"))false
-                else store.begin(project.id,request,sha,outputDir)
+                else store.begin(project.id,request,sha,outputDir,kind)
             }
             if(!reserved)return "Другая операция Termux ещё активна. Дождитесь подтверждения её результата."
 
@@ -184,12 +186,14 @@ class ReleaseGateway(private val context:Context) {
 object ReleaseWire {
     const val CALLBACK="com.animacode.animadev.RELEASE_RESULT"
     const val MAX_KEY_BYTES=96*1024
-    fun validArtifact(raw:JSONObject, sha:String):Boolean=runCatching {
-        raw.getString("kind")=="RELEASE_AAB" &&
+    fun validArtifact(raw:JSONObject, sha:String, kind:String="RELEASE_AAB"):Boolean=runCatching {
+        kind in setOf("RELEASE_APK","RELEASE_AAB") && raw.getString("kind")==kind &&
             raw.getString("commit")==sha &&
             raw.getString("sha256").matches(Regex("[a-f0-9]{64}")) &&
             raw.getLong("size")>1024 &&
-            raw.getString("path").endsWith(".aab") &&
+            raw.getString("path").endsWith(if(kind=="RELEASE_APK")".apk" else ".aab") &&
+            (kind!="RELEASE_APK" || (raw.getString("signer_sha256").matches(Regex("[a-f0-9]{64}")) &&
+                raw.getString("applicationId").isNotBlank() && raw.getInt("versionCode")>0)) &&
             ArtifactPolicy.valid(raw.getString("path"),raw.getString("sha256"),raw.getLong("size"))
     }.getOrDefault(false)
 }
@@ -209,20 +213,21 @@ class ReleaseResultReceiver:BroadcastReceiver() {
             val payload=JSONObject(stdout)
             check(payload.optInt("version")==1 && payload.optString("request_id")==record.getString("id"))
             val ok=result.getInt("exitCode")==0 && result.getInt("err")==-1 && payload.optBoolean("ok")
+            val type=if(record.optString("kind")=="RELEASE_APK")"APK" else "AAB"
             if(ok) {
                 val artifact=payload.getJSONObject("artifact")
-                check(ReleaseWire.validArtifact(artifact,record.getString("sha")))
+                check(ReleaseWire.validArtifact(artifact,record.getString("sha"),record.optString("kind","RELEASE_AAB")))
                 val destination=record.optString("output_dir","/storage/emulated/0/Download")
                 if(destination!="/storage/emulated/0/Download") {
                     record.put("artifact",artifact).put("phase","EXPORTING")
-                        .put("message","AAB подписан. Проверяем SHA-256 и переносим в выбранную папку.")
+                        .put("message","$type подписан. Проверяем SHA-256 и переносим в выбранную папку.")
                     check(store.write(record))
                     if(!ArtifactMoveGateway.start(context,record,artifact,destination))
                         ArtifactMoveGateway.result(context,record,false,"")
                     return
                 }
                 record.put("artifact",artifact).put("state","SUCCEEDED")
-                    .put("message","Release AAB подписан, проверен и сохранён в Загрузки.")
+                    .put("message","Release $type подписан, проверен и сохранён в Загрузки.")
             } else {
                 val code=payload.optString("error_code","RESULT_UNCONFIRMED")
                 if(!code.matches(Regex("[A-Z_]{3,50}")))error("Malformed code")
@@ -233,7 +238,7 @@ class ReleaseResultReceiver:BroadcastReceiver() {
                     else->"FAILED"
                 })
                     .put("message",when(code) {
-                        "CANCELLED"->"Сборка остановлена через Ctrl+C. Подписанный AAB не опубликован."
+                        "CANCELLED"->"Сборка остановлена через Ctrl+C. Подписанный $type не опубликован."
                         "ENVELOPE_MISSING"->"Termux не получил зашифрованное содержимое. Проверьте RUN_COMMAND_STDIN."
                         "TRANSPORT_DECRYPT_FAILED"->"Termux получил данные, но отклонил шифрование. Проверьте связь и повторите с новым одноразовым ключом."
                         "TRANSPORT_UNAVAILABLE"->"Не удалось запустить локальный модуль расшифровки в Termux."

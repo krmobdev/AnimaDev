@@ -38,3 +38,7 @@ Allow RUN_COMMAND in Termux and grant the requested Android permission. In the a
 
 ## 5. Security
 Keep JKS, passwords and SSH private keys out of shared Downloads. Do not blindly execute untrusted repository scripts. This guide does not change repositories or install anything automatically.
+
+### AnimaBridge service control and signed APK (dev.49)
+Register animabridge using the reviewed scripts/install_animabridge_service.sh first. Registration leaves runit DOWN. Do not start a duplicate over a live manual agent. The AnimaDev Termux card uses allowlisted sv actions through Termux RUN_COMMAND, not direct agent paths or credentials.
+Signed Release APK additionally uses local zipalign, apksigner, aapt, JDK and Android SDK. JKS is transferred only through the existing encrypted local channel.

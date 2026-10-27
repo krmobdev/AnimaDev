@@ -108,7 +108,7 @@ class SigningStore(private val context: Context) {
         // Canceling the Android picker never clears a previously selected key.
     }
     Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Text("Ключ подписи Release AAB",style=MaterialTheme.typography.titleMedium)
+        Text("Ключ подписи Release APK / AAB",style=MaterialTheme.typography.titleMedium)
         if(supported.isEmpty()) Text("Нет поддерживаемых проектов.")
         supported.forEach {p->Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
             RadioButton(selected=currentId==p.id,onClick={currentId=p.id})
@@ -178,12 +178,12 @@ class SigningStore(private val context: Context) {
             modifier=Modifier.fillMaxWidth()) {Text(if(checking)"Проверяю…" else "Проверить файл, alias и пароль")}
         if(message.isNotEmpty())Text(message)
         HorizontalDivider()
-        Text("Следующий шаг — сборка Release AAB",style=MaterialTheme.typography.titleMedium)
+        Text("Следующий шаг — сборка Release APK / AAB",style=MaterialTheme.typography.titleMedium)
         Text("Здесь выбирается ключ и проверяется пароль хранилища. Сама сборка находится в разделе проекта «Сборка». Настроенные JKS и alias будут использованы автоматически.",
             style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Button(onClick={onOpenBuild(currentId)},
             enabled=currentId.isNotBlank() && hasAccess && store.alias(currentId).isNotBlank(),
-            modifier=Modifier.fillMaxWidth()) {Text("Перейти к сборке Release AAB")}
+            modifier=Modifier.fillMaxWidth()) {Text("Перейти к сборке Release APK / AAB")}
         if(!hasAccess || store.alias(currentId).isBlank())
             Text("Чтобы перейти к сборке, выберите JKS и сохраните alias.",
                 style=MaterialTheme.typography.bodySmall)

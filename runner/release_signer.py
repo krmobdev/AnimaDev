@@ -125,3 +125,89 @@ def sign_bundle(unsigned, signed, key_data, store_password, key_password, alias,
     with signed.open("rb") as stream:
         digest=hashlib.file_digest(stream,"sha256").hexdigest()
     return {"sha256":digest,"size":signed.stat().st_size}
+
+
+def _verify_apk_archive(path):
+    if (path.is_symlink() or not path.is_file() or path.stat().st_size > BUNDLE_LIMIT
+            or path.resolve() != path.absolute()):
+        raise SigningError("ARTIFACT_INVALID")
+    try:
+        with zipfile.ZipFile(path) as archive:
+            if "AndroidManifest.xml" not in archive.namelist():
+                raise SigningError("ARTIFACT_INVALID")
+    except (OSError, zipfile.BadZipFile):
+        raise SigningError("ARTIFACT_INVALID")
+
+
+def sign_apk(unsigned, aligned, signed, key_data, store_password, key_password,
+             alias, expected, zipalign="zipalign", apksigner="apksigner", aapt="aapt"):
+    """Zipalign, APK-Signature sign and verify with the same anonymous JKS IPC."""
+    unsigned, aligned, signed = map(pathlib.Path, (unsigned, aligned, signed))
+    if (not isinstance(key_data, bytearray) or not 0 < len(key_data) <= MAX_KEY_BYTES
+            or not isinstance(store_password, bytearray) or not 0 < len(store_password) <= MAX_PASSWORD
+            or not isinstance(key_password, bytearray) or not 0 < len(key_password) <= MAX_PASSWORD
+            or not ALIAS.fullmatch(alias)):
+        raise SigningError("SIGNING_INPUT_DENIED")
+    _verify_apk_archive(unsigned)
+    for output in (aligned, signed):
+        if output.exists() or output.is_symlink() or output.parent.resolve()!=output.parent.absolute():
+            raise SigningError("ARTIFACT_PATH_DENIED")
+    try:
+        aligned_result=subprocess.run([zipalign,"-f","4",str(unsigned),str(aligned)],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,timeout=120,check=False)
+        if aligned_result.returncode!=0:
+            raise SigningError("ZIPALIGN_FAILED")
+        _verify_apk_archive(aligned)
+    except (OSError, subprocess.TimeoutExpired):
+        raise SigningError("ZIPALIGN_UNAVAILABLE")
+    fds=[]
+    try:
+        fds=[_ram_fd("jks",key_data)]
+        fds.append(_ram_fd("apk-store-pass",store_password+b"\n"))
+        fds.append(_ram_fd("apk-key-pass",key_password+b"\n"))
+        command=[apksigner,"sign","--ks","/proc/self/fd/"+str(fds[0]),
+            "--ks-type","JKS","--ks-key-alias",alias,
+            "--ks-pass","file:/proc/self/fd/"+str(fds[1]),
+            "--key-pass","file:/proc/self/fd/"+str(fds[2]),
+            "--out",str(signed),str(aligned)]
+        try:
+            result=subprocess.run(command,pass_fds=tuple(fds),stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=180,check=False)
+        except (OSError,subprocess.TimeoutExpired):
+            raise SigningError("APKSIGNER_UNAVAILABLE")
+        if result.returncode!=0:raise SigningError("KEY_OR_SIGNING_FAILED")
+    finally:
+        for fd in fds:os.close(fd)
+    _verify_apk_archive(signed)
+    try:
+        verification=subprocess.run([apksigner,"verify","--verbose","--print-certs",str(signed)],
+            stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+            timeout=90,check=False)
+        if verification.returncode!=0 or len(verification.stdout)>16384:
+            raise SigningError("APK_SIGNATURE_INVALID")
+        fingerprint=re.search(rb"Signer #1 certificate SHA-256 digest:\s*([a-fA-F0-9]{64})",
+                              verification.stdout)
+        if not fingerprint:
+            raise SigningError("APK_SIGNATURE_INVALID")
+        cert=fingerprint.group(1).decode("ascii").lower()
+        inspection=subprocess.run([aapt,"dump","badging",str(signed)],
+            stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+            timeout=60,check=False)
+        if inspection.returncode!=0 or len(inspection.stdout)>250000:
+            raise SigningError("APK_METADATA_INVALID")
+        manifest=re.search(rb"^package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']*)'",
+                           inspection.stdout,re.MULTILINE)
+        if not manifest:
+            raise SigningError("APK_METADATA_INVALID")
+        app_id,version_code,version_name=[v.decode("utf-8") for v in manifest.groups()]
+        if (app_id!=expected["applicationId"] or int(version_code)!=int(expected["versionCode"])
+                or version_name!=str(expected["versionName"])):
+            raise SigningError("APK_METADATA_INVALID")
+    except (OSError,subprocess.TimeoutExpired,UnicodeError):
+        raise SigningError("APK_VERIFICATION_UNAVAILABLE")
+    with signed.open("rb") as stream:
+        digest=hashlib.file_digest(stream,"sha256").hexdigest()
+    return {"sha256":digest,"size":signed.stat().st_size,
+            "signer_sha256":cert,"applicationId":app_id,
+            "versionCode":int(version_code),"versionName":version_name}

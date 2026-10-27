@@ -37,6 +37,7 @@ import com.animacode.animadev.termux.TermuxGateway
         if(neon)item {NeonSection("Termux",AppIcons.Terminal,
             "Linux terminal & development environment for Android")}
         item { ShizukuConnectionCard(context) }
+        item { AnimaBridgeServiceCard(context, termuxReady = permitted && version != null) }
         item {Surface(
             color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.primaryContainer,
             shape=androidx.compose.foundation.shape.RoundedCornerShape(23.dp),

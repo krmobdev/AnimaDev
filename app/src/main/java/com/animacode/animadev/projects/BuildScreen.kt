@@ -99,6 +99,9 @@ import com.animacode.animadev.termux.TermuxGateway
     val effectivePasswordPresent=releasePassword.isNotEmpty() || storedCredentials?.storePassword?.isNotEmpty()==true
     var fallbackBuildTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
     val buildTab=selectedBuildTab ?: fallbackBuildTab
+    val selectedReleaseKind=if(buildTab==1)"RELEASE_APK" else "RELEASE_AAB"
+    val releaseLabel=if(buildTab==1)"Release APK" else "Release AAB"
+    val resultLabel=if(releaseState.optString("kind")=="RELEASE_APK")"Release APK" else "Release AAB"
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     val buildListState=rememberLazyListState()
     LaunchedEffect(releaseState.optString("id"),releaseBusy,permitted) {
@@ -111,7 +114,7 @@ import com.animacode.animadev.termux.TermuxGateway
         }
     }
     LaunchedEffect(buildTab,releaseState.optString("id")) {
-        if(buildTab==1 && releaseForProject && releaseState.optString("id").isNotBlank()) {
+        if(buildTab!=0 && releaseForProject && releaseState.optString("id").isNotBlank()) {
             delay(300)
             buildListState.scrollToItem((buildListState.layoutInfo.totalItemsCount-1).coerceAtLeast(0))
         }
@@ -126,7 +129,7 @@ import com.animacode.animadev.termux.TermuxGateway
     LazyColumn(Modifier.fillMaxSize(),state=buildListState,contentPadding=PaddingValues(start=20.dp,end=20.dp,top=24.dp,bottom=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
         item {
             if(neon) NeonPanel(Modifier.fillMaxWidth(),glowing=true) {
-                Text(if(buildTab==0)"Debug APK Build" else "Release AAB Build",
+                Text(if(buildTab==0)"Debug APK Build" else "$releaseLabel Build",
                     style=MaterialTheme.typography.headlineSmall,
                     fontWeight=androidx.compose.ui.text.font.FontWeight.ExtraBold)
                 Text(project.name+" · "+project.branch.ifBlank {"Branch not verified"},
@@ -153,16 +156,16 @@ import com.animacode.animadev.termux.TermuxGateway
             }
         }
         item {
-            if(neon)NeonTabs(listOf("Debug APK","Release AAB"),buildTab,onSelect={
+            if(neon)NeonTabs(listOf("Debug APK","Release APK","Release AAB"),buildTab,onSelect={
                 if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
-            }) else OperationTabs(listOf("Debug APK","Release AAB"),buildTab) {
+            }) else OperationTabs(listOf("Debug APK","Release APK","Release AAB"),buildTab) {
                 if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
             }
         }
         if(catalogRefresh)item {Text("Сверяем активную ветку с Termux…",style=MaterialTheme.typography.bodySmall)}
         if(busyOwner!=null)item {
             Text("Очередь занята: "+busyOwner+" · "+when {
-                releaseBusy->"Release AAB"
+                releaseBusy->resultLabel
                 record.optString("action")=="TEST"->"Unit-тесты"
                 record.optString("action")=="TEST_DEVICE"->"Тесты на устройстве"
                 else->"Debug APK"
@@ -208,7 +211,7 @@ import com.animacode.animadev.termux.TermuxGateway
                 DebugBuildResult(context,record,project,permitted,onJournal)
             }
         }
-        if(buildTab==1)item {
+        if(buildTab!=0)item {
             Surface(shape=RoundedCornerShape(23.dp),
                 color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainer,
                 border=BorderStroke(1.dp,if(neon)NeonGlass.outline else MaterialTheme.colorScheme.outlineVariant)) {
@@ -218,7 +221,7 @@ import com.animacode.animadev.termux.TermuxGateway
                         horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                         Icon(AppIcons.Build,null,tint=MaterialTheme.colorScheme.primary)
                         Column {
-                            Text(if(neon)"Release signing" else "Release AAB",
+                            Text(if(neon)"Release signing" else releaseLabel,
                                 style=MaterialTheme.typography.titleLarge)
                             Text("Подписанный пакет для публикации",
                                 style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -286,7 +289,7 @@ import com.animacode.animadev.termux.TermuxGateway
                     }
                     if(vaultMessage.isNotBlank())Text(vaultMessage,style=MaterialTheme.typography.bodySmall)
                     if(neon)NeonSection("Build Actions",AppIcons.Build,
-                        "Sign and verify an Android App Bundle")
+                        if(buildTab==1)"Sign and verify an Android APK" else "Sign and verify an Android App Bundle")
                     Button(onClick={
                         tap()
                         val saved=storedCredentials
@@ -295,10 +298,10 @@ import com.animacode.animadev.termux.TermuxGateway
                             releaseKeyPassword.ifEmpty {saved?.keyPassword.orEmpty()}
                         releasePassword="";releaseKeyPassword=""
                         releaseMessage="Подготавливаю защищённую сборку…"
-                        releaseScope.launch {releaseMessage=releaseGateway.launch(project,storePass,keyPass)}
+                        releaseScope.launch {releaseMessage=releaseGateway.launch(project,storePass,keyPass,selectedReleaseKind)}
                     },enabled=canRelease && effectivePasswordPresent,
                         modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)) {
-                        Text(if(neon)"Build Release AAB" else "Собрать Release AAB")
+                        Text(if(neon)"Build $releaseLabel" else "Собрать $releaseLabel")
                     }
                     OutlinedButton(onClick={tap();gateway.start("CHECK",project.id,project.path)},
                         enabled=canCheck,modifier=Modifier.fillMaxWidth()) {
@@ -330,16 +333,16 @@ import com.animacode.animadev.termux.TermuxGateway
                 }
             }
         }
-        if(buildTab==1 && releaseForProject)item {
+        if(buildTab!=0 && releaseForProject)item {
             val state=releaseState.optString("state")
             OutlinedCard(shape=RoundedCornerShape(22.dp),
                 modifier=Modifier.fillMaxWidth(),
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp),
                     verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    if(neon)NeonSection("Release AAB status",AppIcons.History,
-                        "Signed bundle · local Termux build")
-                    else Text("Последняя Release-сборка",style=MaterialTheme.typography.titleMedium)
+                    if(neon)NeonSection("$resultLabel status",AppIcons.History,
+                        "Signed artifact · local Termux build")
+                    else Text("Последняя сборка · $resultLabel",style=MaterialTheme.typography.titleMedium)
                     Text("Job ID: "+releaseState.optString("id"),
                         style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Git SHA: "+releaseState.optString("sha").ifBlank {"Не определён"},
@@ -400,7 +403,7 @@ import com.animacode.animadev.termux.TermuxGateway
                         Text("Другие сборки заблокированы до подтверждения результата.",
                             style=MaterialTheme.typography.bodySmall)
                         if(releaseState.optString("phase")=="EXPORTING")
-                            Text("Сборка завершена. Выполняется проверка и перенос AAB.",
+                            Text("Сборка завершена. Выполняется проверка и перенос $resultLabel.",
                                 style=MaterialTheme.typography.bodySmall)
                         else if(releaseState.optBoolean("cancel_requested"))
                             Text("Отправлен Ctrl+C · ожидаем подтверждение остановки",color=MaterialTheme.colorScheme.error,
@@ -408,7 +411,7 @@ import com.animacode.animadev.termux.TermuxGateway
                         else OutlinedButton(onClick={confirmReleaseStop=true},
                             modifier=Modifier.fillMaxWidth(),
                             colors=ButtonDefaults.outlinedButtonColors(contentColor=MaterialTheme.colorScheme.error)) {
-                            Text("Остановить Release · Ctrl+C")
+                            Text("Остановить $resultLabel · Ctrl+C")
                         }
                     }
                     Text(releaseState.optString("message"),style=MaterialTheme.typography.bodyMedium)

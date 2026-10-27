@@ -1,5 +1,18 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-27 · 0.4.0-beta.10-dev.49 (65; QA 66)
+- RU: Ветка dev создана от актуального main; в неё перенесены управление зарегистрированной службой AnimaBridge из dev.48 и новый тип подписанной сборки Release APK. Основная ветка main и прежняя feature-ветка не изменены.
+- RU: Вкладки Сборка: Debug APK, Release APK, Release AAB. Release APK использует существующую JKS и защищённый канал, Gradle assembleRelease, zipalign, apksigner sign/verify, контроль applicationId/versionCode/versionName и SHA-256, экспорт и историю.
+- EN: The dev branch preserves main and incorporates dev.48 runit AnimaBridge controls. Build now offers Debug APK, signed Release APK and Release AAB using the existing protected JKS channel. APK output is aligned, signed, cert-verified and package-metadata checked before export.
+- EN: GitHub Release publishing is never automatic. No JKS/password logs or changes to main. Device acceptance remains a separate step.
+
+## 2026-10-26 11:00 GMT+03:00 · 0.4.0-beta.10-dev.48 (63; QA 64)
+- RU: На экране Termux появилась карточка AnimaBridge: проверка состояния зарегистрированной службы runit и явные кнопки «Запустить», «Остановить», «Перезапустить». Команды отправляются через официальный Termux RUN_COMMAND с фиксированным путём к sv и неизменяемым именем службы.
+- RU: Перед запуском требуется подтверждённое состояние DOWN. Результат возвращается через одноразовый callback с ID запроса; после команд выполняется независимая проверка sv status. При неизвестном результате нельзя повторять запуск без проверки. Shizuku остаётся отдельной системной диагностикой.
+- RU: Подготовлен одноразовый установщик службы scripts/install_animabridge_service.sh — регистрирует службу изначально остановленной, не завершает текущий агент и не раскрывает секреты. Обновлённые справки встроены в APK.
+- EN: Termux screen now controls the fixed registered AnimaBridge runit service using explicit Status / Start / Stop / Restart buttons through Termux RUN_COMMAND; no agent directory paths enter the Android app.
+- EN: A request-bound one-shot callback and post-action status check prevent blind retries. Registration script starts the service DOWN and does not disturb an existing manual agent; Shizuku remains independent.
+
 ## 2026-10-13 07:03 GMT+03:00 · 0.4.0-beta.10-dev.47 (61) — кандидат / candidate
 - RU: «Обновить origin с GitHub» явно получает все refs/heads/* независимо от узкого remote.origin.fetch. Показ веток начинается с origin, поэтому новые GitHub-ветки доступны на первых страницах даже при множестве локальных веток.
 - RU: Сохраняются незакоммиченные файлы, локальные коммиты, журнал и все worktree. Без reset, clean, push, переключения текущей ветки при fetch и удаления remote-tracking refs. Перед checkout SHA повторно сверяется с GitHub.

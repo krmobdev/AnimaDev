@@ -73,3 +73,7 @@ Open Settings → Appearance → Language to choose System default, Russian or E
 
 ## Data safety
 Do not delete Termux or Git directories to clear app cache. AnimaDev cache cleaning does not remove sources, job journals, SQLite, keystores or saved credentials.
+
+### Release APK and AnimaBridge service control (dev.49)
+Project > Build offers Debug APK, signed Release APK and signed Release AAB. The APK uses the existing SAF-selected JKS, alias and protected credential transport. After Git SHA verification, Gradle assembleRelease is followed by zipalign, APK signing, certificate verification, APK package/version validation and checksum-verified export. GitHub Release publishing is not automatic.
+Termux > AnimaBridge supports Check, Start, Stop and Restart of the explicitly registered runit service; a manually running agent is never adopted or terminated automatically.

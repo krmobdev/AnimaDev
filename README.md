@@ -93,3 +93,6 @@ The guides and change log are bundled offline into the APK from these **same Git
 Real Android UI/device acceptance requires on-device tests, not just successful compilation.
 
 For older stage reports and design notes, see the [docs/](docs/) directory. Old beta constraints are historical and superseded by the current `AGENTS.md` owner authorization.
+
+### dev.49: signed Release APK and AnimaBridge control
+The dev branch carries original main history, the dev.48 Termux/runit AnimaBridge card and a third Build choice: signed Release APK alongside Debug APK and signed Release AAB. The APK pipeline uses offline assembleRelease, zipalign, apksigner signing and verification, package/version and SHA-256 verification, then export. Existing SAF/JKS credentials use the same encrypted transport as AAB. The app does not automatically publish releases or push Git commits.
