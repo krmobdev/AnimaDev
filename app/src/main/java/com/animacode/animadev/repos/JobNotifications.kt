@@ -56,7 +56,7 @@ object JobNotifications {
         val start=((job?.optDouble("started_at",0.0) ?: 0.0)*1000).toLong()
         val tap=PendingIntent.getActivity(context,jid.hashCode(),
             Intent(context,MainActivity::class.java).putExtra("journal_job",jid)
-                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder=NotificationCompat.Builder(context,CHANNEL)
             .setSmallIcon(if(running)android.R.drawable.stat_sys_download

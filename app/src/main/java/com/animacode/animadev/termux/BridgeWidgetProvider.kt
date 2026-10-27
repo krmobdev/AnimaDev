@@ -127,7 +127,16 @@ class BridgeWidgetProvider : AppWidgetProvider() {
                 BridgeServicePolicy.permits("restart", record.serviceState, pending), false)
 
             val open = PendingIntent.getActivity(
-                context, id, Intent(context, MainActivity::class.java),
+                context, id,
+                Intent(context, MainActivity::class.java).apply {
+                    // Reuse the already visible or background task; never stack
+                    // another MainActivity when tapping the widget title.
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                    )
+                },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             views.setOnClickPendingIntent(R.id.bridge_widget_title, open)

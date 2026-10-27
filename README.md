@@ -1,5 +1,7 @@
 # AnimaDev · 0.4.0-beta.10-dev.47
 
+AnimaBridge dev.55: compact launcher widgets with wrap-content panels and a single reusable MainActivity task (widget + notifications). Back no longer reveals duplicated AnimaDev activities.
+
 AnimaBridge dev.54: clear Quick Settings installation state and one-tap Home widget pinning when the launcher supports it.
 
 AnimaBridge dev.54: modern resize-adaptive emerald widget, styled action buttons, shared status refresh without app UI.

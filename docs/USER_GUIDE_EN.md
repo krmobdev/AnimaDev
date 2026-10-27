@@ -1,5 +1,10 @@
 # AnimaDev — User Guide
 
+
+## Home widget and app task behavior (dev.55)
+AnimaDev opens its existing MainActivity task when tapped from a widget, launcher, or notification. It preserves the last in-app screen instead of stacking another MainActivity and leaving ghost copies behind when using Back. Home widgets now draw a compact panel inside launcher-provided space; if the launcher previously allocated 4×4 cells, shrink the widget to 4×3 cells using the Home-screen resize handles to recover desktop space. The widget never stops or starts AnimaBridge simply by opening the app.
+
+
 ## AnimaBridge Start and Restart buttons (dev.52)
 Use Start when the service is stopped or the runit supervisor is offline. Restart is enabled only for a verified running Python agent, including running-with-autostart-disabled. The controller also refuses restart when the service is stopped or not ready, preventing an unexpected start.
 

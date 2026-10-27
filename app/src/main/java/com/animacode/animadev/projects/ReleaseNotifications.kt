@@ -47,7 +47,7 @@ object ReleaseNotifications {
         }
         val open=PendingIntent.getActivity(context,id.hashCode(),
             Intent(context,MainActivity::class.java).putExtra("open_release",true)
-                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification=NotificationCompat.Builder(context,CHANNEL)
             .setSmallIcon(if(busy)android.R.drawable.stat_sys_download else android.R.drawable.stat_sys_download_done)

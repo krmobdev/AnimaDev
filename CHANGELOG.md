@@ -1,5 +1,11 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-27 · 0.4.0-beta.10-dev.55 (77; QA 78)
+- RU: Исправлены дубликаты MainActivity после перехода из домашнего виджета: единственный singleTask для AnimaDev, явный NEW_TASK + CLEAR_TOP + SINGLE_TOP для виджета и уведомлений. Существующий экран и навигация сохраняются, не появляется второй экран при Back/выходе.
+- RU: Виджет стал компактнее: фон теперь охватывает только контент, а не всю выделенную ColorOS область; внутренние отступы уменьшены, большие пустые верхние и нижние поля убраны. Начальный размер 4×3 клетки, размер по-прежнему изменяемый.
+- RU: Сохранено управление агентом без остановки/перезапуска AnimaBridge. Добавлен регрессионный тест структуры AndroidManifest, точек запуска Activity и адаптивных макетов.
+- EN: singleTask MainActivity with explicit reuse flags across widget and notifications eliminates duplicate task instances. Wrap-content widget panel removes giant vertical padding from host-granted launcher space. Default 4×3 grid cells and regression tests added.
+
 ## 2026-10-27 · 0.4.0-beta.10-dev.54 (75; QA 76)
 - RU: Кнопка плитки в приложении теперь яркая, после подтверждённого добавления становится неактивной и показывает пояснение об удалении через Android. Добавлена системная кнопка размещения виджета на рабочем столе и счётчик виджетов, с учётом поддержки лаунчером.
 - EN: Prominent QS tile add button tracks SystemUI lifecycle confirmation, disables when added, and explains system-managed removal. Launcher widget pin prompt with manual fallback and count added.

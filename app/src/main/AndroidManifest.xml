@@ -15,7 +15,8 @@
         <receiver android:name=".projects.ArtifactOpenReceiver" android:exported="false" />
         <receiver android:name=".projects.ArtifactResultReceiver" android:exported="false" />
         <receiver android:name=".projects.ArtifactMoveReceiver" android:exported="false" />
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
