@@ -1,6 +1,8 @@
 # AnimaDev — Change Log / Список изменений
 
 ## 2026-10-27 · 0.4.0-beta.10-dev.49 (65; QA 66)
+- RU: Исправлена конфигурация Gradle 9: Release Lint зависит от prepareSupportDocs, как и от prepareReleaseScripts; устранён отказ assembleRelease до создания APK.
+- EN: Fix Gradle 9 release lint input dependencies on the generated in-app support documentation; assembleRelease no longer fails at the lint model task.
 - RU: Ветка dev создана от актуального main; в неё перенесены управление зарегистрированной службой AnimaBridge из dev.48 и новый тип подписанной сборки Release APK. Основная ветка main и прежняя feature-ветка не изменены.
 - RU: Вкладки Сборка: Debug APK, Release APK, Release AAB. Release APK использует существующую JKS и защищённый канал, Gradle assembleRelease, zipalign, apksigner sign/verify, контроль applicationId/versionCode/versionName и SHA-256, экспорт и историю.
 - EN: The dev branch preserves main and incorporates dev.48 runit AnimaBridge controls. Build now offers Debug APK, signed Release APK and Release AAB using the existing protected JKS channel. APK output is aligned, signed, cert-verified and package-metadata checked before export.
