@@ -20,4 +20,11 @@
     <string name="bridge_check">Check</string>
     <string name="bridge_add_tile">Add to Quick Settings</string>
     <string name="bridge_add_widget_hint">Home screen: Widgets → AnimaBridge</string>
+
+    <string name="bridge_widget_process_running">Agent running</string>
+    <string name="bridge_widget_local_on">RUNNING</string>
+    <string name="bridge_widget_local_off">OFF</string>
+    <string name="bridge_widget_kicker">QUICK CONTROL</string>
+    <string name="bridge_widget_connection_title">Server</string>
+    <string name="bridge_widget_local_process">LOCAL · RUNIT</string>
 </resources>

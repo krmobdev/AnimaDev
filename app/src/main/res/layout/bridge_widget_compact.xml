@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"
+ android:background="@drawable/bridge_widget_background" android:orientation="vertical"
+ android:gravity="center_vertical" android:padding="11dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+ <ImageView android:layout_width="28dp" android:layout_height="28dp" android:layout_marginEnd="10dp"
+  android:src="@drawable/ic_bridge_tile" android:tint="#7EF5AA" android:contentDescription="@null"/>
+ <TextView android:id="@+id/bridge_widget_title" android:layout_width="0dp" android:layout_height="wrap_content"
+  android:layout_weight="1" android:fontFamily="sans-serif-medium" android:textSize="17sp"
+  android:textColor="#F3FFF8" android:text="@string/bridge_widget_title" android:clickable="true"/>
+ <TextView android:id="@+id/bridge_widget_dot" android:layout_width="wrap_content" android:layout_height="wrap_content"
+  android:text="●" android:textColor="#7EF5AA" android:textSize="14sp" android:paddingEnd="4dp"/>
+ <TextView android:id="@+id/bridge_widget_pill" android:layout_width="wrap_content"
+  android:layout_height="wrap_content" android:textSize="10sp" android:fontFamily="sans-serif-medium"
+  android:textColor="#7EF5AA" android:text="@string/bridge_unknown"/>
+</LinearLayout>
+<TextView android:id="@+id/bridge_widget_state" android:layout_width="match_parent"
+ android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textSize="17sp"
+ android:fontFamily="sans-serif-medium" android:singleLine="true" android:ellipsize="end"
+ android:textColor="#7EF5AA" android:text="@string/bridge_unknown"/>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+ android:orientation="horizontal" android:layout_marginTop="8dp"><FrameLayout android:id="@+id/bridge_widget_start" android:layout_width="0dp"
+ android:layout_height="42dp" android:layout_weight="1" android:layout_marginEnd="5dp"
+ android:clickable="true">
+ <ImageView android:id="@+id/bridge_widget_start_bg" android:layout_width="match_parent"
+  android:layout_height="match_parent" android:src="@drawable/bridge_widget_action_secondary"
+  android:scaleType="fitXY" android:contentDescription="@null"/>
+ <TextView android:id="@+id/bridge_widget_start_text" android:layout_width="match_parent"
+  android:layout_height="match_parent" android:gravity="center" android:fontFamily="sans-serif-medium"
+  android:text="@string/bridge_start" android:textSize="12sp" android:textColor="#FFFFFF"/>
+</FrameLayout>
+<FrameLayout android:id="@+id/bridge_widget_stop" android:layout_width="0dp"
+ android:layout_height="42dp" android:layout_weight="1" android:layout_marginEnd="5dp"
+ android:clickable="true">
+ <ImageView android:id="@+id/bridge_widget_stop_bg" android:layout_width="match_parent"
+  android:layout_height="match_parent" android:src="@drawable/bridge_widget_action_secondary"
+  android:scaleType="fitXY" android:contentDescription="@null"/>
+ <TextView android:id="@+id/bridge_widget_stop_text" android:layout_width="match_parent"
+  android:layout_height="match_parent" android:gravity="center" android:fontFamily="sans-serif-medium"
+  android:text="@string/bridge_stop" android:textSize="12sp" android:textColor="#FFFFFF"/>
+</FrameLayout></LinearLayout>
+</LinearLayout>

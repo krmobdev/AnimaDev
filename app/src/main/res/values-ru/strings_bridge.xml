@@ -20,4 +20,11 @@
     <string name="bridge_check">Проверить</string>
     <string name="bridge_add_tile">Добавить в шторку</string>
     <string name="bridge_add_widget_hint">Рабочий стол: Виджеты → AnimaBridge</string>
+
+    <string name="bridge_widget_process_running">Агент запущен</string>
+    <string name="bridge_widget_local_on">РАБОТАЕТ</string>
+    <string name="bridge_widget_local_off">ВЫКЛ.</string>
+    <string name="bridge_widget_kicker">ПУЛЬТ УПРАВЛЕНИЯ</string>
+    <string name="bridge_widget_connection_title">Сервер</string>
+    <string name="bridge_widget_local_process">LOCAL · RUNIT</string>
 </resources>

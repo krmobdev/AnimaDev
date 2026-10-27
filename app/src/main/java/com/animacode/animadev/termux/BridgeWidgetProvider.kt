@@ -9,17 +9,13 @@ import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.view.View
 import android.widget.RemoteViews
 import com.animacode.animadev.MainActivity
 import com.animacode.animadev.R
 import java.text.DateFormat
 import java.util.Date
 
-/**
- * Resizable RemoteViews widget. Android owns its scheduling; actions use explicit
- * immutable PendingIntents and the same gateway/policy as the in-app buttons.
- */
+/** Modern resize-aware launcher widget. One gateway for app, tile, and widget. */
 class BridgeWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         ids.forEach { render(context, manager, it) }
@@ -35,16 +31,25 @@ class BridgeWidgetProvider : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action != ACTION_COMMAND || intent.component?.className != javaClass.name) return
-        val action = intent.getStringExtra(EXTRA_ACTION) ?: return
-        if (action !in BridgeServicePolicy.actions) return
-        BridgeSurfaceSync.dispatch(context, action)
+        if (intent.action != ACTION || intent.component?.className != javaClass.name) return
+        val command = intent.getStringExtra(EXTRA) ?: return
+        if (command !in BridgeServicePolicy.actions) return
+        BridgeSurfaceSync.dispatch(context, command)
         renderAll(context)
     }
 
     companion object {
-        private const val ACTION_COMMAND = "com.animacode.animadev.BRIDGE_WIDGET_COMMAND"
-        private const val EXTRA_ACTION = "bridge_command"
+        private const val ACTION = "com.animacode.animadev.BRIDGE_WIDGET_COMMAND"
+        private const val EXTRA = "bridge_command"
+        private const val GREEN = 0xFF7EF5AA.toInt()
+        private const val AMBER = 0xFFFFCE87.toInt()
+        private const val GRAY = 0xFF8DA99A.toInt()
+
+        internal fun layoutForSize(width: Int, height: Int): Int = when {
+            width in 1..229 -> R.layout.bridge_widget_compact
+            height >= 215 -> R.layout.bridge_widget_large
+            else -> R.layout.bridge_widget_medium
+        }
 
         fun renderAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -56,87 +61,109 @@ class BridgeWidgetProvider : AppWidgetProvider() {
             val record = BridgeServiceStore(context).read()
             val pending = record.phase == "REQUESTED"
             val active = record.serviceState in setOf("running", "ephemeral")
-            val options = manager.getAppWidgetOptions(id)
-            val expanded = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) >= 175
-            val views = RemoteViews(context.packageName, R.layout.bridge_widget)
-            val stateText = when {
+            val stopped = record.serviceState in setOf("stopped", "supervisor_off")
+            val opts = manager.getAppWidgetOptions(id)
+            val layout = layoutForSize(
+                opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0),
+                opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0),
+            )
+            val compact = layout == R.layout.bridge_widget_compact
+            val expanded = layout == R.layout.bridge_widget_large
+            val views = RemoteViews(context.packageName, layout)
+            val state = when {
                 pending -> R.string.bridge_checking
-                record.serviceState == "running" -> R.string.bridge_local_running
+                record.serviceState == "running" -> R.string.bridge_widget_process_running
                 record.serviceState == "ephemeral" -> R.string.bridge_autostart_off
                 record.serviceState == "stopped" -> R.string.bridge_stopped
                 record.serviceState == "supervisor_off" -> R.string.bridge_supervisor_off
                 record.serviceState == "conflict" -> R.string.bridge_conflict
                 else -> R.string.bridge_unknown
             }
-            views.setTextViewText(R.id.bridge_widget_state, context.getString(stateText))
-            views.setTextColor(
-                R.id.bridge_widget_state,
-                if (active) Color.rgb(113, 240, 176) else Color.rgb(245, 205, 142),
-            )
-            views.setTextViewText(
-                R.id.bridge_widget_autostart,
-                context.getString(R.string.bridge_autostart_label) + ": " +
-                    when (record.serviceState) {
-                        "running" -> context.getString(R.string.bridge_enabled)
-                        "ephemeral", "stopped" -> context.getString(R.string.bridge_disabled)
-                        else -> context.getString(R.string.bridge_unknown)
-                    },
-            )
-            val checked = if (record.action == "status" && record.phase == "DONE" && record.requestedAt > 0L) {
-                DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(record.requestedAt))
-            } else context.getString(R.string.bridge_unknown)
-            views.setTextViewText(
-                R.id.bridge_widget_checked,
-                context.getString(R.string.bridge_checked_label) + ": " + checked,
-            )
-            views.setTextViewText(
-                R.id.bridge_widget_feedback,
-                if (record.phase == "ERROR" || record.phase == "UNKNOWN") record.message
-                else context.getString(R.string.bridge_server_unverified),
-            )
-            views.setViewVisibility(
-                R.id.bridge_widget_details,
-                if (expanded) View.VISIBLE else View.GONE,
-            )
-            views.setViewVisibility(
-                R.id.bridge_widget_restart,
-                if (expanded) View.VISIBLE else View.GONE,
-            )
+            val pill = when {
+                pending -> R.string.bridge_checking
+                active -> R.string.bridge_widget_local_on
+                stopped -> R.string.bridge_widget_local_off
+                else -> R.string.bridge_unknown
+            }
+            val accent = if (active && !pending) GREEN else if (stopped && !pending) GRAY else AMBER
+            views.setTextViewText(R.id.bridge_widget_state, context.getString(state))
+            views.setTextViewText(R.id.bridge_widget_pill, context.getString(pill))
+            views.setTextColor(R.id.bridge_widget_state, accent)
+            views.setTextColor(R.id.bridge_widget_pill, accent)
+            views.setTextColor(R.id.bridge_widget_dot, accent)
 
-            val canStart = BridgeServicePolicy.permits("up", record.serviceState, pending)
-            val canStop = BridgeServicePolicy.permits("down", record.serviceState, pending) &&
-                record.serviceState in setOf("running", "ephemeral")
-            val canRestart = BridgeServicePolicy.permits("restart", record.serviceState, pending)
-            bind(context, views, id, R.id.bridge_widget_start, "up", canStart)
-            bind(context, views, id, R.id.bridge_widget_stop, "down", canStop)
-            bind(context, views, id, R.id.bridge_widget_restart, "restart", canRestart)
-            bind(context, views, id, R.id.bridge_widget_check, "status", !pending)
-            val open = Intent(context, MainActivity::class.java)
-            val openPi = PendingIntent.getActivity(
-                context, id, open,
+            if (!compact) {
+                val checked = if (record.action == "status" && record.phase == "DONE" &&
+                    record.requestedAt > 0
+                ) DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(record.requestedAt))
+                  else context.getString(R.string.bridge_unknown)
+                views.setTextViewText(R.id.bridge_widget_checked,
+                    context.getString(R.string.bridge_checked_label) + " · " + checked)
+            }
+            if (expanded) {
+                val autostart = when (record.serviceState) {
+                    "running" -> R.string.bridge_enabled
+                    "ephemeral", "stopped" -> R.string.bridge_disabled
+                    else -> R.string.bridge_unknown
+                }
+                views.setTextViewText(R.id.bridge_widget_autostart, context.getString(autostart))
+                views.setTextViewText(
+                    R.id.bridge_widget_feedback,
+                    if (record.phase == "ERROR" || record.phase == "UNKNOWN")
+                        record.message.take(60)
+                    else context.getString(R.string.bridge_server_unverified),
+                )
+            }
+            bind(context, views, id, R.id.bridge_widget_start, R.id.bridge_widget_start_bg,
+                R.id.bridge_widget_start_text, "up",
+                BridgeServicePolicy.permits("up", record.serviceState, pending), true)
+            bind(context, views, id, R.id.bridge_widget_stop, R.id.bridge_widget_stop_bg,
+                R.id.bridge_widget_stop_text, "down",
+                BridgeServicePolicy.permits("down", record.serviceState, pending) && active, false)
+            if (!compact) bind(context, views, id, R.id.bridge_widget_check,
+                R.id.bridge_widget_check_bg, R.id.bridge_widget_check_text, "status", !pending, false)
+            if (expanded) bind(context, views, id, R.id.bridge_widget_restart,
+                R.id.bridge_widget_restart_bg, R.id.bridge_widget_restart_text, "restart",
+                BridgeServicePolicy.permits("restart", record.serviceState, pending), false)
+
+            val open = PendingIntent.getActivity(
+                context, id, Intent(context, MainActivity::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            views.setOnClickPendingIntent(R.id.bridge_widget_title, openPi)
+            views.setOnClickPendingIntent(R.id.bridge_widget_title, open)
             manager.updateAppWidget(id, views)
         }
 
         private fun bind(
             context: Context, views: RemoteViews, id: Int,
-            viewId: Int, action: String, enabled: Boolean,
+            viewId: Int, bgId: Int, textId: Int, command: String,
+            enabled: Boolean, primary: Boolean,
         ) {
-            views.setBoolean(viewId, "setEnabled", enabled)
-            views.setTextColor(viewId, if (enabled) Color.WHITE else Color.GRAY)
+            // ImageView.setImageResource is safe for RemoteViews on customized launchers.
+            val drawable = when {
+                !enabled -> R.drawable.bridge_widget_action_disabled
+                primary -> R.drawable.bridge_widget_action_primary
+                command == "down" -> R.drawable.bridge_widget_action_danger
+                else -> R.drawable.bridge_widget_action_secondary
+            }
+            views.setImageViewResource(bgId, drawable)
+            views.setTextColor(textId, when {
+                !enabled -> GRAY
+                primary -> 0xFF143325.toInt()
+                command == "down" -> 0xFFFFDBD4.toInt()
+                else -> Color.WHITE
+            })
             val intent = Intent(context, BridgeWidgetProvider::class.java).apply {
-                this.action = ACTION_COMMAND
-                data = Uri.parse("animadev://widget/$id/$action")
-                putExtra(EXTRA_ACTION, action)
+                action = ACTION
+                data = Uri.parse("animadev://widget/$id/$command")
+                putExtra(EXTRA, command)
                 addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
             }
-            val pi = PendingIntent.getBroadcast(
-                context, id * 8 + action.hashCode(), intent,
+            val click = PendingIntent.getBroadcast(
+                context, id * 8 + command.hashCode(), intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            views.setOnClickPendingIntent(viewId, pi)
+            views.setOnClickPendingIntent(viewId, click)
         }
     }
 }

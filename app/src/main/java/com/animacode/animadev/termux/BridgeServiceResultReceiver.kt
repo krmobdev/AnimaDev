@@ -46,5 +46,10 @@ class BridgeServiceResultReceiver : BroadcastReceiver() {
             }
         ))
         BridgeSurfaceSync.publish(context)
+        // Widget and tile require their own post-operation status refresh without
+        // relying on the AnimaDev screen being visible.
+        if (ok && current.action != "status") {
+            BridgeServiceGateway(context).request("status")
+        }
     }
 }
