@@ -41,7 +41,7 @@ import org.json.JSONObject
             val isSelected=selected==index
             OutlinedButton(onClick={onSelect(index)},
                 modifier=(if(scrollable)Modifier.width(132.dp) else Modifier.weight(1f))
-                    .heightIn(min=48.dp).semantics {this.selected=isSelected},
+                    .height(64.dp).semantics {this.selected=isSelected},
                 colors=ButtonDefaults.outlinedButtonColors(
                     containerColor=if(selected==index)MaterialTheme.colorScheme.secondaryContainer
                         else MaterialTheme.colorScheme.surface,

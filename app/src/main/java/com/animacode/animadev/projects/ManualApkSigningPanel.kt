@@ -31,6 +31,10 @@ fun ManualApkSigningPanel(
         keyring.importLegacy(project.id)
         keyRevision++
     }
+    val keygenGeneration = KeyGeneratorStore.generation.intValue
+    LaunchedEffect(keygenGeneration) {
+        if (KeyGeneratorStore(context).read().optString("state") == "SUCCEEDED") keyRevision++
+    }
     val profiles = remember(keyRevision) { keyring.profiles() }
     var selectedId by remember(project.id) { mutableStateOf("") }
     val chosen = profiles.firstOrNull { it.id == selectedId }
@@ -109,7 +113,13 @@ fun ManualApkSigningPanel(
     val running = submitting || job.optString("state") in ManualApkSignStore.running
     val releaseBusy = ReleaseStore(context).busy()
 
+    var showGenerator by remember(project.id) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        OutlinedButton(onClick = { showGenerator = !showGenerator },
+            modifier = Modifier.fillMaxWidth()) {
+            Text(if (showGenerator) "Скрыть генератор JKS" else "Создать новый JKS + резервную копию 7z")
+        }
+        if (showGenerator) KeyGeneratorPanel(context, project, permitted, termuxReady)
         Card(colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         )) {

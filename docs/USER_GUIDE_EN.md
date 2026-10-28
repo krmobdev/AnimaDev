@@ -40,6 +40,12 @@ Each project's main tools are **Git**, **Tests**, **Build** and **History**. Exp
 
 Widget picker now offers separate **AnimaBridge Compact (4×2)** and **AnimaBridge Dashboard (4×3)** with visible previews and independent sizing. The older AnimaBridge widget becomes compact after app update; add Dashboard separately for autostart/server details and four commands.
 
+### Generate a JKS and encrypted backup
+
+Choose **Build → Sign APK → Generate signing key**. Set a name, alias, RSA 2048/4096 bits, and distinct destinations for the JKS and encrypted 7z backup. Enter the archive password twice (12+ characters); choose an archive filename or let the app generate one. Optionally make the new key the project default.
+
+The app generates a separate random JKS password, stores it via Android Keystore, and includes recovery data inside the encrypted backup. The AES-256 7z archive hides filenames and is verified before saving. **AnimaDev does not remember the 7z password.** Keep the archive off-device and retain old signing certificates for updating installed apps.
+
 ### Sign an existing APK without Gradle
 
 Open **Build → Sign APK**, choose an **unsigned** .apk with Android's document picker and choose a destination with **Choose where to save**. The original input remains untouched. Add JKS profiles (including their alias), pick a profile, and optionally mark one as the **project default** shared with Release APK/AAB. Optionally store passwords in the device-bound Android Keystore; you may also enter them for one operation.

@@ -29,6 +29,7 @@
         <receiver android:name=".repos.RepoCancelReceiver" android:exported="false" />
         <receiver android:name=".projects.ReleaseResultReceiver" android:exported="false" />
         <receiver android:name=".projects.ManualApkSignResultReceiver" android:exported="false" />
+        <receiver android:name=".projects.KeyGeneratorResultReceiver" android:exported="false" />
         <receiver android:name=".projects.ReleaseProgressReceiver" android:exported="false" />
         <receiver android:name=".projects.ReleaseCancelReceiver" android:exported="false" />
         <receiver android:name=".projects.ReleaseCancelActionReceiver" android:exported="false" />

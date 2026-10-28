@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.dp
                         animationSpec=tween(160),label="Emerald tab background")
                     val tabModifier=if(scrollable)Modifier.width(112.dp) else Modifier.weight(1f)
                     Surface(onClick={onSelect(index)},
-                        modifier=tabModifier.heightIn(min=52.dp),
+                        modifier=tabModifier.height(64.dp),
                         shape=RoundedCornerShape(17.dp),color=color,
                         border=if(active)BorderStroke(1.dp,
                             NeonGlass.green.copy(alpha=.36f)) else null) {
