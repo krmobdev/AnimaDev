@@ -4,11 +4,12 @@
 
 **AnimaDev** is an Android application for managing local Git projects, Gradle builds and tests **on your phone through Termux**. It helps inspect branches, compare GitHub commits, run supported Gradle tasks, review logs, and build APK/AAB artifacts while keeping your projects and signing secrets in Termux.
 
-**Status:** public beta `0.4.0-beta.10-dev.58`, Android 13+. There are currently **no GitHub Releases or prebuilt official APKs**. You can build the app yourself. Builds/tests in the project do not guarantee compatibility with every Android ROM.
+**Status:** public beta `0.4.0-beta.10-dev.59`, Android 13+. There are currently **no GitHub Releases or prebuilt official APKs**. You can build the app yourself. Builds/tests in the project do not guarantee compatibility with every Android ROM.
 
 ## Features
 
 - Local Git repositories/worktrees, branch comparison, safe, explicit syncing.
+- Standalone APK signing with multi-JKS keyring, project default, optional Android Keystore password vault and Android SAF output selection.
 - Gradle/JUnit tasks, Debug APK, locally signed Release APK/AAB with your own JKS, job history and logs.
 - Optional diagnostic Shizuku integration (no direct Termux command execution through Shizuku).
 - Optional AnimaBridge `runit` controls, Android Quick Settings tile and two informative 4×2 / 4×3 home widgets.

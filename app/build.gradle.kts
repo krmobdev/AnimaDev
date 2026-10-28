@@ -2,6 +2,7 @@ val releaseAssetRoot = layout.buildDirectory.dir("generated/animadev-release-ass
 val prepareReleaseScripts by tasks.registering(Copy::class) {
     from(rootProject.file("runner/release_signer.py"))
     from(rootProject.file("runner/release_worker.py"))
+    from(rootProject.file("runner/manual_apk_sign.py"))
     from(rootProject.file("runner/release_cancel.py"))
     from(rootProject.file("runner/ReleaseTransport.java"))
     into(releaseAssetRoot.map { it.dir("release") })
@@ -34,8 +35,8 @@ android {
         minSdk = 33
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = if (providers.gradleProperty("animadevDeviceFixture").orNull == "true") 84 else 83
-        versionName = "0.4.0-beta.10-dev.58"
+        versionCode = if (providers.gradleProperty("animadevDeviceFixture").orNull == "true") 86 else 85
+        versionName = "0.4.0-beta.10-dev.59"
     }
     sourceSets.getByName("main").assets.srcDir(releaseAssetRoot.get().asFile)
     sourceSets.getByName("main").assets.srcDir(supportAssets.get().asFile)

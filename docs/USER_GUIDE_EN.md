@@ -40,6 +40,12 @@ Each project's main tools are **Git**, **Tests**, **Build** and **History**. Exp
 
 Widget picker now offers separate **AnimaBridge Compact (4×2)** and **AnimaBridge Dashboard (4×3)** with visible previews and independent sizing. The older AnimaBridge widget becomes compact after app update; add Dashboard separately for autostart/server details and four commands.
 
+### Sign an existing APK without Gradle
+
+Open **Build → Sign APK**, choose an **unsigned** .apk with Android's document picker and choose a destination with **Choose where to save**. The original input remains untouched. Add JKS profiles (including their alias), pick a profile, and optionally mark one as the **project default** shared with Release APK/AAB. Optionally store passwords in the device-bound Android Keystore; you may also enter them for one operation.
+
+The input is staged in an app-owned Downloads file. JKS bytes and passwords travel to Termux **only in a one-time encrypted envelope**, where zipalign + apksigner perform signing. A valid certificate and SHA-256 are required before the output is copied to the chosen SAF file. Already-signed APKs are rejected. If the outcome is UNKNOWN, inspect the destination and Downloads **before attempting another sign**. Existing installed apps generally require the same signing certificate to accept an update.
+
 ## 4. AnimaBridge — optional agent control
 
 AnimaDev **does not bundle or install AnimaBridge Agent**. The agent must be installed separately and registered with Termux `termux-services` before the app can manage its `animabridge` service (see [Termux setup](TERMUX_SETUP_EN.md)).

@@ -5,6 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.semantics.semantics
@@ -31,10 +33,15 @@ import org.json.JSONObject
 }
 
 @Composable fun OperationTabs(labels:List<String>,selected:Int,onSelect:(Int)->Unit) {
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+    val scrollable=labels.size>3
+    Row(Modifier.fillMaxWidth()
+        .then(if(scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
+        horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         labels.forEachIndexed {index,label->
             val isSelected=selected==index
-            OutlinedButton(onClick={onSelect(index)},modifier=Modifier.weight(1f).heightIn(min=48.dp).semantics {this.selected=isSelected},
+            OutlinedButton(onClick={onSelect(index)},
+                modifier=(if(scrollable)Modifier.width(132.dp) else Modifier.weight(1f))
+                    .heightIn(min=48.dp).semantics {this.selected=isSelected},
                 colors=ButtonDefaults.outlinedButtonColors(
                     containerColor=if(selected==index)MaterialTheme.colorScheme.secondaryContainer
                         else MaterialTheme.colorScheme.surface,
@@ -43,7 +50,7 @@ import org.json.JSONObject
                 border=androidx.compose.foundation.BorderStroke(
                     if(selected==index)2.dp else 1.dp,
                     if(selected==index)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)) {
-                Text(label)
+                Text(label,maxLines=2,overflow=TextOverflow.Ellipsis)
             }
         }
     }

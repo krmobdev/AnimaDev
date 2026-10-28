@@ -1,5 +1,11 @@
 # AnimaDev — Change Log / Список изменений
 
+## 2026-10-28 · 0.4.0-beta.10-dev.59 (85; QA 86)
+- RU: В разделе «Сборка» появилась самостоятельная вкладка «Подпись APK» для готового неподписанного файла. Исходный и выходной APK выбираются через системный Android DocumentsUI, оригинал не перезаписывается. Защищённая подпись через Termux выполняется без Gradle; результат проверяется apksigner и SHA-256, затем копируется в выбранный SAF-файл.
+- RU: Добавлена библиотека JKS с несколькими профилями и отдельным основным ключом для проекта. Прежний ключ Release импортируется без потери настроек. Пароли можно не хранить либо добровольно сохранить в Android Keystore; JKS и пароли передаются в Termux исключительно внутри одноразового RSA/AES-GCM конверта.
+- EN: Manual no-Gradle APK signing tab with source/destination SAF pickers, multi-JKS keyring, per-project default, optional encrypted password vault, scoped MediaStore staging, verified apksigner and SHA-256 export. No original APK modification.
+
+
 ## 2026-10-27 · 0.4.0-beta.10-dev.58 (83; QA 84)
 - RU: Кнопки добавления виджетов в AnimaBridge больше не обрезаются в две одинаковые «+ AnimaBrid…». Два действия отображаются во всю ширину с конкретными названиями: «+ Быстрый виджет · 4×2» и «+ Полный виджет · 4×3». Выбор провайдеров и поведение подтверждения сохранены.
 - EN: Full-width, unambiguous Quick widget 4×2 and Full widget 4×3 add actions instead of two truncated identical labels.

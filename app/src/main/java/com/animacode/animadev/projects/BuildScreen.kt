@@ -43,7 +43,14 @@ import com.animacode.animadev.termux.TermuxGateway
     val vault=remember {SigningSecretVault(context)}
     var vaultGeneration by remember(project.id){mutableIntStateOf(0)}
     val vaultSaved=remember(project.id,vaultGeneration){vault.has(project.id)}
-    val storedCredentials=remember(project.id,vaultGeneration,signing.documentUri(project.id),signing.alias(project.id)) {if(vaultSaved)vault.load(project.id,signing.documentUri(project.id),signing.alias(project.id)) else null}
+    val storedCredentials=remember(project.id,vaultGeneration,signing.documentUri(project.id),signing.alias(project.id)) {
+        (if(vaultSaved)vault.load(project.id,signing.documentUri(project.id),signing.alias(project.id)) else null)
+            ?: SigningKeyring(context).selected(project.id)?.let { p ->
+                if (p.uri==signing.documentUri(project.id) && p.alias==signing.alias(project.id))
+                    SigningKeyring(context).credentials(p,project.id)
+                else null
+            }
+    }
     var vaultMessage by remember(project.id){mutableStateOf("")}
     val releaseGeneration=ReleaseStore.generation.intValue
     val releaseState=remember(releaseGeneration) {releaseStore.read()}
@@ -100,7 +107,7 @@ import com.animacode.animadev.termux.TermuxGateway
     var fallbackBuildTab by rememberSaveable(project.id) {mutableIntStateOf(0)}
     val buildTab=selectedBuildTab ?: fallbackBuildTab
     val selectedReleaseKind=if(buildTab==1)"RELEASE_APK" else "RELEASE_AAB"
-    val releaseLabel=if(buildTab==1)"Release APK" else "Release AAB"
+    val releaseLabel=when(buildTab) {1->"Release APK";2->"Release AAB";3->"Подпись APK";else->"Debug APK"}
     val resultLabel=if(releaseState.optString("kind")=="RELEASE_APK")"Release APK" else "Release AAB"
     val grant=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){onPermissionUpdated()}
     val buildListState=rememberLazyListState()
@@ -114,7 +121,7 @@ import com.animacode.animadev.termux.TermuxGateway
         }
     }
     LaunchedEffect(buildTab,releaseState.optString("id")) {
-        if(buildTab!=0 && releaseForProject && releaseState.optString("id").isNotBlank()) {
+        if(buildTab in 1..2 && releaseForProject && releaseState.optString("id").isNotBlank()) {
             delay(300)
             buildListState.scrollToItem((buildListState.layoutInfo.totalItemsCount-1).coerceAtLeast(0))
         }
@@ -156,14 +163,17 @@ import com.animacode.animadev.termux.TermuxGateway
             }
         }
         item {
-            if(neon)NeonTabs(listOf("Debug APK","Release APK","Release AAB"),buildTab,onSelect={
+            if(neon)NeonTabs(listOf("Debug APK","Release APK","Release AAB","Подпись APK"),buildTab,onSelect={
                 if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
-            }) else OperationTabs(listOf("Debug APK","Release APK","Release AAB"),buildTab) {
+            }) else OperationTabs(listOf("Debug APK","Release APK","Release AAB","Подпись APK"),buildTab) {
                 if(onBuildTabChange!=null)onBuildTabChange(it) else fallbackBuildTab=it
             }
         }
-        if(catalogRefresh)item {Text("Сверяем активную ветку с Termux…",style=MaterialTheme.typography.bodySmall)}
-        if(busyOwner!=null)item {
+        if(buildTab==3)item {
+            ManualApkSigningPanel(context,project,permitted,termuxVersion!=null)
+        }
+        if(catalogRefresh && buildTab!=3)item {Text("Сверяем активную ветку с Termux…",style=MaterialTheme.typography.bodySmall)}
+        if(busyOwner!=null && buildTab!=3)item {
             Text("Очередь занята: "+busyOwner+" · "+when {
                 releaseBusy->resultLabel
                 record.optString("action")=="TEST"->"Unit-тесты"
@@ -172,7 +182,7 @@ import com.animacode.animadev.termux.TermuxGateway
             },style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if(!permitted)item {Button(onClick={grant.launch(TermuxGateway.PERMISSION)}){Text("Разрешить Termux")}}
-        if(!record.optBoolean("ready"))item {Card {Column(Modifier.padding(16.dp)) {
+        if(!record.optBoolean("ready") && buildTab!=3)item {Card {Column(Modifier.padding(16.dp)) {
             Text("Локальный помощник необходимо обновить")
             ActionButton(onClick={gateway.install()},enabled=permitted && termuxVersion!=null && !blocked && !record.optBoolean("pending")){Text("Обновить помощник")}
         }}}
@@ -211,7 +221,7 @@ import com.animacode.animadev.termux.TermuxGateway
                 DebugBuildResult(context,record,project,permitted,onJournal)
             }
         }
-        if(buildTab!=0)item {
+        if(buildTab in 1..2)item {
             Surface(shape=RoundedCornerShape(23.dp),
                 color=if(neon)NeonGlass.surface else MaterialTheme.colorScheme.surfaceContainer,
                 border=BorderStroke(1.dp,if(neon)NeonGlass.outline else MaterialTheme.colorScheme.outlineVariant)) {
@@ -333,7 +343,7 @@ import com.animacode.animadev.termux.TermuxGateway
                 }
             }
         }
-        if(buildTab!=0 && releaseForProject)item {
+        if(buildTab in 1..2 && releaseForProject)item {
             val state=releaseState.optString("state")
             OutlinedCard(shape=RoundedCornerShape(22.dp),
                 modifier=Modifier.fillMaxWidth(),
